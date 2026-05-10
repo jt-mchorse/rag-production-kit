@@ -1,0 +1,36 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # Add language-specific lint setup per repo (ruff for Python, eslint for TS)
+      - run: echo "Configure lint for this repo's stack"
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # Add test runner per repo (pytest, vitest, jest)
+      - run: echo "Configure tests for this repo's stack"
+
+  memory-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify MEMORY directory exists and has required files
+        run: |
+          test -f MEMORY/full_history_ai.md
+          test -f MEMORY/full_history_human.md
+          test -f MEMORY/core_decisions_ai.md
+          test -f MEMORY/core_decisions_human.md
+      - name: Verify D-001 baseline decision exists
+        run: |
+          grep -q "id: D-001" MEMORY/core_decisions_ai.md

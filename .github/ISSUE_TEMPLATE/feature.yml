@@ -1,0 +1,35 @@
+name: Feature
+description: A scoped piece of work toward this repo's deliverables.
+title: "[feature] "
+labels: ["phase:building"]
+body:
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope
+      description: One paragraph. What gets shipped when this is closed.
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: Bulleted, testable.
+      placeholder: |
+        - [ ] X works on a fresh clone
+        - [ ] Test added covering Y
+        - [ ] Benchmark/measurement recorded in docs/benchmarks.md
+    validations:
+      required: true
+  - type: input
+    id: estimate
+    attributes:
+      label: Estimated session length (minutes)
+      placeholder: "60"
+    validations:
+      required: true
+  - type: textarea
+    id: decisions
+    attributes:
+      label: Related core decisions (D-NNN)
+      description: List any decisions in MEMORY/core_decisions_ai.md this touches.

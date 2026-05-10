@@ -1,0 +1,30 @@
+name: Trending finding
+description: An issue created by the trending intake workflow. Do not file manually.
+title: "[trending] "
+labels: ["trending"]
+body:
+  - type: input
+    id: source
+    attributes:
+      label: Source URL
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: Why it matters
+      description: 2-3 sentences.
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: Suggested scope
+    validations:
+      required: true
+  - type: input
+    id: estimate
+    attributes:
+      label: Estimated session length (minutes)
+    validations:
+      required: true

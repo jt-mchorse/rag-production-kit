@@ -1,0 +1,40 @@
+name: Decision revisit
+description: Propose revisiting a core decision (D-NNN) based on new evidence.
+title: "[decision-revisit] D-NNN: "
+labels: ["decision-revisit"]
+body:
+  - type: input
+    id: decision_id
+    attributes:
+      label: Decision ID being revisited
+      placeholder: "D-007"
+    validations:
+      required: true
+  - type: textarea
+    id: original
+    attributes:
+      label: Original decision (paste from MEMORY/core_decisions_human.md)
+    validations:
+      required: true
+  - type: textarea
+    id: new_evidence
+    attributes:
+      label: New evidence prompting revisit
+    validations:
+      required: true
+  - type: textarea
+    id: proposed
+    attributes:
+      label: Proposed new decision
+    validations:
+      required: true
+  - type: dropdown
+    id: reversibility
+    attributes:
+      label: Reversibility of the new decision
+      options:
+        - cheap
+        - expensive
+        - one-way
+    validations:
+      required: true
