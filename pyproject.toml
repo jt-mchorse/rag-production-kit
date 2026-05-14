@@ -1,0 +1,56 @@
+[build-system]
+requires = ["hatchling>=1.18"]
+build-backend = "hatchling.build"
+
+[project]
+name = "rag-production-kit"
+version = "0.0.1"
+description = "Production-grade RAG: hybrid retrieval, reranking, citation enforcement, hallucination evals, streaming, cost telemetry."
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.11"
+authors = [{ name = "JT McHorse", email = "jmchorse.tech@gmail.com" }]
+keywords = ["llm", "rag", "pgvector", "anthropic", "retrieval"]
+classifiers = [
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Topic :: Software Development :: Libraries",
+]
+
+# psycopg is the only required runtime dep — the retrieval path talks to
+# Postgres+pgvector. Embedders, eval harness, and the web frontend are all
+# opt-in extras (D-002).
+dependencies = [
+  "psycopg[binary]>=3.2",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.0",
+  "pytest-cov>=4.1",
+  "ruff>=0.5",
+]
+
+[project.urls]
+Repository = "https://github.com/jt-mchorse/rag-production-kit"
+Issues    = "https://github.com/jt-mchorse/rag-production-kit/issues"
+
+[tool.hatch.build.targets.wheel]
+packages = ["rag_kit"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts   = "-ra -q"
+markers = [
+    "pg: integration test that requires a running Postgres+pgvector (set DATABASE_URL).",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "SIM", "PT"]
+ignore = ["E501"]
