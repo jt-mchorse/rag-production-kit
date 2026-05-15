@@ -21,7 +21,9 @@ from rag_kit.generator import (
 from rag_kit.retriever import RetrievalResult
 
 
-def _result(external_id: str, text: str, *, fused: float = 0.5, rerank: float | None = None) -> RetrievalResult:
+def _result(
+    external_id: str, text: str, *, fused: float = 0.5, rerank: float | None = None
+) -> RetrievalResult:
     return RetrievalResult(
         external_id=external_id,
         text=text,

@@ -257,9 +257,7 @@ class AnthropicGenerator:
         try:
             import anthropic  # type: ignore
         except ImportError as e:  # pragma: no cover - exercised when extra not installed
-            raise ImportError(
-                "install the `rag-anthropic` extra to use AnthropicGenerator"
-            ) from e
+            raise ImportError("install the `rag-anthropic` extra to use AnthropicGenerator") from e
         key = self._api_key or os.environ.get("ANTHROPIC_API_KEY")
         if not key:
             raise RuntimeError("ANTHROPIC_API_KEY not set and no api_key provided")
@@ -268,9 +266,7 @@ class AnthropicGenerator:
 
     @staticmethod
     def _format_context(retrieved: Sequence[RetrievalResult]) -> str:
-        return "\n\n".join(
-            f"<chunk id={r.external_id!r}>\n{r.text}\n</chunk>" for r in retrieved
-        )
+        return "\n\n".join(f"<chunk id={r.external_id!r}>\n{r.text}\n</chunk>" for r in retrieved)
 
     def generate(
         self,
@@ -298,9 +294,7 @@ class AnthropicGenerator:
             messages=[
                 {
                     "role": "user",
-                    "content": (
-                        f"Query: {query}\n\nContext:\n{self._format_context(retrieved)}"
-                    ),
+                    "content": (f"Query: {query}\n\nContext:\n{self._format_context(retrieved)}"),
                 }
             ],
         )
@@ -316,7 +310,9 @@ class AnthropicGenerator:
 
         stripped = raw_text.strip()
         if stripped.startswith("REFUSE:"):
-            return _refusal("insufficient_context", stripped[len("REFUSE:"):].strip(), threshold, top)
+            return _refusal(
+                "insufficient_context", stripped[len("REFUSE:") :].strip(), threshold, top
+            )
 
         try:
             citations = enforce_citations(stripped, retrieved)
