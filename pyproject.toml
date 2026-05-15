@@ -27,6 +27,11 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+# Production reranker via Cohere. The lexical-overlap fallback is dep-free
+# and ships in the base install (D-006).
+rerank-cohere = [
+  "cohere>=5.13",
+]
 dev = [
   "pytest>=8.0",
   "pytest-cov>=4.1",

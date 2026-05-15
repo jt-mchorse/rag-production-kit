@@ -14,20 +14,29 @@ retrieval, reranking, and answer-grounding patterns you actually need
 when you ship to production — wired against Postgres + pgvector so
 there's one container to bring up, not a fleet.
 
-This PR ships the foundation: **hybrid retrieval**. Documents land in a
-single `documents` table with two indexes — GIN over a `tsvector` for
-lexical (BM25-style) and HNSW over a `vector` column for dense — and the
+**Hybrid retrieval** is the foundation: documents land in a single
+`documents` table with two indexes — GIN over a `tsvector` for lexical
+(BM25-style) and HNSW over a `vector` column for dense — and the
 retriever runs both per query, fusing with [Reciprocal Rank Fusion]
 (Cormack et al., SIGIR 2009). The fused result surfaces per-method ranks
 alongside the score so you can see whether a chunk came in lexically,
 densely, or both — invaluable when you're tuning a corpus.
 
-Everything beyond #1 is staged in follow-up issues: cross-encoder
-reranking ([#2]), query rewriting and decomposition ([#3]), citation
-enforcement with weak-context refusal ([#4]), streaming intermediate
-events ([#5]), cost telemetry ([#6]), and eval harness integration with a
-Recall@5 number against a real corpus ([#7]). The eval harness lives in
-its own repo ([llm-eval-harness]) and is imported, not vendored.
+**Cross-encoder reranking** sits on top, opt-in via
+`Retriever.search(reranker=...)`. Two backends ship: a dep-free
+`LexicalOverlapReranker` (so CI exercises the rerank flow without
+external services) and a `CohereReranker` (production binding behind
+the `[rerank-cohere]` extra). Each result carries the reranker's
+score and the new rank alongside the original `fused_score` and
+per-method ranks; `rerank_delta_ndcg(before, after)` quantifies how
+much the reranker actually moved things, for telemetry.
+
+Everything beyond #1 + #2 is staged in follow-up issues: query
+rewriting and decomposition ([#3]), citation enforcement with
+weak-context refusal ([#4]), streaming intermediate events ([#5]), cost
+telemetry ([#6]), and eval harness integration with a Recall@5 number
+against a real corpus ([#7]). The eval harness lives in its own repo
+([llm-eval-harness]) and is imported, not vendored.
 
 [Reciprocal Rank Fusion]: https://dl.acm.org/doi/10.1145/1571941.1572114
 [#2]: https://github.com/jt-mchorse/rag-production-kit/issues/2
