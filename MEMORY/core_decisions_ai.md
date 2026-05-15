@@ -36,3 +36,30 @@
   reversibility: cheap
   related_issues: [1]
   superseded_by: null
+
+- id: D-005
+  date: 2026-05-15
+  decision: reranker_is_single_method_protocol_parallel_to_embedder_pattern
+  rationale: backend_swap_without_changing_call_sites_consistent_with_embedder_protocol_d002
+  alternatives_rejected: [hard_coded_cohere_client, abstract_base_class, sklearn_style_estimator]
+  reversibility: cheap
+  related_issues: [2, 4]
+  superseded_by: null
+
+- id: D-006
+  date: 2026-05-15
+  decision: lexical_overlap_reranker_ships_as_dep_free_reference_for_hermetic_ci
+  rationale: production_quality_one_byo_backend_away_ci_exercises_full_rerank_flow_without_api_keys
+  alternatives_rejected: [require_cohere_extra_for_any_reranker, ship_no_local_fallback]
+  reversibility: cheap
+  related_issues: [2]
+  superseded_by: null
+
+- id: D-007
+  date: 2026-05-15
+  decision: retriever_search_reranker_kwarg_default_none_keeps_hybrid_only_path_unchanged
+  rationale: backwards_compatible_existing_callers_dont_change_reranking_is_explicit_opt_in
+  alternatives_rejected: [reranker_required, reranker_on_constructor_not_per_call]
+  reversibility: cheap
+  related_issues: [2]
+  superseded_by: null

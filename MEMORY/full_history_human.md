@@ -35,3 +35,17 @@ the benchmarks doc rather than fabricated.
 
 **Next session:** Issue #2 (cross-encoder reranking) — sits cleanly on
 top of the `Retriever.search` output shipped here.
+
+## 2026-05-15 — Issue #2: Cross-encoder reranking layer
+**Duration:** ~60 min · **Branch:** `session/2026-05-15-1437-issue-02`
+
+- Shipped `rag_kit/reranker.py`: `Reranker` Protocol with one method (D-005), `Candidate` + `ScoredCandidate` dataclasses, `LexicalOverlapReranker` (dep-free fallback, D-006), `CohereReranker` (production binding behind the new `[rerank-cohere]` extra, lazy-imported), and `rerank_delta_ndcg()` telemetry helper.
+- Wired `Retriever.search(query, k, reranker=...)` as opt-in (D-007) so existing callers keep their hybrid-only behavior. When a reranker is passed, the retriever over-fetches by the candidate multiplier so the reranker has more candidates than `k` to choose from. `RetrievalResult` gained two optional fields (`rerank_score`, `rerank_rank`) populated only when a reranker was used.
+- 18 new hermetic tests (8 LexicalOverlap + 3 Cohere stub + 6 nDCG telemetry + 1 protocol conformance) plus 2 new pg integration tests (`test_retriever_with_reranker_populates_rerank_fields`, `test_retriever_without_reranker_leaves_rerank_fields_none`). All passing locally.
+- Updated `docs/architecture.md` and README to reflect the reranking layer; benchmarks honestly stay marked pending issue #7.
+
+**Why this work, this session:** Reranking is the highest-leverage retrieval-quality lever after hybrid fusion, and the Protocol shape is the same single-method seam already adopted in `eval-harness` (Backend) and earlier in this repo (Embedder) — locking it now keeps the portfolio consistent.
+
+**Open questions / blockers:** Acceptance criterion 3 ("Bench: recall@5 with/without reranker recorded") deferred to issue #7 (eval-harness integration) since the no-fabricated-benchmarks rule precludes guessing. Live `CohereReranker` calibration requires `COHERE_API_KEY` + budget the operator runs.
+
+**Next session:** Issue #4 (citation enforcement and weak-context refusal) is the natural next step now that we have reranked candidates; it's the layer that turns "the right chunks" into "an answer that's grounded in them."
