@@ -50,6 +50,22 @@ top of the `Retriever.search` output shipped here.
 
 **Next session:** Issue #4 (citation enforcement and weak-context refusal) is the natural next step now that we have reranked candidates; it's the layer that turns "the right chunks" into "an answer that's grounded in them."
 
+## 2026-05-15 — Issue #4: Citation enforcement and weak-context refusal
+**Duration:** ~60 min · **Branch:** `session/2026-05-15-1915-issue-4`
+
+- Shipped `rag_kit/generator.py`: `Generator` Protocol with one method (D-008), `Citation` / `GeneratedAnswer` / `Refusal` dataclasses, `TemplateGenerator` (dep-free, deterministic, hermetic-CI rationale matches D-006's `LexicalOverlapReranker`), and `AnthropicGenerator` (production binding behind the new `[rag-anthropic]` extra, lazy-imported with both real-SDK and dict-shaped content-block handling so unit tests can use simple fakes).
+- Two distinct refusal paths (D-009): the `threshold` check fires *before* the LLM is called when retrieval is weak (`top_score < threshold`, using `rerank_score` if present else `fused_score`) and the citation-enforcement check fires *after* generation if the model's output cannot be reconciled with the retrieved chunks. Both return `Refusal` with a machine-readable `reason` (`insufficient_context` / `unparseable_output`).
+- `enforce_citations(text, retrieved)` is exposed as a free function so alternative generators (or the downstream eval harness in #7) can reuse it. It splits text on sentence-terminal punctuation and rejects sentences without `[cite:...]` markers as well as dangling references to ids not in `retrieved`.
+- 18 new hermetic tests (`test_generator.py`) covering: sentence split edge cases, citation enforcement happy path + missing marker + dangling id + empty text + dedup, `TemplateGenerator` happy path + threshold refusal + empty refusal + rerank-score preference + `max_chunks` limit + invalid constructor, `AnthropicGenerator` validated response + pre-LLM threshold refusal + citation-error to refusal + explicit REFUSE marker + dict-shaped content blocks.
+- Updated `rag_kit/__init__.py` exports and the public-surface docstring; added a "Generation with citations" subsection to the README quickstart and a paragraph in "What this is" explaining the two-refusal-path design.
+- 51/51 hermetic tests pass; 7 pg-integration tests skipped as before (no DATABASE_URL).
+
+**Why this work, this session:** Reranked candidates without a generator with citation enforcement is half the story — production RAG either grounds every claim or refuses. The Protocol + extras shape matches the patterns this repo already uses for Embedder (D-002) and Reranker (D-005), so adoption cost is zero.
+
+**Open questions / blockers:** Acceptance criterion 3 ("faithfulness measured via `llm-eval-harness` in CI") deferred to issue #7. The recorded D-008 contract (Generator Protocol with `[rag-anthropic]` extra) is the seam the eval harness will score against. Real Anthropic-API calibration requires `ANTHROPIC_API_KEY` + budget the operator runs.
+
+**Next session:** Either issue #5 (streaming intermediate events — depends on a working generator, which now exists) or issue #6 (cost telemetry — also depends on the generator). Issue #4 stays open with the eval-harness checkbox pending #7.
+
 ## 2026-05-16 — Issue #5: Streaming intermediate events (SSE)
 **Duration:** ~75 min · **Branch:** `session/2026-05-16-0309-issue-5`
 
@@ -58,10 +74,10 @@ top of the `Retriever.search` output shipped here.
 - `demo/streaming/` runs the whole thing without Postgres: `server.py` (stdlib `http.server`, no FastAPI) plus `index.html` + `app.js` (vanilla JS consuming the SSE stream via `fetch` + `TextDecoder` + frame parser, rendering each phase as a card with elapsed-ms badges). Smoke-tested locally — frames arrive as expected.
 - `scripts/bench_streaming.py` drives N synthetic queries through the pipeline against an in-memory corpus and prints a p50/p95 table per phase. Real measured numbers (n=1000, M-series Mac, Python 3.14.0): retrieving p95 = 0.07 ms, reranking p95 = 0.05 ms, generating p95 = 0.01 ms, total p95 = 0.14 ms, ~8.5 k q/s. Written into `docs/benchmarks.md` with the date and host so they're reproducible and not fabricated.
 - README "What this is" expands to cover the streaming layer; new Quickstart subsection shows the 6-line streaming snippet and how to run the demo. `docs/architecture.md` mermaid updated: `#5` moves to shipped, with a dedicated streaming-layer subsection below the diagram.
-- Two decisions: D-010 (sync generator, not asyncio — retriever and reranker are sync; coloring `async` would force a propagation tax for no concurrency win at the pipeline layer) and D-011 (demo server is stdlib `http.server`, not FastAPI — keeps the base install dep-free per D-002). IDs skip D-008/D-009 which are reserved for PR #11.
+- Two decisions: D-010 (sync generator, not asyncio — retriever and reranker are sync; coloring `async` would force a propagation tax for no concurrency win at the pipeline layer) and D-011 (demo server is stdlib `http.server`, not FastAPI — keeps the base install dep-free per D-002).
 
-**Why this work, this session:** Streaming was the next unblocked priority:high issue, independent of PR #11's generator work (the `TokenStream` Protocol is the seam where that generator plugs in when it merges). Also unblocks the 60-second demo deliverable, which previously cited #5 as the gating dep.
+**Why this work, this session:** Streaming was the next unblocked priority:high issue, independent of the issue-#4 generator work (the `TokenStream` Protocol is the seam where that generator plugs in). Also unblocks the 60-second demo deliverable, which previously cited #5 as the gating dep.
 
-**Open questions / blockers:** None — the pipeline ships behind a Protocol seam, so PR #11's generator drops in without code changes here. Production end-to-end p50/p95 (against real PG + an LLM SDK) is tracked under #6, not duplicated here.
+**Open questions / blockers:** None — the pipeline ships behind a Protocol seam, so the #4 generator drops in without code changes here. Production end-to-end p50/p95 (against real PG + an LLM SDK) is tracked under #6, not duplicated here.
 
-**Next session:** Either PR #11 review-and-merge (now that streaming exists, the full demo with citations is one branch away) or jump to a different repo per the night-session multi-issue loop — likely `agent-orchestration-platform` (tied for most priority:high open) or `vector-search-at-scale` (in-flight draft PR #7).
+**Next session:** Either jump to a different repo per the night-session multi-issue loop — likely `agent-orchestration-platform` (tied for most priority:high open) or `vector-search-at-scale` (in-flight draft PR #7).

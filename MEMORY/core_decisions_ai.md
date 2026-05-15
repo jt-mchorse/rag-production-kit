@@ -64,9 +64,23 @@
   related_issues: [2]
   superseded_by: null
 
-# D-008, D-009 are reserved for PR #11 (issue #4); they pre-date this PR
-# in commit time but aren't on main yet. Skipping to D-010 to avoid
-# collision when PR #11 lands.
+- id: D-008
+  date: 2026-05-15
+  decision: generator_is_protocol_with_template_default_anthropic_extra_mirrors_reranker_pattern
+  rationale: same_swappable_seam_as_embedder_and_reranker_template_keeps_ci_hermetic_anthropic_gated_by_rag_anthropic_extra
+  alternatives_rejected: [hard_coded_anthropic_client, single_concrete_generator_class_with_branching, langchain_chain_object]
+  reversibility: cheap
+  related_issues: [4, 7]
+  superseded_by: null
+
+- id: D-009
+  date: 2026-05-15
+  decision: refusal_is_pre_llm_when_retrieval_weak_and_post_llm_when_citations_invalid
+  rationale: weak_retrieval_refusal_avoids_hallucination_cost_invalid_citation_refusal_avoids_emitting_uncited_claims_two_distinct_failure_modes_two_distinct_reasons
+  alternatives_rejected: [single_post_llm_refusal_path, ask_llm_to_refuse_itself_no_threshold]
+  reversibility: cheap
+  related_issues: [4, 7]
+  superseded_by: null
 
 - id: D-010
   date: 2026-05-16

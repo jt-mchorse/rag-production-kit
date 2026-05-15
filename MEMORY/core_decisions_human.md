@@ -93,7 +93,32 @@ Strategic decisions for this repo, with reasoning. Append-only — superseded de
 
 **Related issues:** #2
 
-*(D-008 and D-009 are reserved for PR #11 / issue #4, which pre-dates this PR in commit time but isn't on `main` yet. Skipping ahead to D-010 here keeps the IDs collision-free when both PRs land.)*
+## D-008 — Generator is a Protocol with a dep-free TemplateGenerator default and an AnthropicGenerator behind an extra (2026-05-15)
+**Decision:** `rag_kit.generator.Generator` is a `Protocol` with a single method `generate(query, retrieved, *, threshold) -> GeneratedAnswer | Refusal`. `TemplateGenerator` (dep-free) ships in the base install for hermetic CI; `AnthropicGenerator` lives behind the new `[rag-anthropic]` extra and lazy-imports the `anthropic` SDK.
+
+**Why:** Same shape as the `Embedder` (D-002) and `Reranker` (D-005) seams in this package — one method, deterministic input, deterministic output shape, backends swap without changing call sites. The dep-free default means CI exercises the full citation/refusal flow without an API key (same rationale as `LexicalOverlapReranker` in D-006). A LangChain-style chain or a single concrete class with branching would have hidden the protocol contract and made the swappable-backends story muddier.
+
+**Alternatives considered:**
+- Hard-coded Anthropic client — rejected; forces every consumer to install the SDK even if they ship a different generator.
+- One concrete `Generator` class with internal branching — rejected; hides the seam and grows ugly as more backends land.
+- A LangChain-style chain — rejected; pulls in a heavy dep tree for what is one well-shaped function.
+
+**Reversibility:** Cheap. The Protocol can grow keyword args (streaming, tool-use) without breaking existing implementers.
+
+**Related issues:** #4, #7
+
+## D-009 — Refusal happens pre-LLM on weak retrieval and post-LLM on invalid citations (2026-05-15)
+**Decision:** Two distinct refusal paths. The threshold check fires before the LLM is called: if `max(rerank_score if present else fused_score) < threshold`, the generator returns a `Refusal(reason="insufficient_context", ...)` without making an API call. The citation-enforcement check fires after the LLM returns: if `enforce_citations(text, retrieved)` raises, the generator returns a `Refusal(reason="unparseable_output", ...)`.
+
+**Why:** These are two different failure modes that deserve two different signals. Weak retrieval is a corpus problem (you don't have the answer in your index); invalid citations are a model problem (the LLM ignored instructions or the context is misaligned). A single post-LLM refusal would conflate them and waste tokens on the cases where retrieval is clearly insufficient. Asking the LLM to refuse itself is more permissive than we want — the threshold makes the refusal decision auditable and reproducible.
+
+**Alternatives considered:**
+- Single post-LLM refusal — rejected; pays for tokens we know are wasted.
+- LLM-self-refusal only (no threshold) — rejected; not auditable, not reproducible, ignores that retrieval scores are an existing signal.
+
+**Reversibility:** Cheap. The threshold is a per-call kwarg; the two reasons are part of `Refusal.reason` and additive.
+
+**Related issues:** #4, #7
 
 ## D-010 — Streaming pipeline is a sync generator, not asyncio (2026-05-16)
 **Decision:** `StreamingPipeline.run(query, k)` is a synchronous generator that yields `StreamEvent`s. Retrieval, reranking, and token streaming all run on the same sync thread. Async-IO is layered only at the HTTP boundary when the SSE wire frames need to be written (the demo server uses `http.server`, which is sync; production deployments wrap the same generator in FastAPI's `StreamingResponse` if they want ASGI).
