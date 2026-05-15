@@ -11,3 +11,7 @@ build/
 *.log
 logs/
 .pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+*.egg-info/
