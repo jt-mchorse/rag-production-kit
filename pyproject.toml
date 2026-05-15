@@ -32,6 +32,11 @@ dependencies = [
 rerank-cohere = [
   "cohere>=5.13",
 ]
+# Production generator via Anthropic. The TemplateGenerator is dep-free
+# and ships in the base install (D-008).
+rag-anthropic = [
+  "anthropic>=0.40",
+]
 dev = [
   "pytest>=8.0",
   "pytest-cov>=4.1",

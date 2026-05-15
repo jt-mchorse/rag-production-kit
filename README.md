@@ -31,6 +31,18 @@ score and the new rank alongside the original `fused_score` and
 per-method ranks; `rerank_delta_ndcg(before, after)` quantifies how
 much the reranker actually moved things, for telemetry.
 
+**Citation enforcement and weak-context refusal** are the answer
+layer. A `Generator` takes retrieved chunks and produces either a
+`GeneratedAnswer` (every claim sentence cites a retrieved chunk via
+inline `[cite:<external_id>]` markers, validated structurally) or a
+`Refusal` with a machine-readable `reason`. The refusal path fires
+*before* the LLM is called when retrieval is weak (top score below
+the caller's `threshold`) and *after* generation if the model's output
+can't be reconciled with the retrieved chunks. Two generators ship,
+mirroring the reranker pattern: a dep-free `TemplateGenerator` for
+hermetic CI, and an `AnthropicGenerator` behind the `[rag-anthropic]`
+extra.
+
 **Streaming intermediate events** turn the pipeline into a typed event
 stream. `StreamingPipeline.run(query, k)` is a sync generator that
 yields a `StreamEvent` at every phase boundary (`retrieving` /
@@ -40,14 +52,15 @@ serializes each one as a Server-Sent Events frame for a browser
 frontend; the demo under `demo/streaming/` is a single-file stdlib HTTP
 server that wires the whole thing up — zero web-framework deps. The
 generator phase is a `TokenStream` protocol seam: any callable that
-yields strings plugs in, so the same pipeline works with the issue-#4
+yields strings plugs in, so the same pipeline works with the #4
 generator, an Anthropic SDK stream, or an offline stub for eval runs.
 
-Everything else is staged in follow-up issues: query rewriting and
-decomposition ([#3]), citation enforcement with weak-context refusal
-([#4]), cost telemetry ([#6]), and eval harness integration with a
-Recall@5 number against a real corpus ([#7]). The eval harness lives in
-its own repo ([llm-eval-harness]) and is imported, not vendored.
+Everything beyond #1 + #2 + #4 + #5 is staged in follow-up issues:
+query rewriting and decomposition ([#3]), cost telemetry ([#6]), and
+eval harness integration with faithfulness measurement against the
+citation contract plus a Recall@5 number against a real corpus
+([#7]). The eval harness lives in its own repo ([llm-eval-harness])
+and is imported, not vendored.
 
 [Reciprocal Rank Fusion]: https://dl.acm.org/doi/10.1145/1571941.1572114
 [#2]: https://github.com/jt-mchorse/rag-production-kit/issues/2
@@ -111,6 +124,27 @@ with connect() as conn:    # reads DATABASE_URL or falls back to the compose ser
         print(f"{r.external_id:10}  fused={r.fused_score:.4f}  ranks={r.ranks}")
         print(f"  {r.text}")
 ```
+
+### Generation with citations
+
+```python
+from rag_kit import GeneratedAnswer, Refusal, TemplateGenerator
+
+# `retrieved` is the list returned by Retriever.search above.
+gen = TemplateGenerator()
+out = gen.generate("when do refunds expire?", retrieved, threshold=0.05)
+if isinstance(out, GeneratedAnswer):
+    print(out.text)                           # "...[cite:doc-1]. ...[cite:doc-2]."
+    for c in out.citations:
+        print(f"  cite={c.external_id}: {c.text}")
+else:                                         # isinstance(out, Refusal)
+    print(f"REFUSED: {out.reason} ({out.detail})")
+```
+
+Swap to the production generator with `AnthropicGenerator()` (requires
+`pip install -e '.[rag-anthropic]'` and `ANTHROPIC_API_KEY`). Citation
+enforcement is also exposed standalone as `enforce_citations(text, retrieved)`
+so alternative generators (or a downstream eval harness; see #7) can reuse it.
 
 Run the test suite:
 
