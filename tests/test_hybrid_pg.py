@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import pytest
 
-from rag_kit import Document, HashEmbedder, Indexer, Retriever
+from rag_kit import Document, HashEmbedder, Indexer, LexicalOverlapReranker, Retriever
 
 CORPUS = [
     # Lexical-favored: the query word "refund" appears verbatim.
@@ -90,3 +90,31 @@ def test_query_input_validated(pg_conn):
         retr.search("", k=3)
     with pytest.raises(ValueError, match="positive"):
         retr.search("anything", k=0)
+
+
+@pytest.mark.pg
+def test_retriever_with_reranker_populates_rerank_fields(pg_conn):
+    _seed(pg_conn)
+    retr = Retriever(pg_conn, HashEmbedder())
+    rr = LexicalOverlapReranker(length_penalty=0.0)
+    results = retr.search("refund Pro plan", k=3, reranker=rr)
+    assert 1 <= len(results) <= 3
+    for r in results:
+        # Reranker populated, retrieval metadata preserved.
+        assert r.rerank_score is not None
+        assert r.rerank_rank is not None
+        assert r.fused_score > 0
+        assert any(m in r.ranks for m in ("lexical", "dense"))
+    # rerank_rank values are 1..len(results) without gaps.
+    ranks = sorted(r.rerank_rank for r in results)
+    assert ranks == list(range(1, len(results) + 1))
+
+
+@pytest.mark.pg
+def test_retriever_without_reranker_leaves_rerank_fields_none(pg_conn):
+    _seed(pg_conn)
+    retr = Retriever(pg_conn, HashEmbedder())
+    results = retr.search("refund window", k=3)
+    for r in results:
+        assert r.rerank_score is None
+        assert r.rerank_rank is None

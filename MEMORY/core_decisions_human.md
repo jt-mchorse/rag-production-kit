@@ -52,3 +52,43 @@ Strategic decisions for this repo, with reasoning. Append-only — superseded de
 **Reversibility:** Cheap. The fusion function is one module (`rag_kit/fusion.py`); swapping it is a localized refactor.
 
 **Related issues:** #1.
+
+## D-005 — Reranker is a single-method `Reranker` Protocol (2026-05-15)
+**Decision:** `rag_kit.reranker.Reranker` is a `typing.Protocol` with one method, `rerank(query, candidates) -> list[ScoredCandidate]`. Backends conform structurally; no inheritance.
+
+**Why:** Same shape as the `Embedder` Protocol (D-002 in this repo) and the `Backend` Protocol in `llm-eval-harness` (D-004 there). The portfolio is using the single-method Protocol pattern as the standard test-substitution seam — recognizable across repos, minimal ceremony per backend, easy to swap providers without touching call sites.
+
+**Alternatives considered:**
+- Hard-coded Cohere client inside `Retriever` — rejected: would force every test that touches retrieval to mock a specific SDK and would lock the production stack to one vendor.
+- Abstract base class — rejected: same redundancy concern as in `llm-eval-harness`; one method doesn't need an ABC.
+- sklearn-style `BaseEstimator`-with-`fit/predict` — rejected: reranking has no fit step, and the verbose interface adds noise without benefit.
+
+**Reversibility:** Cheap. Adding optional methods to the Protocol is backward-compatible; renaming or removing requires a migration but the Protocol shape is small.
+
+**Related issues:** #2, #4
+
+## D-006 — `LexicalOverlapReranker` ships as the dep-free fallback (2026-05-15)
+**Decision:** A `LexicalOverlapReranker` ships in the base install, dependency-free. It's a token-overlap heuristic with a small length-penalty tiebreaker. CI and library consumers exercise the rerank flow against this backend without an API key. Production retrieval quality is one BYO backend away (`CohereReranker` or your own).
+
+**Why:** Without a local fallback, every test that touches reranking needs a mocked SDK or recorded fixtures, and the integration test in `tests/test_hybrid_pg.py` couldn't exercise the end-to-end retriever-with-reranker path against the existing pgvector service container. With the fallback, the rerank flow is tested as a normal hermetic integration test; the fallback's *score quality* is intentionally not the point — its existence is.
+
+**Alternatives considered:**
+- Require the `[rerank-cohere]` extra for any reranking — rejected: forces an external service into the basic test path, hurts library reusability.
+- Ship no local fallback — rejected: tests would have to mock the Cohere SDK, which is exactly the kind of test-mock divergence the project tries to avoid.
+
+**Reversibility:** Cheap. The fallback is a single class in `rag_kit/reranker.py`; replacing it is a one-file change.
+
+**Related issues:** #2
+
+## D-007 — `Retriever.search(reranker=...)` is opt-in; default behavior unchanged (2026-05-15)
+**Decision:** The reranker is a keyword argument on `Retriever.search()`, defaulting to `None`. When `None`, the retriever returns the RRF-fused top-k unchanged (existing behavior). When a `Reranker` is passed, the retriever over-fetches by the candidate multiplier so the reranker has more to choose from, then truncates back to `k` after reranking.
+
+**Why:** Backwards compatibility for the callers that already use the hybrid retrieval and don't want the cost (latency + dollars) of a reranker round-trip on every query. Putting the reranker on the constructor would force a binding-time choice that's actually a per-call concern (e.g., production-quality reranker for user-facing queries, no reranker for internal eval runs).
+
+**Alternatives considered:**
+- Reranker required (always run) — rejected: forces every consumer to pick a reranker even for paths that don't need one.
+- Reranker on the constructor — rejected: turns a per-call concern into a per-instance concern; would force callers to maintain two `Retriever` instances if they want to reroute different queries through different backends.
+
+**Reversibility:** Cheap. The kwarg can grow defaults or be promoted to required without changing call shapes that already pass it.
+
+**Related issues:** #2
