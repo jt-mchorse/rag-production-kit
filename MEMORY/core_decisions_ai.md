@@ -63,3 +63,25 @@
   reversibility: cheap
   related_issues: [2]
   superseded_by: null
+
+# D-008, D-009 are reserved for PR #11 (issue #4); they pre-date this PR
+# in commit time but aren't on main yet. Skipping to D-010 to avoid
+# collision when PR #11 lands.
+
+- id: D-010
+  date: 2026-05-16
+  decision: streaming_pipeline_is_sync_generator_not_asyncio
+  rationale: retriever_and_reranker_are_sync_today_color_only_buys_latency_at_http_boundary_which_demo_handles_with_stdlib_writes
+  alternatives_rejected: [asyncio_throughout, callback_style_with_emit_callable, separate_async_streaming_module]
+  reversibility: cheap
+  related_issues: [5]
+  superseded_by: null
+
+- id: D-011
+  date: 2026-05-16
+  decision: demo_http_server_is_stdlib_http_server_not_fastapi
+  rationale: base_install_stays_dep_free_per_d002_demo_proves_pipeline_works_without_pulling_a_web_framework_into_required_deps
+  alternatives_rejected: [fastapi_as_required_dep, fastapi_behind_extra_with_demo_inside_extra, starlette_minimal_app]
+  reversibility: cheap
+  related_issues: [5]
+  superseded_by: null

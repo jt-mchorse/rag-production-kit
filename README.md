@@ -31,12 +31,23 @@ score and the new rank alongside the original `fused_score` and
 per-method ranks; `rerank_delta_ndcg(before, after)` quantifies how
 much the reranker actually moved things, for telemetry.
 
-Everything beyond #1 + #2 is staged in follow-up issues: query
-rewriting and decomposition ([#3]), citation enforcement with
-weak-context refusal ([#4]), streaming intermediate events ([#5]), cost
-telemetry ([#6]), and eval harness integration with a Recall@5 number
-against a real corpus ([#7]). The eval harness lives in its own repo
-([llm-eval-harness]) and is imported, not vendored.
+**Streaming intermediate events** turn the pipeline into a typed event
+stream. `StreamingPipeline.run(query, k)` is a sync generator that
+yields a `StreamEvent` at every phase boundary (`retrieving` /
+`retrieved` / `reranking` / `reranked` / `generating` / `token` /
+`generated` / `done`, plus `error` if anything throws). `to_sse(event)`
+serializes each one as a Server-Sent Events frame for a browser
+frontend; the demo under `demo/streaming/` is a single-file stdlib HTTP
+server that wires the whole thing up — zero web-framework deps. The
+generator phase is a `TokenStream` protocol seam: any callable that
+yields strings plugs in, so the same pipeline works with the issue-#4
+generator, an Anthropic SDK stream, or an offline stub for eval runs.
+
+Everything else is staged in follow-up issues: query rewriting and
+decomposition ([#3]), citation enforcement with weak-context refusal
+([#4]), cost telemetry ([#6]), and eval harness integration with a
+Recall@5 number against a real corpus ([#7]). The eval harness lives in
+its own repo ([llm-eval-harness]) and is imported, not vendored.
 
 [Reciprocal Rank Fusion]: https://dl.acm.org/doi/10.1145/1571941.1572114
 [#2]: https://github.com/jt-mchorse/rag-production-kit/issues/2
@@ -104,20 +115,51 @@ with connect() as conn:    # reads DATABASE_URL or falls back to the compose ser
 Run the test suite:
 
 ```bash
-pytest -m "not pg"     # unit tests (embedder, fusion math) — no DB needed
+pytest -m "not pg"     # unit tests (embedder, fusion math, streaming) — no DB needed
 DATABASE_URL=postgresql://rag:rag@localhost:5432/rag pytest -m pg   # integration
+```
+
+### Streaming (issue #5)
+
+Drop in your own retriever (or use `Retriever` against PG) and any
+callable that yields tokens; everything else is the same:
+
+```python
+from rag_kit import LexicalOverlapReranker, StreamingPipeline, to_sse
+
+pipe = StreamingPipeline(
+    retriever,                                # anything with .search(query, k, *, reranker)
+    reranker=LexicalOverlapReranker(),        # or CohereReranker, or None
+    token_stream=my_token_callable,           # or None to skip generation
+)
+
+for event in pipe.run("how do I tune shared_buffers?", k=3):
+    print(to_sse(event), end="")              # SSE wire format, or use event.type/payload directly
+```
+
+Try the included demo locally:
+
+```bash
+python -m demo.streaming.server   # in-memory corpus, no Postgres needed
+open http://127.0.0.1:8765/
 ```
 
 ## Benchmarks / Results
 
-*Recall@5 measurement is pending issue [#7] (eval-harness integration
-against a real corpus + held-out query set). The fused-retrieval API is
-shipped and tested in this PR; the empirical quality number comes after
-the eval harness lands here.*
+The streaming pipeline carries **< 0.15 ms p95 overhead** end-to-end on
+an in-memory corpus (1000 queries, M-series Mac, Python 3.14) — see
+[`docs/benchmarks.md`](docs/benchmarks.md). Production end-to-end p50/p95
+on Postgres is tracked under [#6] (cost telemetry & latency).
+
+Recall@5 against a real corpus is pending issue [#7] (eval-harness
+integration); the number will appear in this section with a reproducer
+script when that lands.
 
 ## Demo
 
-*60-second demo pending — depends on the streaming response layer ([#5]).*
+`demo/streaming/` — single-file stdlib server + HTML client that
+renders the SSE stream live. 60-second video pending; the demo is
+runnable today as documented above.
 
 ## Why these decisions
 
