@@ -99,3 +99,21 @@
   reversibility: cheap
   related_issues: [5]
   superseded_by: null
+
+- id: D-012
+  date: 2026-05-16
+  decision: eval_orchestrator_writes_one_runresult_json_per_suite_composite_pr_comment_via_direct_github_api
+  rationale: eval_harness_comment_uses_one_hardcoded_marker_three_suites_need_one_visible_signal_per_pr_not_three_clobbering_stickies
+  alternatives_rejected: [run_three_separate_comments_each_with_own_marker, single_suite_combining_three_metrics_into_one_score, post_via_eval_harness_comment_three_times]
+  reversibility: cheap
+  related_issues: [7]
+  superseded_by: null
+
+- id: D-013
+  date: 2026-05-16
+  decision: eval_corpus_is_single_sentence_chunks_so_templategenerator_one_cite_per_sentence_satisfies_enforce_citations
+  rationale: multi_sentence_chunks_force_templategenerator_to_either_emit_one_cite_for_multiple_sentences_failing_enforcement_or_require_an_llm_to_rewrite_neither_acceptable_for_hermetic_ci_first_real_llm_run_can_supply_real_corpus_shape
+  alternatives_rejected: [multi_sentence_chunks_with_smarter_eval_only_generator, paragraph_chunks_with_relaxed_citation_rule, require_anthropic_api_key_in_ci_to_use_real_generator]
+  reversibility: cheap
+  related_issues: [7]
+  superseded_by: null

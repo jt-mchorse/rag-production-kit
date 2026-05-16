@@ -185,9 +185,20 @@ an in-memory corpus (1000 queries, M-series Mac, Python 3.14) — see
 [`docs/benchmarks.md`](docs/benchmarks.md). Production end-to-end p50/p95
 on Postgres is tracked under [#6] (cost telemetry & latency).
 
-Recall@5 against a real corpus is pending issue [#7] (eval-harness
-integration); the number will appear in this section with a reproducer
-script when that lands.
+Three eval suites run on every PR against the synthetic `rag-qa-v0.1`
+golden set (8 examples, 10-chunk in-memory corpus, dep-free
+`TemplateGenerator`). First baseline (n=8, deterministic):
+
+| suite          | mean score | reproducer                          |
+| -------------- | ---------: | ----------------------------------- |
+| faithfulness   |       1.00 | `python -m evals.run_eval`          |
+| recall_at_5    |       1.00 | `python -m evals.run_eval`          |
+| correctness    |       0.90 | `python -m evals.run_eval`          |
+
+Real-LLM eval runs (Anthropic-backed `Generator`, real pgvector
+retrieval) are operator-triggered with `ANTHROPIC_API_KEY` + `DATABASE_URL`
+locally — the CI fixture path covers regressions in the deterministic
+pipeline and keeps the workflow API-key-free.
 
 ## Demo
 

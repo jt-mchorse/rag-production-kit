@@ -1,0 +1,55 @@
+# Eval delta on PRs (issue #7).
+#
+# Three suites against the synthetic rag-qa-v0.1 golden set:
+#   - faithfulness   (claims cite a retrieved chunk; reuses enforce_citations)
+#   - recall_at_5    (gold chunk id in top-5 retrieved)
+#   - correctness    (deterministic content-token overlap as a judge proxy)
+#
+# Each suite writes a RunResult JSON (same shape eval-harness consumes);
+# the orchestrator composes a single sticky PR comment with all three
+# deltas vs the committed baselines under evals/baselines/.
+#
+# Why fixtures + token-overlap: action runner has no ANTHROPIC_API_KEY
+# budget; real-LLM eval runs are operator-triggered locally with
+# RAG_EVAL_BACKEND=anthropic (not yet wired — lands when budget is set).
+# Mirrors llm-eval-harness's own eval.yml fixture pattern.
+
+name: eval
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  eval-suite:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install rag_kit with [eval] extra
+        run: pip install -e '.[eval]'
+      - name: Regenerate current eval fixtures
+        run: python -m evals.run_eval
+      - name: Diff each suite against its committed baseline (preview in logs)
+        run: |
+          for suite in faithfulness recall_at_5 correctness; do
+            echo "==> $suite"
+            eval-harness diff-json \
+              --current "evals/current/$suite.json" \
+              --baseline "evals/baselines/$suite.json" \
+              --format markdown \
+              || echo "($suite preview exited non-zero — regression flagged — continuing)"
+          done
+      - name: Upsert composite sticky PR comment
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          python -m evals.run_eval \
+            --post-comment \
+            --repo "${{ github.repository }}" \
+            --pr "${{ github.event.pull_request.number }}"

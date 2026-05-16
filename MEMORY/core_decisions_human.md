@@ -147,3 +147,31 @@ Strategic decisions for this repo, with reasoning. Append-only — superseded de
 **Reversibility:** Cheap. The demo server is a single file. Replacing it with FastAPI (or anything else) is a swap-out, not a refactor; the `StreamingPipeline` and `to_sse()` it consumes are unchanged.
 
 **Related issues:** #5
+
+## D-012 — Eval orchestrator writes one RunResult JSON per suite; composite PR comment via direct GitHub API (2026-05-16)
+**Decision:** `evals/run_eval.py` runs each of the three suites (`faithfulness`, `recall_at_5`, `correctness`) and writes one `RunResult`-shape JSON per suite under `evals/current/`. The PR comment is composed by `run_eval.py` itself — three suite-deltas rendered via `eval-harness diff-json --format markdown` and combined into a single comment behind a repo-specific marker (`<!-- rag-production-kit:eval-sticky -->`) — posted via direct `urllib`/GitHub API calls.
+
+**Why:** `eval-harness comment` uses a single hardcoded marker (`<!-- eval-harness:sticky-comment -->`) by design. Calling it three times in one workflow would have each call clobber the previous one. We want one visible signal per PR with all three metrics, not three stickies fighting over the same comment slot. A repo-specific marker also keeps this comment from colliding with the harness's own demo sticky in repos that use both.
+
+**Alternatives considered:**
+- Three separate comments, one per suite, each with its own marker — rejected; clutters the PR.
+- One suite combining the three metrics into a single composite mean — rejected; loses the per-metric signal that's the entire point of the eval ("did faithfulness regress separately from correctness?").
+- Patch `llm-eval-harness` to support a marker argument — viable but out of scope for this issue; would land in the harness repo separately.
+
+**Reversibility:** Cheap. The composite poster is ~40 lines of stdlib `urllib`; switching to a marker-arg upstream is a one-line edit when that ships.
+
+**Related issues:** #7
+
+## D-013 — Eval corpus is single-sentence chunks so `TemplateGenerator`'s one-cite-per-sentence shape satisfies `enforce_citations` (2026-05-16)
+**Decision:** `evals/dataset/corpus_v1.jsonl` chunks are each one sentence. `TemplateGenerator` emits one `[cite:<id>].` per retrieved chunk; `enforce_citations` splits the generator's output on sentence terminals and requires a `[cite:...]` in each. Multi-sentence chunks would mean the generator's single appended cite covers multiple split sentences, the first of which would fail enforcement.
+
+**Why:** The eval suite has to run hermetically in CI without an LLM. `TemplateGenerator` is the dep-free generator (D-008) that ships with this repo; if its output can't be made to satisfy `enforce_citations` against the eval corpus, the faithfulness suite is permanently stuck at 0.0 even when the pipeline is working perfectly. The fix is to make the corpus shape match what `TemplateGenerator` can emit. The real production path uses `AnthropicGenerator` against arbitrary-shape chunks; the real-LLM eval runs (operator-triggered) will switch to it with `ANTHROPIC_API_KEY`.
+
+**Alternatives considered:**
+- Multi-sentence chunks plus a smarter eval-only generator — rejected; introduces a second `TemplateGenerator` variant for eval that drifts from the one consumers actually run in production.
+- Paragraph chunks with a relaxed citation rule (any sentence cites for the whole paragraph) — rejected; would water down the `enforce_citations` contract the rest of the repo depends on.
+- Require `ANTHROPIC_API_KEY` in CI to use the real generator — rejected; the eval workflow has to be hermetic so it runs on every PR without secrets.
+
+**Reversibility:** Cheap. The corpus is one JSONL file; reshaping it is a session's work. The dataset and metric definitions are unchanged.
+
+**Related issues:** #7

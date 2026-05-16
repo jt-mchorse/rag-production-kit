@@ -1,0 +1,53 @@
+{
+  "run_id": "correctness_a1e728ed8297",
+  "started_at": "2026-05-16T00:00:00Z",
+  "suite": "correctness",
+  "dataset_version": "rag-qa-v0.1",
+  "judge_model": "deterministic-stub-v1",
+  "judge_kappa": null,
+  "mean_score": 0.9008,
+  "n_rows": 8,
+  "git_sha": "e40188cff0bc6193eb6d678ffe88e76a0f5f9cbf",
+  "rows": [
+    {
+      "example_id": "rag_qa_001",
+      "score": 0.5714,
+      "reasoning": "token overlap 4/7 (['14', 'customers', 'pro', 'refund'])"
+    },
+    {
+      "example_id": "rag_qa_002",
+      "score": 1.0,
+      "reasoning": "token overlap 7/7 (['business', 'days', 'shipping', 'ships', 'standard', 'three', 'within'])"
+    },
+    {
+      "example_id": "rag_qa_003",
+      "score": 0.8571,
+      "reasoning": "token overlap 6/7 (['account', 'com', 'example', 'password', 'reset', 'visit'])"
+    },
+    {
+      "example_id": "rag_qa_004",
+      "score": 1.0,
+      "reasoning": "token overlap 8/8 (['authentication', 'enterprise', 'every', 'factor', 'login', 'plans', 'require', 'two'])"
+    },
+    {
+      "example_id": "rag_qa_005",
+      "score": 1.0,
+      "reasoning": "token overlap 5/5 (['accepts', 'checkout', 'eur', 'gbp', 'usd'])"
+    },
+    {
+      "example_id": "rag_qa_006",
+      "score": 1.0,
+      "reasoning": "token overlap 10/10 (['60', 'api', 'enforced', 'key', 'limits', 'per', 'rate', 'second', 'sliding', 'window'])"
+    },
+    {
+      "example_id": "rag_qa_007",
+      "score": 0.7778,
+      "reasoning": "token overlap 7/9 (['all', 'can', 'csv', 'dashboard', 'data', 'export', 'json'])"
+    },
+    {
+      "example_id": "rag_qa_008",
+      "score": 1.0,
+      "reasoning": "token overlap 6/6 (['1', 'database', 'east', 'hosted', 'primary', 'us'])"
+    }
+  ]
+}

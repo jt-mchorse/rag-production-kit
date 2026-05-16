@@ -1,0 +1,10 @@
+{"external_id":"doc-refund-pro","text":"Pro tier customers may request a refund within 14 days of purchase"}
+{"external_id":"doc-shipping-standard","text":"Standard shipping for physical merchandise ships within three business days of order confirmation"}
+{"external_id":"doc-password-reset","text":"To reset a forgotten password, visit account.example.com/reset and enter the email on file"}
+{"external_id":"doc-enterprise-2fa","text":"Enterprise plans require two-factor authentication on every login, enforced at the SSO layer"}
+{"external_id":"doc-checkout-currencies","text":"Checkout accepts payment in USD, EUR, and GBP, with prices displayed in the browser's preferred currency"}
+{"external_id":"doc-api-ratelimits","text":"API rate limits are enforced per API key, with a sliding 60-second window and a default budget of 100 requests"}
+{"external_id":"doc-data-export","text":"All account data can be exported from the dashboard under Settings then Data, as either JSON or CSV"}
+{"external_id":"doc-db-region","text":"The primary application database is hosted in AWS us-east-1, with read replicas in us-west-2 and eu-west-1"}
+{"external_id":"doc-noise-pricing","text":"The Free tier is free; the Pro tier costs 29 dollars per month per seat and adds higher API limits"}
+{"external_id":"doc-noise-uptime","text":"The status page publishes a real-time uptime number across all regions, sitting between 99.95 and 99.99 percent over the trailing year"}
