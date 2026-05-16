@@ -49,3 +49,19 @@ top of the `Retriever.search` output shipped here.
 **Open questions / blockers:** Acceptance criterion 3 ("Bench: recall@5 with/without reranker recorded") deferred to issue #7 (eval-harness integration) since the no-fabricated-benchmarks rule precludes guessing. Live `CohereReranker` calibration requires `COHERE_API_KEY` + budget the operator runs.
 
 **Next session:** Issue #4 (citation enforcement and weak-context refusal) is the natural next step now that we have reranked candidates; it's the layer that turns "the right chunks" into "an answer that's grounded in them."
+
+## 2026-05-16 — Issue #5: Streaming intermediate events (SSE)
+**Duration:** ~75 min · **Branch:** `session/2026-05-16-0309-issue-5`
+
+- Shipped `rag_kit/streaming.py`: `StreamEvent` dataclass with a typed `EventType` literal, `StreamingPipeline` (sync generator wrapping retriever + optional reranker + optional `TokenStream`), `to_sse()` SSE wire-formatter, and `PhaseTimings` with dep-free linear-interp percentiles for benchmarking. Errors anywhere become a final `error` event rather than raising out, so an SSE consumer always sees a clean terminal frame.
+- 23 hermetic tests covering event ordering across every combination of optional phases, the SSE wire format (event line + JSON data + Unicode roundtrip + unjsonifiable fallback), the error path on both retrieval and rerank failures, input validation, and `PhaseTimings` percentile math (NIST type-7 known values, empty-handling, edge-clamping). Full suite: 56 hermetic pass, 7 pg-integration skipped as before.
+- `demo/streaming/` runs the whole thing without Postgres: `server.py` (stdlib `http.server`, no FastAPI) plus `index.html` + `app.js` (vanilla JS consuming the SSE stream via `fetch` + `TextDecoder` + frame parser, rendering each phase as a card with elapsed-ms badges). Smoke-tested locally — frames arrive as expected.
+- `scripts/bench_streaming.py` drives N synthetic queries through the pipeline against an in-memory corpus and prints a p50/p95 table per phase. Real measured numbers (n=1000, M-series Mac, Python 3.14.0): retrieving p95 = 0.07 ms, reranking p95 = 0.05 ms, generating p95 = 0.01 ms, total p95 = 0.14 ms, ~8.5 k q/s. Written into `docs/benchmarks.md` with the date and host so they're reproducible and not fabricated.
+- README "What this is" expands to cover the streaming layer; new Quickstart subsection shows the 6-line streaming snippet and how to run the demo. `docs/architecture.md` mermaid updated: `#5` moves to shipped, with a dedicated streaming-layer subsection below the diagram.
+- Two decisions: D-010 (sync generator, not asyncio — retriever and reranker are sync; coloring `async` would force a propagation tax for no concurrency win at the pipeline layer) and D-011 (demo server is stdlib `http.server`, not FastAPI — keeps the base install dep-free per D-002). IDs skip D-008/D-009 which are reserved for PR #11.
+
+**Why this work, this session:** Streaming was the next unblocked priority:high issue, independent of PR #11's generator work (the `TokenStream` Protocol is the seam where that generator plugs in when it merges). Also unblocks the 60-second demo deliverable, which previously cited #5 as the gating dep.
+
+**Open questions / blockers:** None — the pipeline ships behind a Protocol seam, so PR #11's generator drops in without code changes here. Production end-to-end p50/p95 (against real PG + an LLM SDK) is tracked under #6, not duplicated here.
+
+**Next session:** Either PR #11 review-and-merge (now that streaming exists, the full demo with citations is one branch away) or jump to a different repo per the night-session multi-issue loop — likely `agent-orchestration-platform` (tied for most priority:high open) or `vector-search-at-scale` (in-flight draft PR #7).

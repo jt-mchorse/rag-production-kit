@@ -92,3 +92,33 @@ Strategic decisions for this repo, with reasoning. Append-only — superseded de
 **Reversibility:** Cheap. The kwarg can grow defaults or be promoted to required without changing call shapes that already pass it.
 
 **Related issues:** #2
+
+*(D-008 and D-009 are reserved for PR #11 / issue #4, which pre-dates this PR in commit time but isn't on `main` yet. Skipping ahead to D-010 here keeps the IDs collision-free when both PRs land.)*
+
+## D-010 — Streaming pipeline is a sync generator, not asyncio (2026-05-16)
+**Decision:** `StreamingPipeline.run(query, k)` is a synchronous generator that yields `StreamEvent`s. Retrieval, reranking, and token streaming all run on the same sync thread. Async-IO is layered only at the HTTP boundary when the SSE wire frames need to be written (the demo server uses `http.server`, which is sync; production deployments wrap the same generator in FastAPI's `StreamingResponse` if they want ASGI).
+
+**Why:** The retriever (`rag_kit/retriever.py`) and reranker (`rag_kit/reranker.py`) are both sync, and Postgres calls via `psycopg` are sync. Coloring the pipeline `async` would force every existing call site into `async def` without unlocking any real concurrency — there's nothing to interleave at the pipeline layer because each phase blocks on the next phase's input. The wins of `async` show up at the *server* layer (handling many concurrent SSE clients), and that's handled in the HTTP adapter, not in the pipeline.
+
+**Alternatives considered:**
+- `async` throughout — rejected: requires `psycopg` to be in async mode (different driver), forces all downstream consumers to be async-colored.
+- Callback style (`emit_callable(event)`) — rejected: less Pythonic, harder to compose with `for event in pipe.run()` patterns, harder to test.
+- Separate async streaming module sharing nothing with the sync one — rejected: double maintenance for no benefit; we have no need today.
+
+**Reversibility:** Cheap. The pipeline is one file (~290 lines). When async retrieval ships (if ever), an `AsyncStreamingPipeline` can be added without touching the sync one.
+
+**Related issues:** #5
+
+## D-011 — Demo HTTP server is stdlib `http.server`, not FastAPI (2026-05-16)
+**Decision:** The `demo/streaming/` server uses Python's stdlib `http.server.ThreadingHTTPServer` to expose SSE. The base install of `rag-production-kit` does not depend on FastAPI, Starlette, or Uvicorn. A FastAPI adapter is documented as a one-liner (`StreamingResponse(to_sse(e) for e in pipe.run(q))`) and is the recommended production deployment.
+
+**Why:** D-002 commits the base install to `psycopg` as the only required runtime dep. Pulling FastAPI in would make the package install a multi-megabyte dependency for the 90% of consumers who use the streaming pipeline programmatically (e.g., in tests, in benchmarks, in their own server) and never touch this demo. The stdlib server proves the SSE wire format works against a real browser client without imposing that cost.
+
+**Alternatives considered:**
+- FastAPI as a required dep — rejected: violates D-002, bloats the package for non-demo consumers.
+- FastAPI behind a `[demo]` extra with the demo inside the extra — rejected: more moving parts than the demo is worth, still introduces a non-trivial dep on `starlette` and `uvicorn` once installed.
+- Starlette minimal app — rejected: same dep-bloat concern; not as obviously dep-free as `http.server`.
+
+**Reversibility:** Cheap. The demo server is a single file. Replacing it with FastAPI (or anything else) is a swap-out, not a refactor; the `StreamingPipeline` and `to_sse()` it consumes are unchanged.
+
+**Related issues:** #5

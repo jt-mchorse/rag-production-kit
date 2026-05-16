@@ -43,3 +43,32 @@ context_for_next_session:
 decisions_made: [D-005, D-006, D-007]
 followups: []
 ---
+
+---
+session: 2026-05-16T03:09Z
+duration_min: 75
+issue: 5
+focus: streaming_intermediate_events_sse_pipeline
+delta:
+  files_added: 5
+  files_changed: 4
+  tests_added: 23
+  test_pass_rate: "56/56 hermetic + 7 pg-integration skipped"
+  benchmarks:
+    streaming_p50_total_ms: 0.11
+    streaming_p95_total_ms: 0.14
+    streaming_throughput_q_per_s: 8553
+    n: 1000
+    host: "apple_silicon_arm64_python_3_14_0"
+context_for_next_session:
+  - streaming_pipeline_is_sync_generator_yielding_typed_streamevents
+  - phases_retrieving_retrieved_reranking_reranked_generating_token_generated_done_error
+  - to_sse_serializes_one_frame_per_event_per_html_spec
+  - tokenstream_protocol_is_the_seam_for_pr_11_anthropicgenerator_when_it_merges
+  - phasetimings_does_linear_interp_percentile_no_numpy_dep
+  - demo_under_demo_streaming_uses_stdlib_http_server_runs_without_postgres
+  - bench_script_under_scripts_bench_streaming_drives_n_queries_prints_p50_p95_per_phase
+  - d_010_d_011_reserved_for_pr_11_d_008_d_009_to_avoid_collision
+decisions_made: [D-010, D-011]
+followups: []
+---
