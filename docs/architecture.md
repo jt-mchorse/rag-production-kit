@@ -1,10 +1,11 @@
 # Architecture
 
-## Shipped (issues #1, #2)
+## Shipped (issues #1, #2, #5)
 
-The hybrid retrieval path plus the optional cross-encoder reranker.
-One Postgres container, two indexes, one fusion step, one optional
-rerank backend.
+The hybrid retrieval path, the optional cross-encoder reranker, and
+the streaming intermediate-events layer that wraps them. One Postgres
+container, two indexes, one fusion step, one optional rerank backend,
+one typed-event pipeline.
 
 ```mermaid
 flowchart LR
@@ -24,12 +25,39 @@ flowchart LR
     Dense --> RRF["Reciprocal Rank Fusion<br/>(k=60 default)"]:::shipped
     Lex --> RRF
     RRF --> Rerank["Cross-encoder reranker<br/>(#2; opt-in)<br/>LexicalOverlap (default) | Cohere"]:::shipped
-    Rerank --> Out["RetrievalResult[]<br/>fused_score + per-method ranks<br/>+ rerank_score + rerank_rank"]:::shipped
+    Rerank --> Stream["StreamingPipeline (#5)<br/>retrieving / retrieved /<br/>reranking / reranked /<br/>generating / token / generated /<br/>done | error"]:::shipped
+    Stream --> SSE["to_sse() → SSE frames<br/>(demo: stdlib http.server)"]:::shipped
 
-    Out --> Cite["Citation enforcement<br/>+ weak-context refusal (#4)"]:::pending
-    Cite --> Stream["Streaming intermediate events<br/>(#5)"]:::pending
-    Stream --> Answer["Answer + citations"]:::pending
+    Stream --> Cite["Citation enforcement<br/>+ weak-context refusal (#4)"]:::pending
+    Cite --> Answer["Answer + citations"]:::pending
 ```
+
+## Streaming layer (this PR — issue #5)
+
+`StreamingPipeline` composes the retriever + optional reranker +
+optional `TokenStream` into a sync generator that yields a typed
+`StreamEvent` at every phase boundary. The pipeline doesn't import
+any web framework; SSE is a one-function adapter (`to_sse()`) at the
+HTTP boundary. Errors anywhere become a final `error` event rather than
+raising out, so an SSE client always sees a clean terminal frame.
+
+```python
+class StreamEvent:
+    type: Literal["retrieving", "retrieved",
+                  "reranking", "reranked",
+                  "generating", "token", "generated",
+                  "done", "error"]
+    payload: dict[str, Any]   # schema is per-`type`, stable
+    elapsed_ms: float         # wall-clock since pipeline start
+```
+
+The generator is a `TokenStream` Protocol — any callable that takes
+`(query, retrieved)` and yields strings — so the same pipeline works
+with the issue-#4 generator, an Anthropic SDK stream, or a stub for
+offline eval runs. `PhaseTimings` records per-phase wall-clock so a
+caller can compute p50/p95 across N runs without instrumenting the
+pipeline itself; see `scripts/bench_streaming.py` and
+[`docs/benchmarks.md`](benchmarks.md#streaming-pipeline-5).
 
 ## Reranking layer (this PR — issue #2)
 
