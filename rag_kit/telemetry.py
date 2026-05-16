@@ -57,9 +57,7 @@ class ModelPrice:
                 f"completion={completion_tokens}"
             )
         prompt_usd = round(prompt_tokens * self.prompt_per_million / 1_000_000, 6)
-        completion_usd = round(
-            completion_tokens * self.completion_per_million / 1_000_000, 6
-        )
+        completion_usd = round(completion_tokens * self.completion_per_million / 1_000_000, 6)
         return prompt_usd, completion_usd
 
 
@@ -82,9 +80,7 @@ class PriceTable:
     def add(self, model: str, prompt_per_million: float, completion_per_million: float) -> None:
         self._prices[model] = ModelPrice(prompt_per_million, completion_per_million)
 
-    def cost(
-        self, model: str, prompt_tokens: int, completion_tokens: int
-    ) -> tuple[float, float]:
+    def cost(self, model: str, prompt_tokens: int, completion_tokens: int) -> tuple[float, float]:
         """Return ``(prompt_usd, completion_usd)``. Raises ``UnknownModelError`` for unconfigured models."""
         try:
             entry = self._prices[model]

@@ -105,7 +105,7 @@ def _render_chart_svg(records: Sequence[CostRecord], width: int = 720, height: i
         'fill="none" stroke="#ccc"/>'
         f'<polyline points="{points}" fill="none" stroke="#1f6feb" stroke-width="1.5"/>'
         f'<text x="{margin_l - 6}" y="{margin_t + 10}" text-anchor="end" font-size="10" fill="#666">'
-        f'{lat_max:.0f}ms</text>'
+        f"{lat_max:.0f}ms</text>"
         f'<text x="{margin_l - 6}" y="{margin_t + plot_h}" text-anchor="end" font-size="10" fill="#666">'
         "0ms</text>"
         f'<text x="{margin_l}" y="{height - 8}" font-size="10" fill="#666">'
@@ -227,7 +227,9 @@ class _Handler(http.server.BaseHTTPRequestHandler):
 
 
 def main(argv: Sequence[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Serve a stdlib dashboard for the cost-telemetry SQLite store.")
+    parser = argparse.ArgumentParser(
+        description="Serve a stdlib dashboard for the cost-telemetry SQLite store."
+    )
     parser.add_argument("--db", default="./telemetry.db", help="Path to the telemetry SQLite file.")
     parser.add_argument("--port", type=int, default=8766, help="HTTP port to listen on.")
     parser.add_argument("--host", default="127.0.0.1", help="Bind address (default: localhost).")

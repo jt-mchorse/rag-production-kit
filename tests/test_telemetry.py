@@ -36,8 +36,8 @@ def _fixture_prices() -> PriceTable:
     """Fixture prices — explicitly synthetic; not real list prices."""
     return PriceTable(
         {
-            "fake-big":   ModelPrice(prompt_per_million=10.0, completion_per_million=40.0),
-            "fake-small": ModelPrice(prompt_per_million=1.0,  completion_per_million=4.0),
+            "fake-big": ModelPrice(prompt_per_million=10.0, completion_per_million=40.0),
+            "fake-small": ModelPrice(prompt_per_million=1.0, completion_per_million=4.0),
         }
     )
 
@@ -210,8 +210,8 @@ def test_telemetry_store_orders_chronologically(tmp_path):
 
 def test_telemetry_store_last_24h_uses_injected_now(tmp_path):
     store = TelemetryStore(tmp_path / "telemetry.db")
-    store.record(_rec(ts=1_000_000.0))   # older than 24h relative to `now=now_synth`
-    store.record(_rec(ts=2_000_000.0))   # within 24h
+    store.record(_rec(ts=1_000_000.0))  # older than 24h relative to `now=now_synth`
+    store.record(_rec(ts=2_000_000.0))  # within 24h
     now_synth = 2_000_000.0 + 3600  # 1h after the second record
     got = store.last_24h(now=now_synth)
     assert [r.ts for r in got] == [2_000_000.0]
