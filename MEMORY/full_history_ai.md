@@ -140,3 +140,35 @@ context_for_next_session:
 decisions_made: [D-012, D-013]
 followups: []
 ---
+
+---
+session: 2026-05-16T19:30Z
+duration_min: 60
+issue: 3
+focus: query_rewriting_decomposition_template_plus_anthropic
+delta:
+  files_added: 3  # rewriter.py, test_rewriter.py, test_retriever_rewriter.py, bench_rewriter.py = 4 actually
+  files_changed: 3  # __init__.py, retriever.py, README.md
+  tests_added: 29
+  test_pass_rate: "116/116 hermetic + 7 pg-integration skipped"
+  benchmarks:
+    rewriter_recall_at_2_baseline: 0.625
+    rewriter_recall_at_2_rewriter: 0.688
+    rewriter_recall_at_3_baseline: 0.625
+    rewriter_recall_at_3_rewriter: 0.812
+    rewriter_recall_at_5_baseline: 0.875
+    rewriter_recall_at_5_rewriter: 0.938
+    n_queries: 8
+    n_corpus_chunks: 18
+context_for_next_session:
+  - rewriter_protocol_plus_templaterewriter_plus_anthropicrewriter_lazy_imported_via_existing_rag_anthropic_extra
+  - retriever_search_rewriter_kwarg_default_none_keeps_existing_behavior_parallel_to_d_007
+  - multi_sub_query_path_rrf_fuses_across_subqueries_per_method_ranks_dict_carries_subquery_i_keys
+  - reranker_with_rewriter_scores_against_original_user_query_not_any_one_subquery
+  - templaterewriter_patterns_compare_then_multi_question_and_with_priority_order
+  - bench_script_scripts_bench_rewriter_runs_in_memory_token_overlap_no_pg_no_api_keys
+  - anthropic_rewriter_numbers_pending_operator_triggered_anthropic_api_key_run
+  - next_repo_targets_6_cost_telemetry_or_loop_to_a_different_portfolio_repo
+decisions_made: [D-014]
+followups: []
+---
