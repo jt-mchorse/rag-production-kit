@@ -222,9 +222,7 @@ def _summary(results: Sequence[_QueryResult]) -> dict:
         "queries_with_improvement": sum(
             1 for r in results if r.rewriter_recall > r.baseline_recall
         ),
-        "queries_with_regression": sum(
-            1 for r in results if r.rewriter_recall < r.baseline_recall
-        ),
+        "queries_with_regression": sum(1 for r in results if r.rewriter_recall < r.baseline_recall),
     }
 
 
@@ -237,15 +235,13 @@ def _print_text(results: Sequence[_QueryResult], k: int, elapsed_ms: float) -> N
     for r in results:
         delta = r.rewriter_recall - r.baseline_recall
         print(
-            f"{r.query[:60]!r} | {r.baseline_recall:.2f} | "
-            f"{r.rewriter_recall:.2f} | {delta:+.2f}"
+            f"{r.query[:60]!r} | {r.baseline_recall:.2f} | {r.rewriter_recall:.2f} | {delta:+.2f}"
         )
     print()
     print(f"mean recall@{k} baseline: {s['mean_recall_baseline']:.3f}")
     print(f"mean recall@{k} rewriter: {s['mean_recall_rewriter']:.3f}")
     print(
-        f"improvements/regressions: "
-        f"{s['queries_with_improvement']}/{s['queries_with_regression']}"
+        f"improvements/regressions: {s['queries_with_improvement']}/{s['queries_with_regression']}"
     )
 
 
@@ -292,7 +288,9 @@ def _print_json(results: Sequence[_QueryResult], k: int, elapsed_ms: float) -> N
 
 
 def main(argv: Sequence[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Bench TemplateRewriter recall@k on multi-hop fixture.")
+    parser = argparse.ArgumentParser(
+        description="Bench TemplateRewriter recall@k on multi-hop fixture."
+    )
     parser.add_argument("--k", type=int, default=5, help="top-k cut for recall measurement")
     parser.add_argument(
         "--output", choices=("text", "md", "json"), default="text", help="output format"

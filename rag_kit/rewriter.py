@@ -286,9 +286,7 @@ class AnthropicRewriter:
         try:
             import anthropic  # type: ignore
         except ImportError as e:  # pragma: no cover - exercised when extra not installed
-            raise ImportError(
-                "install the `rag-anthropic` extra to use AnthropicRewriter"
-            ) from e
+            raise ImportError("install the `rag-anthropic` extra to use AnthropicRewriter") from e
         key = self._api_key or os.environ.get("ANTHROPIC_API_KEY")
         if not key:
             raise RuntimeError("ANTHROPIC_API_KEY not set and no api_key provided")

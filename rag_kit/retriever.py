@@ -228,7 +228,7 @@ class Retriever:
         fused = reciprocal_rank_fusion(rankings, k=self.k_rrf)
 
         pre_rerank: list[RetrievalResult] = []
-        for ext_id, score, ranks in fused[: per_sub_k]:
+        for ext_id, score, ranks in fused[:per_sub_k]:
             base = seen[ext_id]
             pre_rerank.append(
                 RetrievalResult(

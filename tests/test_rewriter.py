@@ -52,9 +52,7 @@ def test_template_rewriter_compare_pattern_to_versus():
 
 
 def test_template_rewriter_then_pattern_strips_then_prefix():
-    out = TemplateRewriter().rewrite(
-        "Find the CEO of the company. Then describe their education."
-    )
+    out = TemplateRewriter().rewrite("Find the CEO of the company. Then describe their education.")
     assert out.reasoning == "sequential_then_pattern"
     assert out.sub_queries == (
         "Find the CEO of the company.",
@@ -63,9 +61,7 @@ def test_template_rewriter_then_pattern_strips_then_prefix():
 
 
 def test_template_rewriter_multi_question_and_pattern():
-    out = TemplateRewriter().rewrite(
-        "Who founded Anthropic and where did they work before?"
-    )
+    out = TemplateRewriter().rewrite("Who founded Anthropic and where did they work before?")
     assert out.reasoning == "multi_question_and_pattern"
     assert out.sub_queries == (
         "Who founded Anthropic?",
@@ -218,17 +214,13 @@ def test_anthropic_rewriter_rejects_missing_sub_queries():
 
 
 def test_anthropic_rewriter_rejects_empty_sub_queries_list():
-    rw = AnthropicRewriter(
-        client=_fake_client_for({"sub_queries": [], "reasoning": "blank"})
-    )
+    rw = AnthropicRewriter(client=_fake_client_for({"sub_queries": [], "reasoning": "blank"}))
     with pytest.raises(ValueError, match="sub_queries"):
         rw.rewrite("query")
 
 
 def test_anthropic_rewriter_rejects_non_string_entry():
-    rw = AnthropicRewriter(
-        client=_fake_client_for({"sub_queries": ["fine", 42], "reasoning": "x"})
-    )
+    rw = AnthropicRewriter(client=_fake_client_for({"sub_queries": ["fine", 42], "reasoning": "x"}))
     with pytest.raises(ValueError, match="not a string"):
         rw.rewrite("query")
 

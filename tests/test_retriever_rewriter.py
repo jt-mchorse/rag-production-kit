@@ -90,15 +90,11 @@ class _FakeConn:
     def cursor(self) -> _FakeCursor:
         return _FakeCursor(self)
 
-    def lexical_results(
-        self, query: str, limit: int
-    ) -> list[tuple[str, str, dict[str, Any]]]:
+    def lexical_results(self, query: str, limit: int) -> list[tuple[str, str, dict[str, Any]]]:
         rows = self._lexical_by_query.get(query.lower(), [])
         return rows[:limit]
 
-    def dense_results(
-        self, qvec: Any, limit: int
-    ) -> list[tuple[str, str, dict[str, Any]]]:
+    def dense_results(self, qvec: Any, limit: int) -> list[tuple[str, str, dict[str, Any]]]:
         return list(self._dense_default[:limit])
 
 
@@ -163,9 +159,7 @@ def test_single_sub_query_rewrite_collapses_to_single_hybrid_call():
     results = retriever.search("original query", k=2, rewriter=rewriter)
     assert {r.external_id for r in results} == {"doc-x", "doc-y"}
     # Lexical channel was called with the rewritten query, not the original.
-    lex_params = [
-        entry[1] for entry in conn.query_log if "PLAINTO_TSQUERY" in entry[0].upper()
-    ]
+    lex_params = [entry[1] for entry in conn.query_log if "PLAINTO_TSQUERY" in entry[0].upper()]
     assert lex_params, "lexical channel was not called"
     assert lex_params[0][0] == "rewritten query"
 
@@ -190,14 +184,18 @@ def test_multi_sub_query_rewrite_runs_hybrid_per_sub_query_and_fuses():
         )
     )
     retriever = Retriever(conn, HashEmbedder())
-    results = retriever.search("Who founded Anthropic and where did they work before?", k=2, rewriter=rewriter)
+    results = retriever.search(
+        "Who founded Anthropic and where did they work before?", k=2, rewriter=rewriter
+    )
     ids = {r.external_id for r in results}
     assert ids == {"doc-founders", "doc-prior"}, ids
     # Per-method ranks dict now carries sub-query keys, not lexical/dense.
     for r in results:
         assert any(k.startswith("subquery_") for k in r.ranks), r.ranks
     # Two sub-queries → two lexical SQL calls.
-    lexical_calls = [s for s in (entry[0] for entry in conn.query_log) if "PLAINTO_TSQUERY" in s.upper()]
+    lexical_calls = [
+        s for s in (entry[0] for entry in conn.query_log) if "PLAINTO_TSQUERY" in s.upper()
+    ]
     assert len(lexical_calls) == 2
 
 
