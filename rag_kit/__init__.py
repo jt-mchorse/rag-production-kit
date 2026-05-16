@@ -1,4 +1,4 @@
-"""rag-production-kit: hybrid retrieval (BM25 + pgvector) with RRF fusion + cross-encoder reranking + SSE streaming + cited generation.
+"""rag-production-kit: hybrid retrieval (BM25 + pgvector) with RRF fusion + cross-encoder reranking + SSE streaming + cited generation + query rewriting.
 
 Public surface:
 
@@ -12,6 +12,8 @@ Public surface:
         Citation, enforce_citations,
         # Streaming (#5):
         StreamEvent, StreamingPipeline, PhaseTimings, TokenStream, to_sse,
+        # Query rewriting / decomposition (#3):
+        TemplateRewriter, AnthropicRewriter, Rewriter, RewriteResult,
     )
 
 Layers shipped:
@@ -21,6 +23,10 @@ Layers shipped:
 - #1: Retriever.search — run FTS + ANN in parallel, fuse with RRF.
 - #2: Reranker protocol + LexicalOverlapReranker (dep-free) + CohereReranker
       (production). Wired into Retriever.search(reranker=...).
+- #3: Rewriter protocol + TemplateRewriter (dep-free) + AnthropicRewriter
+      (production). Pre-retrieval decomposition into 1..K sub-queries.
+      Wired into Retriever.search(rewriter=...); multi-sub-query rewrites
+      RRF-fuse rankings across sub-queries.
 - #4: Generator protocol + TemplateGenerator (dep-free) + AnthropicGenerator
       (production). Citation enforcement and weak-context refusal both
       via structured outputs (GeneratedAnswer | Refusal).
@@ -57,6 +63,12 @@ from .reranker import (
     rerank_delta_ndcg,
 )
 from .retriever import RetrievalResult, Retriever
+from .rewriter import (
+    AnthropicRewriter,
+    Rewriter,
+    RewriteResult,
+    TemplateRewriter,
+)
 from .streaming import (
     EventType,
     PhaseTimings,
@@ -87,6 +99,11 @@ __all__ = [
     "Reranker",
     "ScoredCandidate",
     "rerank_delta_ndcg",
+    # Rewriting (#3)
+    "AnthropicRewriter",
+    "RewriteResult",
+    "Rewriter",
+    "TemplateRewriter",
     # Generation (#4)
     "AnthropicGenerator",
     "Citation",
