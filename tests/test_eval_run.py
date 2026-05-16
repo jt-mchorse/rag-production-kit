@@ -51,21 +51,28 @@ def test_score_faithfulness_pass_and_refusal():
     score, _ = run_eval._score_faithfulness(answer, chunk)
     assert score == 1.0
 
-    refusal = Refusal(reason="insufficient_context", detail="weak", used_threshold=0.0, top_score=0.0)
+    refusal = Refusal(
+        reason="insufficient_context", detail="weak", used_threshold=0.0, top_score=0.0
+    )
     s2, _ = run_eval._score_faithfulness(refusal, chunk)
     assert s2 == 0.0
 
 
 def test_score_recall_at_5_partial_credit():
     retrieved = [
-        run_eval._retrieve_in_memory("q", [run_eval._Chunk(f"d{i}", "x")], k=1)[0]
-        for i in range(5)
+        run_eval._retrieve_in_memory("q", [run_eval._Chunk(f"d{i}", "x")], k=1)[0] for i in range(5)
     ]
     # Replace external ids manually so we can assert exact membership.
     from rag_kit.retriever import RetrievalResult
 
     retrieved = [
-        RetrievalResult(external_id=f"d{i}", text="t", metadata={}, fused_score=0.0, ranks={"lex": i + 1, "dense": i + 1})
+        RetrievalResult(
+            external_id=f"d{i}",
+            text="t",
+            metadata={},
+            fused_score=0.0,
+            ranks={"lex": i + 1, "dense": i + 1},
+        )
         for i in range(5)
     ]
     score, _ = run_eval._score_recall_at_5(retrieved, gold_ids=("d0", "d3"))
@@ -83,7 +90,9 @@ def test_score_correctness_uses_content_tokens():
         used_threshold=0.0,
         top_score=1.0,
     )
-    score, _ = run_eval._score_correctness(answer, expected="Pro customers get a 14-day refund window.")
+    score, _ = run_eval._score_correctness(
+        answer, expected="Pro customers get a 14-day refund window."
+    )
     assert score == 1.0
 
 
@@ -163,7 +172,10 @@ def test_post_composite_comment_creates_when_no_existing(monkeypatch):
 
     monkeypatch.setattr(run_eval.urllib.request, "urlopen", _fake_urlopen)
     run_eval._post_composite_comment(
-        "owner/repo", 42, {"faithfulness": "## f", "recall_at_5": "## r", "correctness": "## c"}, token="tkn"
+        "owner/repo",
+        42,
+        {"faithfulness": "## f", "recall_at_5": "## r", "correctness": "## c"},
+        token="tkn",
     )
     methods = [c[0].split()[0] for c in calls]
     assert "GET" in methods
@@ -177,19 +189,32 @@ def test_post_composite_comment_patches_existing(monkeypatch):
 
     class _ListResp:
         status = 200
-        def __enter__(self): return self
-        def __exit__(self, *a): pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            pass
+
         def read(self):
-            return json.dumps([
-                {"id": 7, "body": "older comment"},
-                {"id": 8, "body": "<!-- rag-production-kit:eval-sticky -->\nold"},
-            ]).encode()
+            return json.dumps(
+                [
+                    {"id": 7, "body": "older comment"},
+                    {"id": 8, "body": "<!-- rag-production-kit:eval-sticky -->\nold"},
+                ]
+            ).encode()
 
     class _PatchResp:
         status = 200
-        def __enter__(self): return self
-        def __exit__(self, *a): pass
-        def read(self): return b'{"id": 8}'
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            pass
+
+        def read(self):
+            return b'{"id": 8}'
 
     def _fake_urlopen(req):
         method = req.get_method()
@@ -199,7 +224,10 @@ def test_post_composite_comment_patches_existing(monkeypatch):
 
     monkeypatch.setattr(run_eval.urllib.request, "urlopen", _fake_urlopen)
     run_eval._post_composite_comment(
-        "owner/repo", 42, {"faithfulness": "## f", "recall_at_5": "## r", "correctness": "## c"}, token="tkn"
+        "owner/repo",
+        42,
+        {"faithfulness": "## f", "recall_at_5": "## r", "correctness": "## c"},
+        token="tkn",
     )
     patch_call = next(c for c in calls if c[0].startswith("PATCH"))
     assert "/comments/8" in patch_call[0]

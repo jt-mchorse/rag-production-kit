@@ -138,7 +138,9 @@ def _retrieve_in_memory(query: str, corpus: list[_Chunk], k: int) -> list[Retrie
     return results
 
 
-def _score_faithfulness(generated: GeneratedAnswer | Refusal, retrieved: list[RetrievalResult]) -> tuple[float, str]:
+def _score_faithfulness(
+    generated: GeneratedAnswer | Refusal, retrieved: list[RetrievalResult]
+) -> tuple[float, str]:
     if isinstance(generated, Refusal):
         return 0.0, f"refused (reason={generated.reason})"
     try:
@@ -148,13 +150,18 @@ def _score_faithfulness(generated: GeneratedAnswer | Refusal, retrieved: list[Re
     return 1.0, "all sentences cite a retrieved chunk"
 
 
-def _score_recall_at_5(retrieved: list[RetrievalResult], gold_ids: tuple[str, ...]) -> tuple[float, str]:
+def _score_recall_at_5(
+    retrieved: list[RetrievalResult], gold_ids: tuple[str, ...]
+) -> tuple[float, str]:
     if not gold_ids:
         return 0.0, "no gold_chunk_ids in dataset row"
     top_ids = {r.external_id for r in retrieved[:5]}
     hits = [g for g in gold_ids if g in top_ids]
     score = len(hits) / len(gold_ids)
-    return score, f"hits {len(hits)}/{len(gold_ids)} (gold={list(gold_ids)}, top5={sorted(top_ids)})"
+    return (
+        score,
+        f"hits {len(hits)}/{len(gold_ids)} (gold={list(gold_ids)}, top5={sorted(top_ids)})",
+    )
 
 
 def _score_correctness(generated: GeneratedAnswer | Refusal, expected: str) -> tuple[float, str]:
@@ -281,7 +288,9 @@ def write_runs(runs: list[_SuiteRun], out_dir: Path, *, dataset_version: str) ->
     paths: dict[str, Path] = {}
     for run in runs:
         path = out_dir / f"{run.suite}.json"
-        path.write_text(json.dumps(run.to_run_result(dataset_version=dataset_version), indent=2) + "\n")
+        path.write_text(
+            json.dumps(run.to_run_result(dataset_version=dataset_version), indent=2) + "\n"
+        )
         paths[run.suite] = path
     return paths
 
@@ -297,7 +306,9 @@ def _post_composite_comment(repo: str, pr: int, deltas: dict[str, str], token: s
     marker = "<!-- rag-production-kit:eval-sticky -->"
     body_parts = [marker, "", "# Eval delta — rag-production-kit"]
     body_parts.append("")
-    body_parts.append("Three suites against the synthetic `rag-qa-v0.1` golden set; current vs committed baseline.")
+    body_parts.append(
+        "Three suites against the synthetic `rag-qa-v0.1` golden set; current vs committed baseline."
+    )
     body_parts.append("")
     for suite in SUITES:
         body_parts.append(f"## `{suite}`")
@@ -314,7 +325,10 @@ def _post_composite_comment(repo: str, pr: int, deltas: dict[str, str], token: s
 
     # Find an existing sticky comment by marker.
     list_url = f"https://api.github.com/repos/{repo}/issues/{pr}/comments?per_page=100"
-    req = urllib.request.Request(list_url, headers={"Authorization": f"Bearer {token}", "Accept": "application/vnd.github+json"})
+    req = urllib.request.Request(
+        list_url,
+        headers={"Authorization": f"Bearer {token}", "Accept": "application/vnd.github+json"},
+    )
     existing_id: int | None = None
     try:
         with urllib.request.urlopen(req) as resp:
@@ -329,10 +343,27 @@ def _post_composite_comment(repo: str, pr: int, deltas: dict[str, str], token: s
     payload = json.dumps({"body": body}).encode()
     if existing_id is not None:
         edit_url = f"https://api.github.com/repos/{repo}/issues/comments/{existing_id}"
-        req = urllib.request.Request(edit_url, data=payload, method="PATCH", headers={"Authorization": f"Bearer {token}", "Accept": "application/vnd.github+json", "Content-Type": "application/json"})
+        req = urllib.request.Request(
+            edit_url,
+            data=payload,
+            method="PATCH",
+            headers={
+                "Authorization": f"Bearer {token}",
+                "Accept": "application/vnd.github+json",
+                "Content-Type": "application/json",
+            },
+        )
     else:
         create_url = f"https://api.github.com/repos/{repo}/issues/{pr}/comments"
-        req = urllib.request.Request(create_url, data=payload, headers={"Authorization": f"Bearer {token}", "Accept": "application/vnd.github+json", "Content-Type": "application/json"})
+        req = urllib.request.Request(
+            create_url,
+            data=payload,
+            headers={
+                "Authorization": f"Bearer {token}",
+                "Accept": "application/vnd.github+json",
+                "Content-Type": "application/json",
+            },
+        )
     with urllib.request.urlopen(req) as resp:
         if resp.status >= 300:
             raise RuntimeError(f"comment post failed: {resp.status} {resp.read().decode()}")
@@ -363,11 +394,21 @@ def _diff_markdown(current: Path, baseline: Path) -> str:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--write-baselines", action="store_true", help="Overwrite committed baselines with this run.")
-    parser.add_argument("--post-comment", action="store_true", help="Render diffs against baselines and post a composite PR sticky comment.")
+    parser.add_argument(
+        "--write-baselines",
+        action="store_true",
+        help="Overwrite committed baselines with this run.",
+    )
+    parser.add_argument(
+        "--post-comment",
+        action="store_true",
+        help="Render diffs against baselines and post a composite PR sticky comment.",
+    )
     parser.add_argument("--repo", default=None, help="`owner/name` for the sticky comment.")
     parser.add_argument("--pr", type=int, default=None, help="PR number for the sticky comment.")
-    parser.add_argument("--token-env", default="GITHUB_TOKEN", help="Env var to read the API token from.")
+    parser.add_argument(
+        "--token-env", default="GITHUB_TOKEN", help="Env var to read the API token from."
+    )
     args = parser.parse_args(argv)
 
     runs = run_all_suites()
