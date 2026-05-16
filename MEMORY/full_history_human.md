@@ -95,3 +95,19 @@ top of the `Retriever.search` output shipped here.
 **Open questions / blockers:** None. PR #11 is ready for review. Issue #4 is 100% complete; issue #7 picks up the eval-harness wiring next.
 
 **Next session:** Issue #7 in this repo (eval-harness integration) — sits cleanly on top of the now-ready Generator Protocol.
+
+## 2026-05-16 — Issue #7: Eval harness integration (faithfulness, recall@k, correctness)
+**Duration:** ~30 min · **Branch:** `session/2026-05-16-1517-issue-7`
+
+- Wired `llm-eval-harness` into this repo via a new `[eval]` extra (pinned to commit `2398cc3`) and a fresh `.github/workflows/eval.yml` that runs on every PR. The workflow installs the extra, regenerates current eval fixtures via `python -m evals.run_eval`, diffs each suite against its committed baseline, and posts a single composite sticky PR comment with all three deltas (D-012).
+- Three suites land. `faithfulness` reuses `enforce_citations` from #4: per-row 1.0 iff the generator produced a valid `GeneratedAnswer`, 0.0 on `Refusal` or citation failure. `recall_at_5` scores fraction of `provenance.gold_chunk_ids` present in the top-5 retrieved external_ids. `correctness` is deterministic content-token overlap with the expected output as a judge-rubric proxy (the real LLM-judge path is operator-triggered with `ANTHROPIC_API_KEY`).
+- Hermetic by design. An in-memory token-overlap retriever stands in for pgvector so the workflow runs with zero external services. Mirrors the fixture pattern in `llm-eval-harness`'s own `eval.yml` — committed baselines, regenerated current, diff-and-comment. First baselines from this session: faithfulness 1.0, recall@5 1.0, correctness 0.90 against the 8-row synthetic `rag-qa-v0.1` dataset.
+- Corpus chunks intentionally single-sentence (D-013) so `TemplateGenerator`'s one-cite-per-sentence shape satisfies `enforce_citations` without an LLM. The real-LLM eval path (operator-triggered) will switch to `AnthropicGenerator` against arbitrary-shape chunks.
+- 13 new hermetic tests in `tests/test_eval_run.py` exercise the tokenizer, in-memory retriever, three per-suite scorers, JSON write/read, sticky-comment poster (create + patch + dry-run via fake `urlopen`), and a roundtrip over the committed baselines.
+- README "Benchmarks / Results" section replaces the "pending issue #7" placeholder with real measured baseline numbers and the reproducer command.
+
+**Why this work, this session:** Issue #7 was the third acceptance box on issue #4 (refactored into its own issue per the prior session) and the eval-harness gateway every other repo in the portfolio is supposed to import. Closing it ships the cross-repo wiring that proves the harness is real — both for this repo and for `llm-cost-optimizer` / `agent-orchestration-platform` (which copy this pattern).
+
+**Open questions / blockers:** Real Anthropic-API runs require `ANTHROPIC_API_KEY` + budget the operator allocates; the workflow design supports a future `RAG_EVAL_BACKEND=anthropic` switch but doesn't wire it now to avoid an accidentally-billed CI run. The judge calibration data is committed but unused until the operator runs `eval-harness judge calibrate` against the same API key.
+
+**Next session:** Either #3 (query rewriting / decomposition) or #6 (cost telemetry) in this repo — both build on the now-shipped Generator + eval suite.

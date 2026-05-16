@@ -112,3 +112,31 @@ context_for_next_session:
 decisions_made: []
 followups: []
 ---
+
+---
+session: 2026-05-16T15:30Z
+duration_min: 30
+issue: 7
+focus: eval_harness_integration_three_metrics_workflow
+delta:
+  files_added: 13  # __init__, run_eval, dataset+corpus, 3 baselines, 3 current, calibration, workflow, test
+  files_changed: 2  # README, pyproject
+  tests_added: 13
+  test_pass_rate: "87/87 hermetic + 7 pg-integration skipped"
+  benchmarks:
+    faithfulness_mean: 1.0
+    recall_at_5_mean: 1.0
+    correctness_mean: 0.9008
+    n_rows: 8
+    judge: deterministic-stub-v1
+context_for_next_session:
+  - eval_extra_pins_eval_harness_to_2398cc3_hatch_allow_direct_references_enabled
+  - three_suites_faithfulness_recall_at_5_correctness_each_writes_one_runresult_json
+  - in_memory_token_overlap_retriever_stands_in_for_pgvector_for_hermetic_ci
+  - composite_pr_comment_via_direct_github_api_repo_specific_marker_avoids_clobbering_d_012
+  - corpus_chunks_are_single_sentence_for_templategenerator_compatibility_d_013
+  - real_llm_eval_path_operator_triggered_with_anthropic_api_key_not_yet_wired
+  - workflow_eval_yml_on_pr_install_eval_extra_run_eval_post_composite_sticky
+decisions_made: [D-012, D-013]
+followups: []
+---
