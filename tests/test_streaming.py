@@ -73,9 +73,7 @@ class ReverseReranker:
     """Deterministic reranker that reverses input order. Lets us assert that
     the rerank phase actually mutated the result list."""
 
-    def rerank(
-        self, query: str, candidates: Sequence[Candidate]
-    ) -> list[ScoredCandidate]:
+    def rerank(self, query: str, candidates: Sequence[Candidate]) -> list[ScoredCandidate]:
         out: list[ScoredCandidate] = []
         n = len(candidates)
         for new_idx, c in enumerate(reversed(candidates)):
@@ -233,9 +231,7 @@ def test_error_during_retrieval_emits_error_event_and_returns_cleanly() -> None:
 
 
 class ExplodingReranker:
-    def rerank(
-        self, query: str, candidates: Sequence[Candidate]
-    ) -> list[ScoredCandidate]:
+    def rerank(self, query: str, candidates: Sequence[Candidate]) -> list[ScoredCandidate]:
         raise ValueError("bad rerank")
 
 
@@ -271,9 +267,7 @@ def test_to_sse_emits_event_line_and_json_data() -> None:
     assert frame.startswith("event: retrieving\n")
     assert frame.endswith("\n\n")
     # Round-trip: pull data line, parse JSON, assert shape.
-    data_line = next(
-        ln for ln in frame.splitlines() if ln.startswith("data: ")
-    )
+    data_line = next(ln for ln in frame.splitlines() if ln.startswith("data: "))
     parsed = json.loads(data_line[len("data: ") :])
     assert parsed["payload"]["query"] == "hello"
     assert parsed["elapsed_ms"] == 0.0
@@ -287,9 +281,7 @@ def test_to_sse_serializes_unicode_without_escapes() -> None:
     frame = to_sse(e)
     assert "café — espresso" in frame
     # And it still parses as JSON.
-    data_line = next(
-        ln for ln in frame.splitlines() if ln.startswith("data: ")
-    )
+    data_line = next(ln for ln in frame.splitlines() if ln.startswith("data: "))
     parsed = json.loads(data_line[len("data: ") :])
     assert parsed["payload"]["text"] == "café — espresso"
 

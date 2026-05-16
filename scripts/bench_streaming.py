@@ -116,9 +116,7 @@ class _BenchRetriever:
         query_terms = {t.lower() for t in query.split() if t}
         scored: list[tuple[str, str, float]] = []
         for ext_id, text in self._corpus:
-            overlap = sum(
-                1 for tok in text.lower().split() if tok.strip(".,") in query_terms
-            )
+            overlap = sum(1 for tok in text.lower().split() if tok.strip(".,") in query_terms)
             scored.append((ext_id, text, float(overlap) + 0.01))
         scored.sort(key=lambda r: r[2], reverse=True)
         out: list[RetrievalResult] = []
@@ -191,7 +189,7 @@ def main() -> None:
     if timings.retrieving:
         rps = n_queries / wall if wall > 0 else float("inf")
         mean_total = statistics.mean(timings.total)
-        extra = f"  ({n_queries} queries in {wall*1000:.0f} ms; {rps:.1f} q/s; mean total {mean_total:.2f} ms)"
+        extra = f"  ({n_queries} queries in {wall * 1000:.0f} ms; {rps:.1f} q/s; mean total {mean_total:.2f} ms)"
     print(f"Streaming pipeline benchmark · n={args.n} · k={args.k}{extra}")
     print()
     print_table(timings)

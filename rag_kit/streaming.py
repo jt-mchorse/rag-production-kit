@@ -34,14 +34,14 @@ from .retriever import RetrievalResult
 
 EventType = Literal[
     "retrieving",  # phase start: retrieving from PG
-    "retrieved",   # phase end: chunks + phase_ms
-    "reranking",   # phase start (only if reranker is set)
-    "reranked",    # phase end: chunks + phase_ms
+    "retrieved",  # phase end: chunks + phase_ms
+    "reranking",  # phase start (only if reranker is set)
+    "reranked",  # phase end: chunks + phase_ms
     "generating",  # phase start (only if token_stream is set)
-    "token",       # one token from the generator
-    "generated",   # phase end: full text + phase_ms
-    "done",        # whole pipeline finished cleanly
-    "error",       # pipeline failed; payload has message + exception type
+    "token",  # one token from the generator
+    "generated",  # phase end: full text + phase_ms
+    "done",  # whole pipeline finished cleanly
+    "error",  # pipeline failed; payload has message + exception type
 ]
 
 

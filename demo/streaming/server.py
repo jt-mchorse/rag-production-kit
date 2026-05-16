@@ -47,9 +47,15 @@ _DEMO_DIR = Path(__file__).resolve().parent
 # A tiny in-memory corpus so the demo is self-contained. Keep this list
 # short and varied enough that the reranker has something to reorder.
 _CORPUS: list[tuple[str, str]] = [
-    ("pg-tuning", "Postgres tuning for production: shared_buffers, work_mem, effective_cache_size."),
+    (
+        "pg-tuning",
+        "Postgres tuning for production: shared_buffers, work_mem, effective_cache_size.",
+    ),
     ("rrf", "Reciprocal rank fusion combines lexical and dense retrieval channels."),
-    ("hnsw", "HNSW index parameters: M controls graph degree, ef_search trades latency for recall."),
+    (
+        "hnsw",
+        "HNSW index parameters: M controls graph degree, ef_search trades latency for recall.",
+    ),
     ("rerank", "Cross-encoder reranking improves NDCG at the cost of latency."),
     ("cite", "Citation enforcement: every claim should reference a chunk by id."),
     ("stream", "Server-sent events let a browser render intermediate pipeline phases."),
@@ -94,9 +100,7 @@ class SlowReranker:
         self._inner = LexicalOverlapReranker(length_penalty=0.0)
         self._sleep_ms = sleep_ms
 
-    def rerank(
-        self, query: str, candidates: Sequence[Candidate]
-    ) -> list[ScoredCandidate]:
+    def rerank(self, query: str, candidates: Sequence[Candidate]) -> list[ScoredCandidate]:
         time.sleep(self._sleep_ms / 1000.0)
         return self._inner.rerank(query, candidates)
 
