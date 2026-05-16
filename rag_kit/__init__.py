@@ -1,4 +1,4 @@
-"""rag-production-kit: hybrid retrieval (BM25 + pgvector) with RRF fusion + cross-encoder reranking + SSE streaming + cited generation + query rewriting.
+"""rag-production-kit: hybrid retrieval (BM25 + pgvector) with RRF fusion + cross-encoder reranking + SSE streaming + cited generation + query rewriting + cost telemetry.
 
 Public surface:
 
@@ -14,6 +14,8 @@ Public surface:
         StreamEvent, StreamingPipeline, PhaseTimings, TokenStream, to_sse,
         # Query rewriting / decomposition (#3):
         TemplateRewriter, AnthropicRewriter, Rewriter, RewriteResult,
+        # Cost telemetry (#6):
+        CostRecord, ModelPrice, PriceTable, TelemetryStore, Aggregate,
     )
 
 Layers shipped:
@@ -33,9 +35,13 @@ Layers shipped:
 - #5: StreamingPipeline — sync-generator pipeline that emits typed phase
       events (retrieving / retrieved / reranking / reranked / generating /
       token / generated / done / error); `to_sse()` wire-formats for SSE.
+- #6: Cost telemetry — CostRecord per request (tokens, USD, latency,
+      per-phase timings), TelemetryStore (stdlib sqlite3, 24-hour window),
+      PriceTable (operator-supplied, no defaults shipped — D-015),
+      Aggregate (p50/p95/p99). Dashboard via
+      `scripts/telemetry_dashboard.py`.
 
 Layers in later PRs:
-- Cost telemetry (#6)
 - Eval harness integration + faithfulness measurement (#7)
 """
 
@@ -77,6 +83,17 @@ from .streaming import (
     StreamingPipeline,
     TokenStream,
     to_sse,
+)
+from .telemetry import (
+    Aggregate,
+    CostRecord,
+    ModelPrice,
+    PriceTable,
+    TelemetryStore,
+    UnknownModelError,
+)
+from .telemetry import (
+    aggregate as aggregate_telemetry,
 )
 
 __all__ = [
@@ -122,4 +139,12 @@ __all__ = [
     "StreamingPipeline",
     "TokenStream",
     "to_sse",
+    # Cost telemetry (#6)
+    "Aggregate",
+    "CostRecord",
+    "ModelPrice",
+    "PriceTable",
+    "TelemetryStore",
+    "UnknownModelError",
+    "aggregate_telemetry",
 ]

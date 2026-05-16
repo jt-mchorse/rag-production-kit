@@ -70,11 +70,21 @@ that asks Claude to decompose the query and validates the JSON
 response. The kwarg defaults to `None`, so every existing caller keeps
 its exact single-query behavior.
 
-Everything beyond #1 + #2 + #3 + #4 + #5 is staged in follow-up issues:
-cost telemetry ([#6]) and eval harness integration with faithfulness
-measurement against the citation contract plus a Recall@5 number against
-a real corpus ([#7]). The eval harness lives in its own repo
-([llm-eval-harness]) and is imported, not vendored.
+**Cost telemetry** captures per-request token counts, USD cost, and
+per-phase latency to a stdlib SQLite file. The `PriceTable` is
+operator-supplied — **no default prices ship** (D-015), same posture
+as the no-fabricated-benchmarks rule extended to pricing: querying a
+model that isn't in the table raises `UnknownModelError` rather than
+silently emitting `$0.00`. A dep-free local dashboard
+(`scripts/telemetry_dashboard.py`, stdlib `http.server` + inline SVG)
+renders the last 24 hours with p50 / p95 / p99 latency, total USD,
+and the most recent 20 records — works air-gapped.
+
+Everything beyond #1 + #2 + #3 + #4 + #5 + #6 is staged in follow-up
+issues: eval harness integration with faithfulness measurement against
+the citation contract plus a Recall@5 number against a real corpus
+([#7]). The eval harness lives in its own repo ([llm-eval-harness])
+and is imported, not vendored.
 
 [Reciprocal Rank Fusion]: https://dl.acm.org/doi/10.1145/1571941.1572114
 [#2]: https://github.com/jt-mchorse/rag-production-kit/issues/2
@@ -221,12 +231,71 @@ python -m demo.streaming.server   # in-memory corpus, no Postgres needed
 open http://127.0.0.1:8765/
 ```
 
+### Cost telemetry (issue #6)
+
+Per-request capture of token counts, USD cost, and per-phase latency,
+persisted to a stdlib SQLite file (`telemetry.db`) and visualized via a
+dep-free local HTTP dashboard.
+
+```python
+from rag_kit import CostRecord, ModelPrice, PriceTable, TelemetryStore
+
+# Prices are operator-supplied — nothing ships in the table (D-015).
+prices = PriceTable({
+    "claude-opus-4-7":   ModelPrice(prompt_per_million=15.0, completion_per_million=75.0),
+    "claude-sonnet-4-6": ModelPrice(prompt_per_million=3.0,  completion_per_million=15.0),
+})
+
+with TelemetryStore("./telemetry.db") as store:
+    rec = CostRecord.build(
+        ts=None,                                   # default time.time()
+        query="how do I tune shared_buffers?",
+        model="claude-opus-4-7",
+        retrieved_count=5,
+        prompt_tokens=1200,
+        completion_tokens=180,
+        total_latency_ms=420.0,
+        per_phase_ms={"retrieving": 50.0, "reranking": 30.0, "generating": 340.0},
+        price_table=prices,
+    )
+    store.record(rec)                              # → row in cost_records
+    # 24-hour window with p50 / p95 / p99 latency, totals, and counts:
+    from rag_kit import aggregate_telemetry
+    agg = aggregate_telemetry(store.last_24h())
+    print(f"n={agg.n} total=${agg.total_usd} p95={agg.latency_p95_ms:.0f}ms")
+```
+
+`CostRecord` is computed from a `PriceTable`; calling `cost()` for a
+model that isn't configured raises `UnknownModelError` rather than
+silently emitting `$0.00` — same posture as the no-fabricated-
+benchmarks rule (D-013) extended to prices (D-015).
+
+Launch the dashboard (single-page, inline-SVG chart, no external
+assets) — works air-gapped:
+
+```bash
+python -m scripts.telemetry_dashboard --db ./telemetry.db --port 8766
+# open http://127.0.0.1:8766/
+
+# or seed deterministic synthetic records on a fresh DB:
+python -m scripts.telemetry_dashboard --db ./telemetry.db --seed 60 --port 8766
+```
+
+Endpoints:
+
+- `GET /` → HTML dashboard (24-hour window, 4 stat cards, latency chart,
+  most recent 20 records).
+- `GET /api/last_24h` → JSON snapshot of the same window for scripts /
+  downstream tooling.
+
 ## Benchmarks / Results
 
 The streaming pipeline carries **< 0.15 ms p95 overhead** end-to-end on
 an in-memory corpus (1000 queries, M-series Mac, Python 3.14) — see
 [`docs/benchmarks.md`](docs/benchmarks.md). Production end-to-end p50/p95
-on Postgres is tracked under [#6] (cost telemetry & latency).
+on Postgres is captured per-request by the cost-telemetry layer ([#6],
+section above) — there is no fabricated headline number; the operator's
+own SQLite store is the source of truth.
 
 Three eval suites run on every PR against the synthetic `rag-qa-v0.1`
 golden set (8 examples, 10-chunk in-memory corpus, dep-free

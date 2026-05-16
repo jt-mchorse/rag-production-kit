@@ -189,3 +189,17 @@ Strategic decisions for this repo, with reasoning. Append-only — superseded de
 **Reversibility:** Cheap. The protocol is one method; concrete rewriters are one class each; the retriever's multi-hop branch is one method (`_multi_hop_search`) that can be inlined or refactored without touching consumers.
 
 **Related issues:** #3
+
+## D-015 — Cost-telemetry `PriceTable` ships no defaults; operator supplies prices; unknown model raises (2026-05-16)
+**Decision:** The `PriceTable` constructor in `rag_kit.telemetry` accepts an explicit mapping of model id → `ModelPrice` (or starts empty). No defaults ship with the repo. Calling `cost(model, ...)` for a model that isn't in the table raises `UnknownModelError` (subclass of `KeyError`). The eval / dashboard / unit tests supply their own fixture prices (clearly labeled synthetic).
+
+**Why:** Same posture as D-013 (no fabricated benchmarks) extended to pricing. Public list prices for Claude, GPT, Cohere, etc. change frequently and vary by region, tier, and negotiated contract — the repo can't be the source of truth for a downstream deployment's actual numbers. Worse, a silent `$0.00` fallback would be a load-bearing bug: the cost dashboard would underreport, the operator would not notice until the bill arrived, and the table would have to be rolled back. Failing loud on unconfigured models means the dashboard is honest at all times; the operator is forced to make the price decision explicit at integration time, where they have the necessary context.
+
+**Alternatives considered:**
+- Ship Anthropic public list prices as defaults — rejected; prices drift, the repo would have to track them, and downstream deployments often have different contract numbers. The default would become a stale lie that the operator can't easily see.
+- Ship zero defaults with a warning — rejected; warnings get suppressed in production logs and a `$0.00` total looks like real data on a dashboard.
+- Require prices at `TelemetryStore.__init__` so a store can't be opened without them — rejected; couples storage and pricing concerns. A record can be inserted with zero tokens (e.g., for purely-retrieval calls) and not need a price entry; coupling them would force a price table for use cases that don't need one.
+
+**Reversibility:** Cheap. `PriceTable` is one class; defaults could be added later as a separate `PriceTable.from_anthropic_list_prices(as_of_date=...)` constructor without changing existing callers.
+
+**Related issues:** #6
