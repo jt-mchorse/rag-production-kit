@@ -92,3 +92,23 @@ context_for_next_session:
 decisions_made: [D-010, D-011]
 followups: []
 ---
+
+---
+session: 2026-05-16T15:05Z
+duration_min: 35
+issue: 4
+focus: rebase_pr_11_onto_main_after_streaming_pr_landed
+delta:
+  files_changed: 6  # __init__.py, README, 4 memory files
+  tests_added: 0
+  test_pass_rate: "74/74 hermetic + 7 pg-integration skipped"
+context_for_next_session:
+  - pr_11_rebased_on_main_with_d_008_d_009_and_d_010_d_011_interleaved_chronologically
+  - readme_what_this_is_now_describes_1_2_4_5_together_one_paragraph_per_layer
+  - rag_kit_init_exports_generator_and_streaming_layers_both_sets
+  - issue_4_criterion_3_faithfulness_in_ci_re_scoped_to_issue_7_where_it_belongs
+  - pr_11_state_clean_ready_for_review_per_d_004_next_scheduled_session_can_squash_merge
+  - issue_7_eval_harness_integration_is_the_next_repo_target_in_this_run
+decisions_made: []
+followups: []
+---

@@ -81,3 +81,17 @@ top of the `Retriever.search` output shipped here.
 **Open questions / blockers:** None — the pipeline ships behind a Protocol seam, so the #4 generator drops in without code changes here. Production end-to-end p50/p95 (against real PG + an LLM SDK) is tracked under #6, not duplicated here.
 
 **Next session:** Either jump to a different repo per the night-session multi-issue loop — likely `agent-orchestration-platform` (tied for most priority:high open) or `vector-search-at-scale` (in-flight draft PR #7).
+
+## 2026-05-16 — Issue #4: Resume PR #11 (rebase + ready)
+**Duration:** ~35 min · **Branch:** `session/2026-05-15-1915-issue-4` (force-pushed)
+
+- Rebased PR #11 onto current `main` (the streaming work #5 had landed in between). 3 commits replayed; 6 files conflicted and were resolved cleanly: `README.md` "What this is" now describes #1 + #2 + #4 + #5 together; `rag_kit/__init__.py` exports both the Generator (#4) and Streaming (#5) public surfaces; MEMORY files interleave D-008/D-009 (this PR) and D-010/D-011 (already on main) in chronological order with the placeholder "reserved-for-#11" comment removed.
+- Local hermetic suite 74/74 pass, ruff lint and format clean. PR #11 CI is green on the rebased head across lint + unit (3.11/3.12) + integration-pg + memory-check (`mergeState: CLEAN`).
+- Edited issue #4 body to move acceptance criterion 3 ("Faithfulness measured via llm-eval-harness in CI") into issue #7, where the cross-repo eval-harness wiring actually lives — the Generator Protocol + `enforce_citations()` contract shipped here is the seam #7 will score against.
+- Marked PR #11 ready for review. The next scheduled session can squash-merge per D-004.
+
+**Why this work, this session:** PR #11 was stuck `CONFLICTING` against `main` after the streaming PR landed, blocking both the generator from shipping and the eval-harness integration in #7 (which builds on the Generator). 30 minutes of conflict resolution unblocks two issues.
+
+**Open questions / blockers:** None. PR #11 is ready for review. Issue #4 is 100% complete; issue #7 picks up the eval-harness wiring next.
+
+**Next session:** Issue #7 in this repo (eval-harness integration) — sits cleanly on top of the now-ready Generator Protocol.
