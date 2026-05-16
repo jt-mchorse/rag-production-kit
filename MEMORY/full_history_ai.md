@@ -172,3 +172,27 @@ context_for_next_session:
 decisions_made: [D-014]
 followups: []
 ---
+
+---
+session: 2026-05-16T20:30Z
+duration_min: 50
+issue: 6
+focus: cost_telemetry_per_request_blob_sqlite_store_stdlib_dashboard
+delta:
+  files_added: 3  # rag_kit/telemetry.py, tests/test_telemetry.py, scripts/telemetry_dashboard.py
+  files_changed: 2  # __init__.py, README.md
+  tests_added: 21
+  test_pass_rate: "108/108 hermetic + 7 pg-integration skipped"
+context_for_next_session:
+  - cost_telemetry_layer_costrecord_pricetable_telemetrystore_aggregate_lives_at_rag_kit_telemetry
+  - sqlite_via_stdlib_no_new_runtime_dep_d_002_preserved
+  - price_table_ships_no_defaults_unknown_model_raises_d_015
+  - aggregate_percentile_uses_same_nist_type_7_math_as_streaming_phase_timings
+  - dashboard_at_scripts_telemetry_dashboard_stdlib_http_server_inline_svg_no_external_deps_airgapped
+  - dashboard_endpoints_get_root_html_get_api_last_24h_json
+  - dashboard_seed_flag_inserts_synthetic_records_clearly_labeled_synthetic_n
+  - issue_6_acceptance_telemetry_schema_documented_done_dashboard_chart_renders_last_24h_done_unit_test_for_cost_calc_with_fixture_prices_done
+  - this_branch_is_off_main_pre_d_014_rewriter_pr_so_init_py_exports_only_telemetry_not_rewriter
+decisions_made: [D-015]
+followups: []
+---

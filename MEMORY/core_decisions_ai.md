@@ -126,3 +126,12 @@
   reversibility: cheap
   related_issues: [3]
   superseded_by: null
+
+- id: D-015
+  date: 2026-05-16
+  decision: price_table_ships_no_defaults_operator_supplies_prices_unknown_model_raises_not_silent_zero
+  rationale: same_posture_as_d_013_no_fabricated_benchmarks_extended_to_no_fabricated_prices_public_list_prices_change_repo_cant_be_source_of_truth_for_a_downstream_deployment_silent_zero_would_be_a_load_bearing_bug_in_cost_dashboards
+  alternatives_rejected: [ship_anthropic_public_list_prices_as_defaults, ship_zero_defaults_with_a_warning, gate_telemetry_behind_required_prices_at_init_time_too_coupled]
+  reversibility: cheap
+  related_issues: [6]
+  superseded_by: null
