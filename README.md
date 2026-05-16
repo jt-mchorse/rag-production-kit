@@ -55,12 +55,26 @@ generator phase is a `TokenStream` protocol seam: any callable that
 yields strings plugs in, so the same pipeline works with the #4
 generator, an Anthropic SDK stream, or an offline stub for eval runs.
 
-Everything beyond #1 + #2 + #4 + #5 is staged in follow-up issues:
-query rewriting and decomposition ([#3]), cost telemetry ([#6]), and
-eval harness integration with faithfulness measurement against the
-citation contract plus a Recall@5 number against a real corpus
-([#7]). The eval harness lives in its own repo ([llm-eval-harness])
-and is imported, not vendored.
+**Query rewriting and decomposition** is the pre-retrieval seam,
+opt-in via `Retriever.search(rewriter=...)`. A `Rewriter` takes the raw
+user query and returns 1..K sub-queries plus a short reasoning string;
+when the rewriter returns ≥2 sub-queries, the retriever runs hybrid
+search per sub-query and fuses the rankings with RRF across sub-queries
+(the per-method ranks dict on each returned result then carries
+`subquery_0`, `subquery_1`, … instead of `lexical` / `dense`). Two
+backends ship — a dep-free `TemplateRewriter` that handles common
+multi-hop patterns (`Compare X with Y`, `A. Then B.`, multi-question
+conjunctions like `Who is X and where did Y work?`) for hermetic CI,
+and an `AnthropicRewriter` behind the existing `[rag-anthropic]` extra
+that asks Claude to decompose the query and validates the JSON
+response. The kwarg defaults to `None`, so every existing caller keeps
+its exact single-query behavior.
+
+Everything beyond #1 + #2 + #3 + #4 + #5 is staged in follow-up issues:
+cost telemetry ([#6]) and eval harness integration with faithfulness
+measurement against the citation contract plus a Recall@5 number against
+a real corpus ([#7]). The eval harness lives in its own repo
+([llm-eval-harness]) and is imported, not vendored.
 
 [Reciprocal Rank Fusion]: https://dl.acm.org/doi/10.1145/1571941.1572114
 [#2]: https://github.com/jt-mchorse/rag-production-kit/issues/2
@@ -153,6 +167,35 @@ pytest -m "not pg"     # unit tests (embedder, fusion math, streaming) — no DB
 DATABASE_URL=postgresql://rag:rag@localhost:5432/rag pytest -m pg   # integration
 ```
 
+### Query rewriting / decomposition (issue #3)
+
+Multi-hop questions (e.g., `Who founded Anthropic and where did they
+work before?`) retrieve better when split into independent sub-queries.
+Pass a `Rewriter` to `Retriever.search`; when it decomposes (≥2
+sub-queries), the retriever runs hybrid search per sub-query and fuses
+the rankings with RRF across sub-queries. When the rewriter chooses
+not to decompose (1 sub-query), the call collapses back to the existing
+single-shot path.
+
+```python
+from rag_kit import Retriever, TemplateRewriter
+
+results = retr.search(
+    "Who founded Anthropic and where did they work before?",
+    k=5,
+    rewriter=TemplateRewriter(),     # or AnthropicRewriter() in production
+)
+for r in results:
+    # per-method ranks become per-sub-query ranks when the rewriter expanded
+    print(r.external_id, r.ranks)    # e.g., {'subquery_0': 1, 'subquery_1': 2}
+```
+
+The `TemplateRewriter` is dep-free and deterministic — its decomposition
+patterns are listed in [`rag_kit/rewriter.py`](rag_kit/rewriter.py). The
+`AnthropicRewriter` asks Claude to return strict JSON
+(`{"sub_queries": [...], "reasoning": "..."}`) and validates the
+response; install with `pip install -e '.[rag-anthropic]'`.
+
 ### Streaming (issue #5)
 
 Drop in your own retriever (or use `Retriever` against PG) and any
@@ -199,6 +242,25 @@ Real-LLM eval runs (Anthropic-backed `Generator`, real pgvector
 retrieval) are operator-triggered with `ANTHROPIC_API_KEY` + `DATABASE_URL`
 locally — the CI fixture path covers regressions in the deterministic
 pipeline and keeps the workflow API-key-free.
+
+**Rewriter recall@k on a synthetic multi-hop fixture** (issue #3,
+`scripts/bench_rewriter.py`, 18-chunk corpus, 8 multi-hop questions,
+dep-free `TemplateRewriter` against the same in-memory token-overlap
+retriever the eval suite uses). Real, reproducible numbers; not LLM-backed:
+
+| k | mean recall (baseline) | mean recall (rewriter) | improvements / regressions |
+|---|---:|---:|---:|
+| 2 | 0.625 | 0.688 | 1 / 0 |
+| 3 | 0.625 | 0.812 | 3 / 0 |
+| 5 | 0.875 | 0.938 | 1 / 0 |
+
+The gap is largest at k=3, where the candidate budget is tight relative
+to the two distinct facts each multi-hop query needs. No query regresses
+on this fixture; running it on your own corpus is two lines:
+`python -m scripts.bench_rewriter --k 3 --output md`.
+`AnthropicRewriter` numbers are pending an operator-triggered run (the
+script wires it but the bench fixture above is `TemplateRewriter`-only
+so CI stays API-key-free).
 
 ## Demo
 

@@ -175,3 +175,17 @@ Strategic decisions for this repo, with reasoning. Append-only — superseded de
 **Reversibility:** Cheap. The corpus is one JSONL file; reshaping it is a session's work. The dataset and metric definitions are unchanged.
 
 **Related issues:** #7
+
+## D-014 — Rewriter is a single-method Protocol with `TemplateRewriter` default + `AnthropicRewriter` extra, opt-in on `Retriever.search` (2026-05-16)
+**Decision:** Pre-retrieval query rewriting / decomposition follows the same swappable seam as the embedder (D-002), reranker (D-005), and generator (D-008): a `Rewriter` Protocol with a single `rewrite(query) -> RewriteResult` method, a dep-free `TemplateRewriter` reference, and an `AnthropicRewriter` lazy-imported behind the *existing* `[rag-anthropic]` extra (no new extra needed). `Retriever.search` accepts `rewriter=...` as a kwarg defaulting to `None`, so every existing caller keeps its exact single-query behavior — parallel to D-007.
+
+**Why:** Three reasons stack. (1) The protocol pattern is now the load-bearing seam in three of the four pluggable layers in this repo; making the rewriter follow it keeps the public surface consistent and lets a third-party `Rewriter` drop in the same way a third-party `Generator` does today. (2) `TemplateRewriter` carries the same hermetic-CI rationale as D-006 and D-013 — the full rewrite-and-retrieve flow has to be exercisable without an API key so the eval workflow stays free, and rule-based decomposition over a handful of common multi-hop patterns is enough to demonstrate the seam end-to-end. (3) Reusing `[rag-anthropic]` (already pulled in by `AnthropicGenerator`) avoids an extras-list sprawl problem: anyone using the production generator already has the SDK installed.
+
+**Alternatives considered:**
+- Hardcoded `AnthropicRewriter` with no seam — rejected; locks the repo to one provider, breaks the consistency with the three other pluggable layers, and the CI workflow would either need an API key or a separate code path.
+- Pipeline step outside `Retriever.search` (caller decomposes, then calls search once per sub-query) — rejected; pushes RRF-across-sub-queries fusion onto every consumer, and `StreamingPipeline` would lose the rewriter as a typed phase.
+- Abstract base class instead of `Protocol` — rejected; inconsistent with D-005 and D-008, and the structural typing of `Protocol` is exactly what lets test stubs and third-party rewriters drop in without inheritance.
+
+**Reversibility:** Cheap. The protocol is one method; concrete rewriters are one class each; the retriever's multi-hop branch is one method (`_multi_hop_search`) that can be inlined or refactored without touching consumers.
+
+**Related issues:** #3

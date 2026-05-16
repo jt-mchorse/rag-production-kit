@@ -117,3 +117,12 @@
   reversibility: cheap
   related_issues: [7]
   superseded_by: null
+
+- id: D-014
+  date: 2026-05-16
+  decision: rewriter_is_single_method_protocol_template_default_anthropic_extra_opt_in_on_retriever_search
+  rationale: same_swappable_seam_as_embedder_reranker_generator_template_keeps_ci_hermetic_anthropic_reuses_existing_rag_anthropic_extra_kwarg_default_none_keeps_existing_callers_unchanged_parallel_to_d_007
+  alternatives_rejected: [hard_coded_anthropic_rewriter_no_seam, separate_pipeline_step_outside_retriever_breaks_one_call_search, abstract_base_class_instead_of_protocol_inconsistent_with_d_005_d_008]
+  reversibility: cheap
+  related_issues: [3]
+  superseded_by: null
