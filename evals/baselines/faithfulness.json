@@ -1,0 +1,53 @@
+{
+  "run_id": "faithfulness_8a5718786576",
+  "started_at": "2026-05-16T00:00:00Z",
+  "suite": "faithfulness",
+  "dataset_version": "rag-qa-v0.1",
+  "judge_model": "deterministic-stub-v1",
+  "judge_kappa": null,
+  "mean_score": 1.0,
+  "n_rows": 8,
+  "git_sha": "e40188cff0bc6193eb6d678ffe88e76a0f5f9cbf",
+  "rows": [
+    {
+      "example_id": "rag_qa_001",
+      "score": 1.0,
+      "reasoning": "all sentences cite a retrieved chunk"
+    },
+    {
+      "example_id": "rag_qa_002",
+      "score": 1.0,
+      "reasoning": "all sentences cite a retrieved chunk"
+    },
+    {
+      "example_id": "rag_qa_003",
+      "score": 1.0,
+      "reasoning": "all sentences cite a retrieved chunk"
+    },
+    {
+      "example_id": "rag_qa_004",
+      "score": 1.0,
+      "reasoning": "all sentences cite a retrieved chunk"
+    },
+    {
+      "example_id": "rag_qa_005",
+      "score": 1.0,
+      "reasoning": "all sentences cite a retrieved chunk"
+    },
+    {
+      "example_id": "rag_qa_006",
+      "score": 1.0,
+      "reasoning": "all sentences cite a retrieved chunk"
+    },
+    {
+      "example_id": "rag_qa_007",
+      "score": 1.0,
+      "reasoning": "all sentences cite a retrieved chunk"
+    },
+    {
+      "example_id": "rag_qa_008",
+      "score": 1.0,
+      "reasoning": "all sentences cite a retrieved chunk"
+    }
+  ]
+}

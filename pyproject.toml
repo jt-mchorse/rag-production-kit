@@ -37,6 +37,11 @@ rerank-cohere = [
 rag-anthropic = [
   "anthropic>=0.40",
 ]
+# Eval suite imports llm-eval-harness directly (D-002: imported, not vendored).
+# Pinned to a specific commit so the schema the suite writes can't drift.
+eval = [
+  "eval-harness @ git+https://github.com/jt-mchorse/llm-eval-harness@2398cc3d6440ef753bdd39efa347fb5e551ff6f6",
+]
 dev = [
   "pytest>=8.0",
   "pytest-cov>=4.1",
@@ -49,6 +54,12 @@ Issues    = "https://github.com/jt-mchorse/rag-production-kit/issues"
 
 [tool.hatch.build.targets.wheel]
 packages = ["rag_kit"]
+
+[tool.hatch.metadata]
+# The `[eval]` extra pins eval-harness to a specific commit via a direct URL
+# reference (D-002: the eval harness lives in its own repo and is imported,
+# not vendored). Hatch requires this opt-in to allow direct references.
+allow-direct-references = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
