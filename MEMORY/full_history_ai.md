@@ -45,6 +45,27 @@ followups: []
 ---
 
 ---
+session: 2026-05-15T19:15Z
+duration_min: 60
+issue: 4
+focus: citation_enforcement_and_weak_context_refusal
+delta:
+  files_added: 2
+  files_changed: 3
+  tests_added: 18
+  test_pass_rate: "51/51 hermetic (7 pg-integration skipped as before)"
+context_for_next_session:
+  - generator_protocol_plus_template_default_plus_anthropic_extra_lands_d008
+  - two_refusal_paths_pre_llm_threshold_and_post_llm_citation_validation_d009
+  - enforce_citations_is_a_free_function_so_alt_generators_can_reuse_d008
+  - faithfulness_in_ci_via_eval_harness_is_the_remaining_box_on_issue_4_belongs_with_7
+  - rag_anthropic_extra_added_to_pyproject_anthropic_sdk_lazy_imported
+  - default_threshold_0_02_tuned_to_existing_hybrid_retrieval_fixture_scores
+decisions_made: [D-008, D-009]
+followups: []
+---
+
+---
 session: 2026-05-16T03:09Z
 duration_min: 75
 issue: 5
@@ -64,11 +85,30 @@ context_for_next_session:
   - streaming_pipeline_is_sync_generator_yielding_typed_streamevents
   - phases_retrieving_retrieved_reranking_reranked_generating_token_generated_done_error
   - to_sse_serializes_one_frame_per_event_per_html_spec
-  - tokenstream_protocol_is_the_seam_for_pr_11_anthropicgenerator_when_it_merges
+  - tokenstream_protocol_is_the_seam_used_with_4_anthropicgenerator
   - phasetimings_does_linear_interp_percentile_no_numpy_dep
   - demo_under_demo_streaming_uses_stdlib_http_server_runs_without_postgres
   - bench_script_under_scripts_bench_streaming_drives_n_queries_prints_p50_p95_per_phase
-  - d_010_d_011_reserved_for_pr_11_d_008_d_009_to_avoid_collision
 decisions_made: [D-010, D-011]
+followups: []
+---
+
+---
+session: 2026-05-16T15:05Z
+duration_min: 35
+issue: 4
+focus: rebase_pr_11_onto_main_after_streaming_pr_landed
+delta:
+  files_changed: 6  # __init__.py, README, 4 memory files
+  tests_added: 0
+  test_pass_rate: "74/74 hermetic + 7 pg-integration skipped"
+context_for_next_session:
+  - pr_11_rebased_on_main_with_d_008_d_009_and_d_010_d_011_interleaved_chronologically
+  - readme_what_this_is_now_describes_1_2_4_5_together_one_paragraph_per_layer
+  - rag_kit_init_exports_generator_and_streaming_layers_both_sets
+  - issue_4_criterion_3_faithfulness_in_ci_re_scoped_to_issue_7_where_it_belongs
+  - pr_11_state_clean_ready_for_review_per_d_004_next_scheduled_session_can_squash_merge
+  - issue_7_eval_harness_integration_is_the_next_repo_target_in_this_run
+decisions_made: []
 followups: []
 ---
