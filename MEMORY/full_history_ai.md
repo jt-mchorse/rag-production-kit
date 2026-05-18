@@ -215,3 +215,25 @@ context_for_next_session:
 decisions_made: [D-016]
 followups: []
 ---
+
+---
+session: 2026-05-18T15:27Z
+duration_min: 25
+issue: 17
+focus: architecture_doc_covers_all_eight_shipped_layers
+delta:
+  files_changed: 2  # README.md, docs/architecture.md
+  files_added: 0
+  tests_added: 0   # pure docs
+  test_pass_rate: "137/137 + 7 pg-integration skipped"
+context_for_next_session:
+  - docs_architecture_md_rewritten_one_integrated_index_plus_query_lifecycle_mermaid_at_top_plus_one_section_per_shipped_layer
+  - eight_layer_sections_hybrid_retrieval_reranker_rewriter_generator_streaming_telemetry_eval_nextjs_demo
+  - readme_architecture_dropped_ascii_for_one_paragraph_summary_link
+  - pending_section_removed_every_runtime_layer_in_section_2_has_shipped
+  - mermaid_labels_with_parens_fully_double_quoted_same_lint_as_cost_optimizer_doc
+  - no_new_d_entry_pure_docs_references_d_002_through_d_016
+  - quality_bar_section_1_architecture_diagram_now_met_was_previously_partial
+decisions_made: []
+followups: []
+---

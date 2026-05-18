@@ -154,3 +154,16 @@ top of the `Retriever.search` output shipped here.
 **Open questions / blockers:** As with the other Next-shaped PRs this night, the in-browser walkthrough wasn't performed on this branch — protocol contract + production build + unit tests cover the wiring, but the chip hover/scroll feel needs a human reviewer's eye. PR body is honest about this.
 
 **Next session:** Loop continues against the low-priority backlog or wrap. With 7+ issues shipped tonight, wrap is the more honest call — the remaining low-priority items are 15-30 min ad-hoc work that doesn't move the build sequence.
+
+## 2026-05-18 — Issue #17: Architecture doc covers all 8 shipped layers
+**Duration:** ~25 min · **Branch:** `session/2026-05-18-1527-issue-17` · **PR:** [#18](https://github.com/jt-mchorse/rag-production-kit/pull/18) (ready)
+
+- Rewrote `docs/architecture.md` from "one layer shipped" to "eight layers shipped": one top-of-doc integrated mermaid showing the offline index path (corpus → embedder → pgvector) and the online query path (query → rewriter → lex+dense → RRF → reranker → generator + citations → streaming + telemetry → SSE / Next.js demo), plus one per-layer section for #1 through #8.
+- Each layer section has a prose statement of what it does, a mermaid of its data flow, the relevant D-NNN references (D-002 through D-016), and a "composes with" line linking it to neighbours. Mermaid labels containing parens are fully double-quoted — same lint applied to the cost-optimizer architecture doc last session.
+- README Architecture section dropped its ASCII block for a one-paragraph summary that points at the rewritten doc. Bottom-of-doc "## Pending" section removed — every runtime layer in §2 has shipped.
+
+**Why this work, this session:** Every original `priority:high` issue is closed; the recently shipped Next.js demo (#8) brings the repo to feature-complete per its §2 spec. The architecture diagram was the most visible remaining §1 quality-bar gap — there was a diagram, but it labeled #4 as pending and listed every layer after #2 in a stale "Pending" section. Filling that gap is the cleanest move toward v0.1.
+
+**Open questions / blockers:** None — PR is ready for review.
+
+**Next session:** Continue the multi-issue loop; next zero-open-issue repo in build sequence is embedding-model-shootout (per §8) but it has an in-flight PR with a lint blocker (PR #9) — either fix that or proceed to chunking-strategies-lab.
