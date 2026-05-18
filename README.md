@@ -97,26 +97,7 @@ and is imported, not vendored.
 
 ## Architecture
 
-See [`docs/architecture.md`](docs/architecture.md). The high-level
-shape of the shipped layer:
-
-```
-                                  ┌─────────────────────────┐
-                                  │  Postgres + pgvector    │
-   ┌─────────────┐  embed text    │  documents(             │
-   │   Indexer   │ ───────────▶   │    text, tsv (GIN),     │
-   └─────────────┘                │    embedding (HNSW)     │
-                                  │  )                      │
-   ┌─────────────┐  query +       │                         │
-   │  Retriever  │  embed query   │  · ts_rank_cd top-k     │
-   └─────────────┘ ◀───────────── │  · embedding <=> top-k  │
-          │   RRF fuse            └─────────────────────────┘
-          ▼
-   ┌─────────────────────────────────────────────────────────┐
-   │  RetrievalResult[]                                      │
-   │  (external_id, text, fused_score, ranks{lex, dense})    │
-   └─────────────────────────────────────────────────────────┘
-```
+Eight runtime layers ship today: hybrid retrieval + RRF fusion (#1), opt-in cross-encoder reranking (#2), pre-retrieval query rewriting (#3), generator + citation enforcement + structured refusal (#4), typed SSE streaming pipeline (#5), cost telemetry with a 24-hour dashboard (#6), eval-harness integration with composite PR comments (#7), and a Next.js demo speaking the same SSE protocol as the Python demo (#8). Index and query paths, the full per-layer detail, and the D-NNN design decisions behind each one live in **[docs/architecture.md](docs/architecture.md)**.
 
 ## Quickstart
 
