@@ -1,0 +1,30 @@
+{
+  "name": "rag-production-kit-nextjs-demo",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Next.js 15 demo frontend for rag-production-kit: streaming answer with inline citation chips + retrieved-chunks panel. Self-contained — runs on `npm run dev` without Postgres, Anthropic, or the Python backend.",
+  "type": "module",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "next": "^15.1.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "typescript": "^5.7.0",
+    "vitest": "^2.1.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

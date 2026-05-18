@@ -15,3 +15,5 @@ logs/
 .coverage.*
 htmlcov/
 *.egg-info/
+demo/nextjs/.next/
+demo/nextjs/tsconfig.tsbuildinfo
