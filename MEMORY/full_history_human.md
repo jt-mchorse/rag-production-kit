@@ -140,3 +140,17 @@ top of the `Retriever.search` output shipped here.
 **Open questions / blockers:** None. PR will go up for review per D-004; the next scheduled session can squash-merge.
 
 **Next session:** Loop to a different portfolio repo per the multi-issue session prompt — only #8 (Next.js demo frontend) remains in this repo and it's a bigger build. Alternatively, target `llm-cost-optimizer` or `embedding-model-shootout` next.
+
+## 2026-05-18 — Issue #8: Next.js demo frontend with inline citations
+**Duration:** ~55 min · **Branch:** `session/2026-05-18-issue-08` · **PR:** #16
+
+- Shipped `demo/nextjs/`: a minimal Next.js 15 + React 19 App Router app that demonstrates the streaming-with-citations pattern. Stands alongside the existing `demo/streaming/` Python demo — same wire format (D-016), different layer. Self-contained: deterministic in-repo fixtures so a fresh clone runs `npm run dev` with no Postgres, no Anthropic key, no Python backend.
+- The page layout: query box, pipeline phase pills (idle → active → done as SSE events arrive), streamed answer on the left with inline `[N]` citation chips, retrieved-chunks panel on the right. Hovering a chip highlights the matching chunk; clicking smooth-scrolls + flashes the highlight. The route handler emits the *same* events as the Python demo (retrieving / retrieved / reranking / reranked / generating / token / generated / done) so the protocol is the load-bearing artifact, not the UI framework.
+- 13 hermetic tests: 6 on the corpus + streamer (retrieve determinism, zero-overlap fallback, citation 1..N invariant, reassembly), 7 on the route's SSE protocol shape. `?delay=0` strips per-token sleep so the suite runs in <300 ms. Production build is clean (`/` static 2.05 kB, `/api/stream` dynamic).
+- D-016 records the "re-emit the same protocol, don't invent a new one" decision. Same posture as the existing D-005.
+
+**Why this work, this session:** Last remaining med-priority issue across the portfolio and the largest scope (90-min estimate). Fits the night session's room for a bigger swing after six smaller shipped issues.
+
+**Open questions / blockers:** As with the other Next-shaped PRs this night, the in-browser walkthrough wasn't performed on this branch — protocol contract + production build + unit tests cover the wiring, but the chip hover/scroll feel needs a human reviewer's eye. PR body is honest about this.
+
+**Next session:** Loop continues against the low-priority backlog or wrap. With 7+ issues shipped tonight, wrap is the more honest call — the remaining low-priority items are 15-30 min ad-hoc work that doesn't move the build sequence.

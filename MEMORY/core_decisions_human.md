@@ -203,3 +203,20 @@ Strategic decisions for this repo, with reasoning. Append-only — superseded de
 **Reversibility:** Cheap. `PriceTable` is one class; defaults could be added later as a separate `PriceTable.from_anthropic_list_prices(as_of_date=...)` constructor without changing existing callers.
 
 **Related issues:** #6
+
+## D-016 — Next.js demo re-emits the same SSE protocol as the Python demo, not a new wire format (2026-05-18)
+
+**Decision:** The new `demo/nextjs/` frontend speaks the *same* SSE event protocol as `demo/streaming/server.py`. Frame shape `event: <type>\ndata: { payload, elapsed_ms }`. Event types: `retrieving`, `retrieved`, `reranking`, `reranked`, `generating`, `token`, `generated`, `done`. The TypeScript route handler (`demo/nextjs/app/api/stream/route.ts`) emits these events with the same names and the same payload keys the Python `to_sse()` helper produces.
+
+**Why:** The protocol is the artifact this repo teaches — phases visible to the user as the model retrieves, reranks, then generates. Two implementations of the same protocol (Python stdlib server + TypeScript Next.js route) is more pedagogically useful than two protocols in one repo. An operator reading either demo learns the same wire format; an operator who wants to swap one backend for the other gets a one-protocol migration, not a re-architecture. The decision also makes the JS-tier demo a *real* port, not a parallel reinvention: the Python demo proves the protocol works under stdlib transport, the Next demo proves it works under Next 15's route handlers; both render against the same client mental model.
+
+Same posture as D-005 (which records the rag-kit's `StreamingPipeline` as a single SSE protocol across phases) and the broader portfolio pattern of "one protocol across layers" seen in `nextjs-streaming-ai-patterns` D-005 and D-006.
+
+**Alternatives considered:**
+- Proxy the Next route to the running Python server — rejected: doubles the "fresh-clone runs" requirement (`docker compose up` + `python -m demo.streaming.server` + `npm run dev`). The demo's load-bearing posture is *runs on a fresh clone, no infra*.
+- Invent a new JSON-streaming wire format more native to the Next idiom (e.g., `application/x-ndjson`) — rejected: silos the cookbook's teaching across two protocols. The repo would need two parallel explanations of "how phase events flow", one per backend.
+- Serialize the whole answer at once on the server and animate client-side — rejected: drops the streaming pattern this repo is *about*. Real RAG UX wants the per-token feel; faking it with a client-side typewriter trades the protocol's teaching for a styling trick.
+
+**Reversibility:** Cheap. The route handler is one file (~100 lines). Swapping it for a proxy or a different wire format would touch only `app/api/stream/route.ts` and the client's `handleFrame` parser.
+
+**Related issues:** #8

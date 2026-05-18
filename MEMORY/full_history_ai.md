@@ -196,3 +196,22 @@ context_for_next_session:
 decisions_made: [D-015]
 followups: []
 ---
+
+---
+session: 2026-05-18T04:50Z
+duration_min: 55
+issue: 8
+focus: nextjs_15_demo_with_inline_citations_seventh_issue_of_night
+delta:
+  files_changed: 16
+  tests_added: 13
+context_for_next_session:
+  - d_016_nextjs_demo_speaks_same_sse_protocol_as_python_demo
+  - new_demo_nextjs_subdirectory_alongside_existing_demo_streaming
+  - fresh_clone_runs_with_no_postgres_no_anthropic_no_python_backend_deterministic_in_repo_fixtures
+  - citation_chips_hover_highlight_plus_click_scroll_to_matching_chunk_in_panel
+  - production_build_static_root_dynamic_api_stream
+  - pr_body_flags_browser_walkthrough_as_not_done_in_pr
+decisions_made: [D-016]
+followups: []
+---
