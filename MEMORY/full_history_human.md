@@ -167,3 +167,17 @@ top of the `Retriever.search` output shipped here.
 **Open questions / blockers:** None — PR is ready for review.
 
 **Next session:** Continue the multi-issue loop; next zero-open-issue repo in build sequence is embedding-model-shootout (per §8) but it has an in-flight PR with a lint blocker (PR #9) — either fix that or proceed to chunking-strategies-lab.
+
+## 2026-05-18 — Issue #19: snapshot test for README rewriter recall@k table
+**Duration:** ~20 min · **Branch:** `session/2026-05-18-1931-issue-19`
+
+- Added `tests/test_rewriter_bench_snapshot.py` (4 tests). Parametrized over k ∈ {2, 3, 5}, each one locates the README's "Rewriter recall@k" table by its header signature, parses the row, and asserts every numeric cell matches what `scripts.bench_rewriter._run(k)` + `_summary(...)` produce. The row-count test guards against silently dropping or adding a k-row.
+- The README has hard-coded recall numbers (`0.625`, `0.688`, `0.812`, `0.938`) for the synthetic multi-hop fixture. The bench is deterministic — `TemplateRewriter` dep-free, fixed in-process corpus + questions, the in-memory token-overlap retriever — but no test enforced that the README rows matched the live script output until now.
+- Failure messages on every assertion name the per-k regen command and a `git diff README.md` hint.
+- Verified the failure path by tampering one cell (k=3 rewriter mean `0.812` → `0.999`); the test fired with the regen hint visible.
+
+**Why this work, this session:** Third snapshot test landed today across the portfolio (cost-optimizer for `docs/savings.{json,md}` + table, prompt-regression-suite for `docs/regression_demo.html`, now rag-kit for the README rewriter table). The handoff §10 commits the portfolio to "no fabricated benchmarks"; snapshot tests are the structural enforcement mechanism wherever a doc cites a measured number.
+
+**Open questions / blockers:** None — PR ready for review.
+
+**Next session:** The streaming-overhead p95 numbers in `docs/benchmarks.md` are wall-clock dependent and intentionally out of scope; a separate file should track real-LLM eval-suite numbers (faithfulness/recall_at_5/correctness) once they have a similar snapshot gap worth closing.

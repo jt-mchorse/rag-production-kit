@@ -237,3 +237,25 @@ context_for_next_session:
 decisions_made: []
 followups: []
 ---
+
+---
+session: 2026-05-18T20:45Z
+duration_min: 20
+issue: 19
+focus: snapshot_test_locks_readme_rewriter_recall_table_to_bench_rewriter_output
+delta:
+  files_added: 1   # tests/test_rewriter_bench_snapshot.py
+  files_changed: 0
+  tests_added: 4   # parametrized over k in {2,3,5} plus row-count guard
+  test_pass_rate: "141/141 + 7 pg-integration skipped"
+context_for_next_session:
+  - snapshot_imports_scripts_bench_rewriter_run_and_summary_directly_no_subprocess
+  - readme_table_located_by_header_signature_robust_to_surrounding_prose_edits
+  - parametrized_k_in_2_3_5_each_cell_matched_means_at_abs_5e_4_counts_exact
+  - failure_messages_name_three_regen_commands_one_per_k_plus_git_diff_readme_md
+  - tamper_verified_by_editing_k_3_rewriter_mean_0_812_to_0_999_test_fired_then_reverted
+  - row_count_test_guards_against_silently_dropping_or_adding_a_k_row
+  - pattern_parallel_to_llm_cost_optimizer_iter_3_and_prompt_regression_suite_iter_4_landed_same_day
+decisions_made: []
+followups: []
+---
