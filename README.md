@@ -337,6 +337,15 @@ so CI stays API-key-free).
 renders the SSE stream live. 60-second video pending; the demo is
 runnable today as documented above.
 
+`demo/nextjs/` — Next.js 15 + React 19 frontend speaking the *same*
+SSE protocol, with inline footnote citation chips and a retrieved-chunks
+panel side-by-side with the streamed answer (#8). Hovering a `[N]`
+chip highlights the matching chunk; clicking scrolls it into view.
+Runs on `npm run dev` with no Postgres, no Anthropic key, no Python
+backend — the corpus and answer streamer are deterministic in-process
+fixtures so a fresh clone demonstrates the pattern offline. See
+[`demo/nextjs/README.md`](demo/nextjs/README.md).
+
 ## Why these decisions
 
 See [`MEMORY/core_decisions_human.md`](MEMORY/core_decisions_human.md).

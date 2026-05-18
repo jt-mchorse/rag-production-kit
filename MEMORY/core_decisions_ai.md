@@ -135,3 +135,12 @@
   reversibility: cheap
   related_issues: [6]
   superseded_by: null
+
+- id: D-016
+  date: 2026-05-18
+  decision: nextjs_demo_re_emits_same_sse_protocol_as_python_demo_not_a_new_wire_format
+  rationale: protocol_is_the_real_artifact_this_repo_teaches_phases_visible_to_user_as_model_retrieves_reranks_generates_two_impls_of_one_protocol_more_useful_than_two_protocols_in_one_repo_same_posture_as_d_005_for_rag_kit_streaming_module
+  alternatives_rejected: [proxy_next_route_to_running_python_server_doubles_fresh_clone_requirement, invent_new_json_streaming_format_more_native_to_next_silos_teaching_across_two_protocols, serialize_whole_answer_animate_client_side_drops_streaming_pattern_repo_is_about]
+  reversibility: cheap
+  related_issues: [8]
+  superseded_by: null
