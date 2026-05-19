@@ -181,3 +181,17 @@ top of the `Retriever.search` output shipped here.
 **Open questions / blockers:** None — PR ready for review.
 
 **Next session:** The streaming-overhead p95 numbers in `docs/benchmarks.md` are wall-clock dependent and intentionally out of scope; a separate file should track real-LLM eval-suite numbers (faithfulness/recall_at_5/correctness) once they have a similar snapshot gap worth closing.
+
+## 2026-05-19 — Issue #21: snapshot test for README eval mean-score table
+**Duration:** ~25 min · **Branch:** `session/2026-05-19-1509-issue-21`
+
+- Added `tests/test_eval_bench_snapshot.py` (4 tests). Parses the README's "First baseline" `| suite | mean score | reproducer |` table by header signature, then parametrized over `(faithfulness, recall_at_5, correctness)`: each test asserts the README's mean cell matches what `evals.run_eval.run_all_suites()` produces today, within `abs=5e-3` (two-decimal half-round). The row-count guard asserts the suite set is exactly the orchestrator's `SUITES`, so silent additions / drops fail loudly.
+- A module-scoped fixture caches one `run_all_suites()` invocation across the three parametrized rows, keeping the test under 0.2s.
+- Failure messages on every assertion name the regen command (`python -m evals.run_eval --write-baselines`) and a `git diff README.md` hint.
+- Tamper-verified by editing the `correctness` cell `0.90` → `0.99` in the README; the test fired with the regen hint, then reverted to green.
+
+**Why this work, this session:** Issue #19 explicitly flagged the eval mean-score table as the worth-following-up parallel gap, after the rewriter recall table was locked in the same pattern. The portfolio's "no fabricated benchmarks" rule (handoff §10) is enforced structurally by snapshot tests wherever a doc cites a measured number — this PR closes the second of two README benchmark tables in this repo.
+
+**Open questions / blockers:** None — PR ready for review.
+
+**Next session:** Both README benchmark tables are now locked; the streaming p95 numbers stay out of scope. Continue the multi-issue loop into the next zero-issue portfolio repo (embedding-model-shootout or chunking-strategies-lab per §8).
