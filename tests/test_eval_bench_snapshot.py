@@ -46,9 +46,7 @@ REGEN_HINT = (
 # Header signature: a row that opens with `| suite | mean score | reproducer`.
 # Whitespace inside cells is permissive; the regex only anchors the column
 # names so cosmetic edits (extra spacing, column widening) don't trip it.
-_TABLE_HEADER_RE = re.compile(
-    r"^\|\s*suite\s*\|\s*mean score\s*\|\s*reproducer\s*\|"
-)
+_TABLE_HEADER_RE = re.compile(r"^\|\s*suite\s*\|\s*mean score\s*\|\s*reproducer\s*\|")
 
 
 def _extract_readme_eval_table() -> dict[str, float]:
@@ -105,8 +103,7 @@ def live_means() -> dict[str, float]:
     """
     runs = run_all_suites()
     return {
-        run.suite: run.to_run_result(dataset_version="rag-qa-v0.1")["mean_score"]
-        for run in runs
+        run.suite: run.to_run_result(dataset_version="rag-qa-v0.1")["mean_score"] for run in runs
     }
 
 
