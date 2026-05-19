@@ -259,3 +259,26 @@ context_for_next_session:
 decisions_made: []
 followups: []
 ---
+
+---
+session: 2026-05-19T15:09Z
+duration_min: 25
+issue: 21
+focus: snapshot_test_locks_readme_eval_mean_score_table_to_run_eval_output
+delta:
+  files_added: 1   # tests/test_eval_bench_snapshot.py
+  files_changed: 0
+  tests_added: 4   # parametrized over the three suites plus row-count guard
+  test_pass_rate: "145/145 + 7 pg-integration skipped"
+context_for_next_session:
+  - second_readme_table_now_locked_third_snapshot_test_in_this_repo
+  - parametrized_over_faithfulness_recall_at_5_correctness_each_cell_matched_means_at_abs_5e_3
+  - module_scoped_fixture_caches_one_run_all_suites_call_across_the_three_parametrized_rows
+  - failure_messages_name_python_m_evals_run_eval_write_baselines_plus_git_diff_readme_md
+  - tamper_verified_by_editing_correctness_cell_0_90_to_0_99_test_fired_then_reverted
+  - row_count_test_guards_against_silently_dropping_or_adding_a_suite_row
+  - follow_up_19_explicitly_recommended_was_now_the_filing_thread_of_21
+  - eval_orchestrator_remains_deterministic_d_012_plus_d_013_still_load_bearing_no_new_decision
+decisions_made: []
+followups: []
+---
