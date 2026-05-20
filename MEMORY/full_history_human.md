@@ -195,3 +195,16 @@ top of the `Retriever.search` output shipped here.
 **Open questions / blockers:** None — PR ready for review.
 
 **Next session:** Both README benchmark tables are now locked; the streaming p95 numbers stay out of scope. Continue the multi-issue loop into the next zero-issue portfolio repo (embedding-model-shootout or chunking-strategies-lab per §8).
+
+## 2026-05-20 — Issue #23: lock rag_kit public surface
+**Duration:** ~35 min · **Branch:** `session/2026-05-20-0311-issue-23`
+
+- Added `tests/test_public_surface.py` (5 test functions, 13 test items: 4 standalone + 9 parametrized submodule anchors) that locks the top-level `rag_kit` surface across five orthogonal axes: `__version__` is semver-ish, every `__all__` entry is bound and non-None, `__all__` agrees bidirectionally with the AST-parsed `from .X import …` block (filtered on `level >= 1` for relative imports — same adaptation `prompt-regression-suite#20` used), the README quickstart's quoted imports resolve, and one anchor per submodule survives.
+- Companion change: added `__version__ = "0.0.1"` to `rag_kit/__init__.py`, mirroring `pyproject.toml`'s `[project] version`. No `importlib.reload` workaround was needed — this repo doesn't ship a pytest plugin via entry-points like `llm-eval-harness` does, so `rag_kit/__init__.py` is instrumented from the start (already at 100%).
+- Tamper-verified three of five axes locally: a bad `__version__` fires test (1); dropping `"Document"` from `__all__` fires test (3) naming `{'Document'}`; alias-renaming `HashEmbedder as HashEmbedderV2` fires tests (2), (4), (5)[embedder] simultaneously plus (3) — full surface coverage working as designed.
+
+**Why this work, this session:** Fourth strike of the portfolio-wide public-surface hygiene pattern, applied to the largest top-level surface in the portfolio (42 names, nine submodules). Explicitly named as one of the remaining five targets in the 2026-05-19 day-session report, and earliest in build sequence among them.
+
+**Open questions / blockers:** None — PR ready for review.
+
+**Next session:** Continue the night-session multi-issue loop into the next portable target: `embedding-model-shootout`, then `chunking-strategies-lab`, then `python-async-llm-pipelines`, then the Python example in `mcp-server-cookbook`.

@@ -282,3 +282,25 @@ context_for_next_session:
 decisions_made: []
 followups: []
 ---
+
+---
+session: 2026-05-20T03:11Z
+duration_min: 35
+issue: 23
+focus: public_surface_snapshot_test_locks_rag_kit_top_level_init
+delta:
+  files_added: 1   # tests/test_public_surface.py
+  files_changed: 1   # rag_kit/__init__.py (+__version__)
+  tests_added: 13   # 4 standalone + 9 parametrized submodule anchors
+  test_pass_rate: "158/158 + 7 pg-integration skipped"
+context_for_next_session:
+  - public_surface_pattern_portable_to_remaining_four_python_repos_embedding_model_shootout_chunking_strategies_lab_python_async_llm_pipelines_mcp_server_cookbook_python_example
+  - rag_kit_now_publishes_dunder_version_str_0_0_1_mirror_of_pyproject
+  - ast_parser_filters_on_level_geq_1_for_relative_imports_same_fix_as_prompt_regression_suite_pr_20
+  - no_importlib_reload_workaround_needed_no_entry_points_pytest_plugin_in_this_repo_init_already_at_100pct_coverage
+  - tamper_verified_three_axes_bad_version_drop_document_alias_rename_hashembedder
+  - readme_quickstart_line_115_now_pinned_document_hashembedder_indexer_retriever
+  - nine_submodule_anchors_embedder_fusion_generator_indexer_reranker_retriever_rewriter_streaming_telemetry
+decisions_made: []
+followups: []
+---
