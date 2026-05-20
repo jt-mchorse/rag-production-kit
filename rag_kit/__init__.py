@@ -45,6 +45,8 @@ Layers in later PRs:
 - Eval harness integration + faithfulness measurement (#7)
 """
 
+__version__ = "0.0.1"  # mirror of pyproject.toml [project] version
+
 from .embedder import EMBEDDING_DIM, Embedder, HashEmbedder
 from .fusion import reciprocal_rank_fusion
 from .generator import (
