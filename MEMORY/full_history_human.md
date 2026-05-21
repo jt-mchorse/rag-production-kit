@@ -208,3 +208,18 @@ top of the `Retriever.search` output shipped here.
 **Open questions / blockers:** None — PR ready for review.
 
 **Next session:** Continue the night-session multi-issue loop into the next portable target: `embedding-model-shootout`, then `chunking-strategies-lab`, then `python-async-llm-pipelines`, then the Python example in `mcp-server-cookbook`.
+
+## 2026-05-21 — Issue #25: Capture script for the two-surface 60s demo
+**Duration:** ~25 min · **Branch:** `session/2026-05-21-1635-issue-25` · **PR:** [#26](https://github.com/jt-mchorse/rag-production-kit/pull/26) (draft — issue stays open for JT's GIF recording)
+
+- Issue #25 filed in-session as the fourth instance of today's portfolio-wide demo-capture pattern (sister to `llm-eval-harness` #26, `llm-cost-optimizer` #24, `prompt-regression-suite` #21 — all landed earlier in the same multi-issue loop). The trigger: rag-production-kit had zero open issues but the README's "Demo" section still carried a stale "60-second video pending" sentence, so the escape from Phase B step 5 applies — file an actionable issue grounded in real README content, then work it.
+- `scripts/capture_demo.sh` runs both demo surfaces: (1) spawns `python -m demo.streaming.server` in the background, polls the bound port until it accepts a connection, then `curl -s -N --max-time` against `/stream?q=postgres+tuning` so all eight pipeline phase events print live to the terminal (`retrieving` → `retrieved` → `reranking` → `reranked` → `generating` → `token` × N → `generated` → `done`); (2) optionally `cd demo/nextjs && exec npm run dev` (default; smoke test sets `CAPTURE_LAUNCH_NEXTJS=0`). The SSE server is reaped via EXIT trap so Ctrl+C from the operator's recording session and the smoke test both leave a clean port.
+- Tiny upstream change to `demo/streaming/server.py`: the `__main__` block now reads a `PORT` env var (default `8765` — documented behavior unchanged). The smoke test binds a free OS port via `socket(0)` and forwards it via `CAPTURE_DEMO_PORT`, so two parallel test runs or a stray leftover server from a manual capture can't collide on 8765. One line added; the inner `main(host, port)` signature was already configurable.
+- `tests/test_capture_demo_smoke.py` (4 tests, module-scoped fixture) asserts: exit 0, all eight SSE phase events appear in pipeline order (the load-bearing assertion the script exists to make recordable — phase ordering is the entire D-005 wire contract), the Next.js section describes the `npm install && npm run dev` launch path even with launch skipped, and the bound port is free after the script exits (verifies the EXIT trap reaping). Full suite: 162 passed + 7 pre-existing Postgres skips.
+- README "Demo" section rewritten to point at `scripts/capture_demo.sh` and both surfaces; replaces the stale `60-second video pending` sentence with an explicit #25 follow-up reference. No "pending until ..." language.
+
+**Why this work, this session:** Fourth instance of the demo-capture pattern landed in today's multi-issue session, and the first repo with a multi-surface (Python + Next.js) demo path — gave the script a slightly richer shape (background-process reaping, port polling, idempotent `npm install`) that the future targets in the remaining repos can lift verbatim.
+
+**Open questions / blockers:** None. Acceptance criteria 1 (`docs/demo.gif|mp4`) and 2 (README embed) remain pending JT screen capture.
+
+**Next session:** Loop should now skip the four "demo-capture only" repos for autonomous turns (eval-harness, cost-optimizer, prompt-regression, rag-production-kit) — all blocked on the same JT recording action — and pick from the next-eligible open queues across the remaining repos.
