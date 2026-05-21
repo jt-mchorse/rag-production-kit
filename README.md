@@ -314,18 +314,40 @@ so CI stays API-key-free).
 
 ## Demo
 
-`demo/streaming/` — single-file stdlib server + HTML client that
-renders the SSE stream live. 60-second video pending; the demo is
-runnable today as documented above.
+The runnable surface today is one command on a fresh clone:
 
-`demo/nextjs/` — Next.js 15 + React 19 frontend speaking the *same*
-SSE protocol, with inline footnote citation chips and a retrieved-chunks
-panel side-by-side with the streamed answer (#8). Hovering a `[N]`
-chip highlights the matching chunk; clicking scrolls it into view.
-Runs on `npm run dev` with no Postgres, no Anthropic key, no Python
-backend — the corpus and answer streamer are deterministic in-process
-fixtures so a fresh clone demonstrates the pattern offline. See
-[`demo/nextjs/README.md`](demo/nextjs/README.md).
+```bash
+scripts/capture_demo.sh
+```
+
+That drives the two demo surfaces in sequence without an API key or
+Postgres:
+
+1. **Streaming SSE server** — spawns `python -m demo.streaming.server`
+   in the background, then `curl -N` against `/stream?q=postgres+tuning`
+   so the eight pipeline phase events (`retrieving` → `retrieved` →
+   `reranking` → `reranked` → `generating` → `token` (n times) →
+   `generated` → `done`) print live to the terminal. The single-file
+   stdlib server is reaped on exit.
+2. **Next.js frontend** (`demo/nextjs/`) — Next.js 15 + React 19
+   speaking the *same* SSE protocol, with inline footnote citation
+   chips and a retrieved-chunks panel side-by-side with the streamed
+   answer (#8). Hovering a `[N]` chip highlights the matching chunk;
+   clicking scrolls it into view. Corpus and answer streamer are
+   deterministic in-process fixtures (no Postgres, no Anthropic key,
+   no Python backend) — see [`demo/nextjs/README.md`](demo/nextjs/README.md).
+
+Knobs: `CAPTURE_PACE_SECONDS` (default `2` for recording, `0` for CI);
+`CAPTURE_LAUNCH_NEXTJS=0` skips the `npm run dev` launch (the path the
+smoke test exercises); `CAPTURE_SSE_TIMEOUT` caps the SSE read (default
+`6` s — the full hermetic stream is ~500 ms);
+`CAPTURE_DEMO_PORT` / `PORT` overrides the stdlib server's bound port
+(default `8765`). `tests/test_capture_demo_smoke.py` runs the whole
+script end-to-end in CI so the demo can't bitrot.
+
+The captured 60-second GIF/video that this script drives is tracked
+in **#25**; once recorded it lands at `docs/demo.gif` and gets
+embedded here.
 
 ## Why these decisions
 
