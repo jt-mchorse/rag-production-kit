@@ -304,3 +304,29 @@ context_for_next_session:
 decisions_made: []
 followups: []
 ---
+
+---
+session: 2026-05-21T16:50Z
+duration_min: 25
+issue: 25
+focus: capture_script_for_60s_demo_two_surfaces_sse_plus_nextjs
+delta:
+  files_added: 2   # scripts/capture_demo.sh, tests/test_capture_demo_smoke.py
+  files_changed: 2 # README.md (Demo section), demo/streaming/server.py (PORT env var)
+  tests_added: 4
+  test_pass_rate: "162/162 + 7 pg-integration skipped"
+context_for_next_session:
+  - issue_25_filed_in_session_as_sister_to_eval_harness_20_cost_optimizer_18_prompt_regression_15_all_in_same_portfolio_loop_today
+  - capture_script_lives_at_scripts_capture_demo_sh_one_bash_entry_point_for_jt_recording
+  - two_surfaces_streaming_sse_server_with_curl_tour_then_nextjs_npm_run_dev_via_exec
+  - port_env_var_added_to_demo_streaming_server_main_block_default_8765_documented_behavior_unchanged_for_parallel_test_safety
+  - smoke_test_binds_free_os_port_via_socket_then_passes_via_capture_demo_port_env_so_no_collision_on_8765
+  - smoke_test_load_bearing_assertion_all_eight_sse_phase_events_appear_in_pipeline_order_retrieving_retrieved_reranking_reranked_generating_token_generated_done
+  - smoke_test_also_verifies_port_is_free_after_script_exit_to_pin_exit_trap_reaping_background_server
+  - readme_demo_section_replaces_stale_60_second_video_pending_sentence_with_25_followup_reference
+  - acceptance_criterion_3_capture_script_under_scripts_satisfied_acceptance_1_gif_and_2_readme_embed_remain_blocked_on_human_recording
+  - pr_26_draft_issue_25_stays_open_until_jt_records_gif
+  - fourth_capture_demo_script_landed_today_pattern_now_in_eval_harness_cost_optimizer_prompt_regression_rag_production_kit
+followups: [#25]
+decisions_made: []
+---

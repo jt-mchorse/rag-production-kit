@@ -191,4 +191,9 @@ def main(host: str = "127.0.0.1", port: int = 8765) -> None:
 
 
 if __name__ == "__main__":
-    main()
+    # `PORT` lets `scripts/capture_demo.sh` and its smoke test pick a
+    # free port off the OS so parallel test runs don't collide on 8765.
+    # Default keeps the documented behavior unchanged.
+    import os
+
+    main(port=int(os.environ.get("PORT", "8765")))
