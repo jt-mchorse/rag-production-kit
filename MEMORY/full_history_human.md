@@ -208,3 +208,17 @@ top of the `Retriever.search` output shipped here.
 **Open questions / blockers:** None — PR ready for review.
 
 **Next session:** Continue the night-session multi-issue loop into the next portable target: `embedding-model-shootout`, then `chunking-strategies-lab`, then `python-async-llm-pipelines`, then the Python example in `mcp-server-cookbook`.
+
+## 2026-05-22 — README "What this is" section claimed #7 was staged but it shipped 6 days ago; #8 was unmentioned (#27)
+
+**Duration:** ~30 min. **Issue:** [#27](https://github.com/jt-mchorse/rag-production-kit/issues/27). **PR:** [#28](https://github.com/jt-mchorse/rag-production-kit/pull/28).
+
+The README's "What this is" section walked the reader through six bold sub-sections, one per shipped layer (#1 hybrid retrieval through #6 cost telemetry), and then closed with a paragraph claiming "Everything beyond #1 + #2 + #3 + #4 + #5 + #6 is staged in follow-up issues" — naming #7 (eval-harness integration) as pending and not mentioning #8 (Next.js demo) at all. Both shipped a week ago. The Architecture section three lines below already said "Eight runtime layers ship today" with #7 and #8 inclusive, so the same README contradicted itself top-to-bottom.
+
+Replaced the stale paragraph with two new bold sub-sections, one for #7 and one for #8, of the same shape as the existing six. Added the missing `[#8]` link reference. Architecture, Quickstart, Benchmarks, Demo, and the bodies for layers #1–#6 are unchanged.
+
+Lock-against-drift: `tests/test_readme_what_this_is_lists_shipped_layers.py` (+4 tests) extracts every column-0 bold opener (`**...**`) inside the What-this-is section and asserts the set matches a canonical eight-layer frozenset (catches both missing and extra layers symmetrically), hard-pins the stale `/staged\s+in\s+follow-up\s+issues/` phrase absent (whitespace-insensitive because the original wrapped at `follow-up\n`), and cross-checks the Architecture section's "Eight runtime layers ship today" line still parses cleanly and agrees on the count. Tamper-verified.
+
+Issue #27 was filed in-session: after Phase A merged seven PRs and the cost-optimizer #25 PR closed, no actionable priority:high/med issues remained open across the portfolio (the seven open issues are all priority:low demo-capture work that needs a human screen recorder). This drift was caught while scanning rag-production-kit for an actionable bug; tenth post-v0.1 README-vs-code drift fix in the portfolio pattern.
+
+**Open questions / blockers:** None. **Next session:** continue the multi-issue loop or fall through to another repo for similar drift hunting.
