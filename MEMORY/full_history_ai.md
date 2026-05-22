@@ -304,3 +304,28 @@ context_for_next_session:
 decisions_made: []
 followups: []
 ---
+
+---
+session: 2026-05-22T16:00Z
+duration_min: 30
+issue: 27
+focus: readme_what_this_is_section_now_lists_all_eight_shipped_layers
+delta:
+  files_changed: 1   # README.md
+  files_added: 1     # tests/test_readme_what_this_is_lists_shipped_layers.py
+  tests_added: 4
+  test_pass_rate: "162/162 + 7 pg-integration skipped"
+context_for_next_session:
+  - readme_what_this_is_section_closing_paragraph_l83_87_said_everything_beyond_layers_1_to_6_was_staged_but_7_shipped_2026_05_16_and_8_shipped_2026_05_18
+  - architecture_section_already_said_eight_runtime_layers_ship_today_so_one_part_of_readme_contradicted_another
+  - replaced_stale_paragraph_with_two_new_bold_sub_sections_eval_harness_integration_and_nextjs_demo_frontend_same_shape_as_the_existing_six
+  - added_missing_link_reference_for_issue_8
+  - new_snapshot_test_four_axes_canonical_layer_set_match_no_extra_bold_openers_stale_phrase_absent_architecture_section_agrees
+  - canonical_layers_frozenset_lives_in_the_test_so_a_future_ninth_layer_must_update_both_the_section_and_the_test
+  - stale_phrase_matched_via_re_staged_s_plus_in_s_plus_follow_up_s_plus_issues_because_the_original_wrapped_mid_line_at_follow_up_newline_issues
+  - tamper_verified_by_reinjecting_the_wrapped_stale_phrasing_third_assertion_fires_with_the_matched_wrapped_form_quoted_in_the_message
+  - issue_27_was_filed_in_session_after_phase_a_pr_review_merged_seven_prs_and_session_one_closed_llm_cost_optimizer_25_no_other_actionable_high_or_med_issues_were_open_anywhere_the_portfolio_is_pure_drift_hunting_at_this_point
+  - tenth_post_v0_1_readme_vs_code_drift_fix_in_the_portfolio_pattern
+decisions_made: []
+followups: []
+---
