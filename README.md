@@ -80,11 +80,23 @@ silently emitting `$0.00`. A dep-free local dashboard
 renders the last 24 hours with p50 / p95 / p99 latency, total USD,
 and the most recent 20 records — works air-gapped.
 
-Everything beyond #1 + #2 + #3 + #4 + #5 + #6 is staged in follow-up
-issues: eval harness integration with faithfulness measurement against
-the citation contract plus a Recall@5 number against a real corpus
-([#7]). The eval harness lives in its own repo ([llm-eval-harness])
-and is imported, not vendored.
+**Eval-harness integration** is wired through the sibling
+[llm-eval-harness] repo (imported, not vendored — D-002). Three
+suites run on every PR against the synthetic `rag-qa-v0.1` golden
+set: faithfulness against the citation contract, recall@5 against the
+in-memory corpus, and judge-scored answer correctness. CI's `eval`
+job builds the composite PR comment with the per-suite mean-score
+table the Benchmarks section quotes verbatim; baselines live under
+`evals/baselines/` and the orchestrator is the deterministic
+`python -m evals.run_eval` ([#7]).
+
+**Next.js demo frontend** is a React 19 / Next.js 15 single-page app
+under `demo/nextjs/` that speaks the *same* SSE protocol as the
+single-file stdlib demo under `demo/streaming/` — inline citation
+chips with hover-highlight and click-to-scroll, retrieval and rerank
+panels mirroring the `StreamEvent` phase boundaries, hermetic against
+in-repo fixtures so a fresh clone runs without Postgres, Anthropic, or
+a Python backend ([#8]).
 
 [Reciprocal Rank Fusion]: https://dl.acm.org/doi/10.1145/1571941.1572114
 [#2]: https://github.com/jt-mchorse/rag-production-kit/issues/2
@@ -93,6 +105,7 @@ and is imported, not vendored.
 [#5]: https://github.com/jt-mchorse/rag-production-kit/issues/5
 [#6]: https://github.com/jt-mchorse/rag-production-kit/issues/6
 [#7]: https://github.com/jt-mchorse/rag-production-kit/issues/7
+[#8]: https://github.com/jt-mchorse/rag-production-kit/issues/8
 [llm-eval-harness]: https://github.com/jt-mchorse/llm-eval-harness
 
 ## Architecture
