@@ -236,3 +236,23 @@ Four invariants pinned: path-token reachability with `OPERATOR_SUPPLIED_PATHS` a
 **Open questions / blockers:** none.
 
 **Next session:** continue the sweep across `chunking-strategies-lab`, `python-async-llm-pipelines`, `agent-orchestration-platform`.
+
+## 2026-05-23 — 60-second demo capture script (#25, AC3 of 3)
+
+**Duration:** ~25 min. **Issue:** [#25](https://github.com/jt-mchorse/rag-production-kit/issues/25). **PR:** [#31](https://github.com/jt-mchorse/rag-production-kit/pull/31).
+
+Fourth issue in the day-session multi-issue loop, after `llm-eval-harness#33`, `llm-cost-optimizer#29`, and `prompt-regression-suite#28`. Three stages map to the two demo surfaces from #25's spec plus a hermetic in-process preview:
+
+- **STAGE 1 (auto, hermetic).** `scripts/capture_demo.py` composes `StreamingPipeline` directly with the stubs `demo.streaming.server` already ships — `FakeRetriever`, `SlowReranker`, `_stub_token_stream`, `_CORPUS`. Re-using rather than redefining means a future change to the demo's corpus or the FakeRetriever's `sleep_ms` flows automatically through to the recorded phase sequence — the two surfaces can't drift apart. Each event prints as an SSE frame matching what `curl -N` against the live server shows over the wire.
+
+- **STAGE 2 (operator-action).** Cheat-sheet for the actual SSE server the README cites: `python -m demo.streaming.server` then `curl -N 'http://localhost:8765/stream?q=postgres+tuning'`. `--launch-server` subprocess-spawns the server and curls for one-key recording sessions; off by default because the server is long-running and can't run hermetically in CI.
+
+- **STAGE 3 (operator-action).** Cheat-sheet for `cd demo/nextjs && npm run dev`, the `http://localhost:3000` URL, and a three-step click checklist (search input + phase pills tick through retrieve → rerank → generate → citation chip hover highlights matching chunk → retrieved-chunks panel collapse/expand). The Next.js dev server is **never** auto-spawned even with `--launch-server` — npm/node startup cost makes that a poor recording experience; the operator launches it themselves before hitting record.
+
+`tests/test_capture_demo_smoke.py` adds four tests under the same hermetic contract as `tests/test_streaming.py`. The first test asserts STAGE 1 emits the exact phase sequence the streaming-test contract defines (`retrieving` first, full phase set present, `done` last, at least one `token` event between `generating` and `generated`).
+
+**Why this work, this session:** Fourth loop iteration. Build-sequence position 4. After this PR the portfolio's demo-script coverage is 6 of 7 (six repos with `capture_demo` script committed; one remaining — `mcp-server-cookbook#16`). The pattern across the four PRs in this loop is stable enough that the cookbook PR will be a straight transcription.
+
+**Open questions / blockers:** AC1 + AC2 are operator-only (screen recorder + README embed). PR is ready for review on AC3 standalone — issue #25 stays open until JT records.
+
+**Next session:** `mcp-server-cookbook` #16 to close the AC3-coverage loop across the portfolio.

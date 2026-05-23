@@ -351,3 +351,24 @@ context_for_next_session:
   - three_repos_remaining_in_arch_doc_lock_sweep_chunking_strategies_lab_python_async_llm_pipelines_agent_orchestration_platform
 followups: []
 ---
+
+---
+session: 2026-05-23T23:55Z
+duration_min: 25
+issue: 25
+focus: demo_capture_script_three_stages_streaming_pipeline_preview_plus_sse_server_and_nextjs_cheatsheets
+delta:
+  files_added: 2   # scripts/capture_demo.py, tests/test_capture_demo_smoke.py
+  files_changed: 1  # .gitignore (docs/demo-artifacts/)
+  tests_added: 4
+decisions_made: []
+context_for_next_session:
+  - fourth_in_day_session_loop_after_eval_harness_33_cost_optimizer_29_prompt_regression_suite_28
+  - stage_1_reuses_demo_streaming_server_stubs_via_importlib_FakeRetriever_SlowReranker_stub_token_stream_corpus_so_corpus_or_timing_changes_flow_through_to_recording_no_drift
+  - stage_2_sse_server_optional_launch_via_subprocess_spawn_python_m_demo_streaming_server_plus_curl_long_running_server_off_by_default
+  - stage_3_nextjs_dev_server_never_auto_spawned_npm_node_startup_too_slow_for_recording_experience_cheatsheet_only
+  - issue_25_now_1_of_3_ac_complete_ac1_gif_mp4_and_ac2_readme_embed_remain_operator_only
+  - portfolio_demo_script_coverage_now_eval_harness_done_cost_optimizer_done_prompt_regression_suite_done_rag_production_kit_done_nextjs_already_done_ai_app_already_done_only_mcp_server_cookbook_16_remaining
+  - five_repos_completed_in_this_day_session_two_phase_a_merges_plus_three_phase_b_c_demo_script_lands_pace_about_25_30min_per_issue_after_eval_harness_baseline
+followups: []
+---
