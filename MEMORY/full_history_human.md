@@ -222,3 +222,17 @@ Lock-against-drift: `tests/test_readme_what_this_is_lists_shipped_layers.py` (+4
 Issue #27 was filed in-session: after Phase A merged seven PRs and the cost-optimizer #25 PR closed, no actionable priority:high/med issues remained open across the portfolio (the seven open issues are all priority:low demo-capture work that needs a human screen recorder). This drift was caught while scanning rag-production-kit for an actionable bug; tenth post-v0.1 README-vs-code drift fix in the portfolio pattern.
 
 **Open questions / blockers:** None. **Next session:** continue the multi-issue loop or fall through to another repo for similar drift hunting.
+
+## 2026-05-23 — Architecture-doc drift lock (#29)
+
+**Duration:** ~25 min. **Issue:** [#29](https://github.com/jt-mchorse/rag-production-kit/issues/29). **PR:** [#30](https://github.com/jt-mchorse/rag-production-kit/pull/30).
+
+This repo is the **first in the portfolio with both coverage axes** — the doc annotates surfaces with both `(#NN)` issue references AND `D-NNN` decision references. The lock covers both axes simultaneously (compare: `llm-cost-optimizer` PR #28 D-NNN-only; `vector-search-at-scale` PR #22 #NN-only).
+
+Four invariants pinned: path-token reachability with `OPERATOR_SUPPLIED_PATHS` allow-list (currently empty), closed-feature-issue coverage anchored to `KNOWN_SHIPPED_ISSUES = (1..8)`, active-decision coverage anchored to `MEMORY/core_decisions_ai.md` non-superseded entries from D-002, and banned-phrase absence. Tamper-verified all four. No `docs/architecture.md` changes — already in steady state.
+
+**Why this work, this session:** Second of five sister issues in this night-session sweep across the Python half of the portfolio.
+
+**Open questions / blockers:** none.
+
+**Next session:** continue the sweep across `chunking-strategies-lab`, `python-async-llm-pipelines`, `agent-orchestration-platform`.
