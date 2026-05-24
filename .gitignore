@@ -17,3 +17,9 @@ htmlcov/
 *.egg-info/
 demo/nextjs/.next/
 demo/nextjs/tsconfig.tsbuildinfo
+
+# Intermediate artifacts produced during a re-capture of the 60-second
+# demo (scripts/capture_demo.py). The committed demo asset lives at
+# docs/demo.gif (or .mp4); any transient recorder side-files land here
+# and aren't source.
+docs/demo-artifacts/
