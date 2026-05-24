@@ -372,3 +372,24 @@ context_for_next_session:
   - five_repos_completed_in_this_day_session_two_phase_a_merges_plus_three_phase_b_c_demo_script_lands_pace_about_25_30min_per_issue_after_eval_harness_baseline
 followups: []
 ---
+
+---
+session: 2026-05-24T03:36Z
+duration_min: 25
+issue: 32
+focus: suite_filter_on_run_eval_for_iterative_scorer_dev
+delta:
+  files_changed: 2   # evals/run_eval.py, tests/test_eval_run.py
+  tests_added: 4
+  test_pass_rate: "182_passed_7_skipped"
+decisions_made: []
+context_for_next_session:
+  - run_eval_always_wrote_all_three_suite_jsons_and_write_baselines_clobbered_all_three_no_way_to_iterate_on_one_scorer
+  - parallel_to_llm_eval_harness_suite_filter_on_runner_same_shape_different_repo
+  - run_all_suites_keeps_computing_all_three_scoring_is_one_pass_over_dataset_savings_is_in_disk_writes_not_compute
+  - post_comment_renders_selected_suite_as_actual_delta_unselected_as_skipped_via_suite_filter_so_composite_comment_shape_stays_stable_for_ci_subscribers
+  - validation_manual_not_via_argparse_choices_so_error_can_list_inventory_on_stderr
+  - fourth_in_night_session_loop_after_llm_eval_harness_34_llm_cost_optimizer_30_prompt_regression_suite_29
+  - pattern_so_far_each_repo_got_one_cli_surface_parity_fix_either_format_out_addition_or_filter_or_dead_code_revival
+followups: []
+---
