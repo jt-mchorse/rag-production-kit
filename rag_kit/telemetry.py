@@ -49,6 +49,17 @@ class ModelPrice:
     prompt_per_million: float
     completion_per_million: float
 
+    def __post_init__(self) -> None:
+        # D-015 prevents silent-zero via UnknownModelError; this guard extends
+        # the same posture to silent-negative. A negative per-million rate
+        # silently inverts the sign of CostRecord.total_usd downstream.
+        for name, value in (
+            ("prompt_per_million", self.prompt_per_million),
+            ("completion_per_million", self.completion_per_million),
+        ):
+            if value < 0.0:
+                raise ValueError(f"{name} must be >= 0.0; got {value}")
+
     def cost(self, prompt_tokens: int, completion_tokens: int) -> tuple[float, float]:
         """Return ``(prompt_usd, completion_usd)`` rounded to 6 decimal places."""
         if prompt_tokens < 0 or completion_tokens < 0:
