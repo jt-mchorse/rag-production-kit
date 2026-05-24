@@ -414,3 +414,26 @@ context_for_next_session:
   - test_pattern_pyfakeconn_obviates_database_url_so_construction_tests_run_in_default_hermetic_suite
 followups: []
 ---
+
+---
+session: 2026-05-25T00:10Z
+duration_min: 15
+issue: 36
+focus: model_price_post_init_validates_non_negative_rates
+delta:
+  files_changed: 1   # rag_kit/telemetry.py
+  files_added: 0
+  tests_added: 7   # 4 parametrized negative-value cases + 1 inclusive-zero + 2 PriceTable.add wrap-through cases
+  test_pass_rate: "196_passed_7_skipped"
+decisions_made: []
+context_for_next_session:
+  - model_price_frozen_dataclass_at_telemetry_py_45_post_init_validates_prompt_per_million_and_completion_per_million_ge_zero
+  - cost_method_already_validated_token_counts_non_negative_at_line_54_but_rates_themselves_were_not_validated_creating_sign_flip_path
+  - d_015_explicit_silent_zero_load_bearing_bug_in_cost_dashboards_this_extends_no_silent_zero_to_no_silent_negative
+  - mirrors_sister_fix_llm_cost_optimizer_34_pr_35_same_pattern_same_session_two_cost_aware_repos_defended_consistently
+  - frozen_dataclass_post_init_runs_at_construction_does_not_break_frozenness_pattern_reused_from_cost_optimizer
+  - price_table_add_wraps_model_price_construction_so_realistic_operator_supplies_bad_config_path_caught_through_wrap_through_tests
+  - upper_bound_deliberately_not_enforced_thousand_per_mtok_could_be_legit_niche_model_strict_ge_zero_is_sign_flip_guard
+  - third_phase_bc_target_in_180_min_day_session_after_phase_a_5_pr_merge_plus_llm_eval_harness_40_plus_llm_cost_optimizer_34
+followups: []
+---

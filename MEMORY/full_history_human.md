@@ -285,3 +285,16 @@ Four new tests cover the filter on the default current-dir path, the `--write-ba
 **Open questions / blockers:** none — PR ready for review.
 
 **Next session:** With four iterations behind and limited time left in the 180-minute cap, check the clock before deciding whether to start a fifth. Build sequence #5 (`embedding-model-shootout`) and #6 (`chunking-strategies-lab`) are the next reasonable targets if there's time.
+
+## 2026-05-25 — Issue #36: ModelPrice validates non-negative rates in __post_init__
+**Duration:** ~15 min · **Branch:** `session/2026-05-24-issue-36`
+
+- `ModelPrice` at `rag_kit/telemetry.py:45` is a frozen dataclass accepting `prompt_per_million` and `completion_per_million` floats. `cost()` at line 52 already validated token counts non-negative — but the per-million **rates** themselves were not validated. A negative rate flowed through `prompt_tokens * rate / 1_000_000` and silently inverted the sign of `CostRecord.total_usd` downstream. D-015 explicitly calls silent-zero "a load-bearing bug in cost dashboards"; this extends the same posture to silent-negative.
+- Added `__post_init__` raising `ValueError(f"{field} must be >= 0.0; got {value}")` for either rate `< 0.0`. Comment in source documents the D-015 anchor. `frozen=True` only blocks reassignment, not the initial set, so `__post_init__` works cleanly on a frozen dataclass.
+- Seven new cases in `tests/test_telemetry.py` under a `#36` block: parametrized over (field × bad-value, 4 cases); inclusive-zero accepted (1 case); `PriceTable.add(..., -X, Y)` wrap-through validates through the realistic operator-supplies-bad-config path (2 cases). Full suite 196/196 + 7 skipped (`DATABASE_URL` not set locally).
+
+**Why this work, this session:** Direct mirror of `llm-cost-optimizer` PR #35 (`ModelPricing.__post_init__`) shipped earlier in this same day session. The two cost-aware repos in the portfolio now defend their dashboards consistently. Third Phase B+C target after `llm-eval-harness` #40 (drift thresholds) and `llm-cost-optimizer` #34 (pricing rates).
+
+**Open questions / blockers:** none — PR ready for review.
+
+**Next session:** Time remaining in the 180-min cap permits another iteration. Build sequence #5 (`embedding-model-shootout`) or #6 (`chunking-strategies-lab`) are the natural next pickups; both have public-surface numeric parameters worth scanning.
