@@ -256,3 +256,19 @@ Fourth issue in the day-session multi-issue loop, after `llm-eval-harness#33`, `
 **Open questions / blockers:** AC1 + AC2 are operator-only (screen recorder + README embed). PR is ready for review on AC3 standalone — issue #25 stays open until JT records.
 
 **Next session:** `mcp-server-cookbook` #16 to close the AC3-coverage loop across the portfolio.
+
+## 2026-05-24 — Issue #32: `--suite` filter on `evals/run_eval.py`
+
+**Duration:** ~25 min. **Issue:** [#32](https://github.com/jt-mchorse/rag-production-kit/issues/32). **Branch:** `session/2026-05-24-0332-issue-32`.
+
+`evals/run_eval.py` always wrote all three suite JSONs (`faithfulness`, `recall_at_5`, `correctness`), and `--write-baselines` clobbered all three. There was no way to iteratively update one baseline without `git restore`-ing the unrelated two by hand. Parallel to `llm-eval-harness`'s own `--suite` filter on the runner — same dev-iteration use case, different repo.
+
+`--suite faithfulness|recall_at_5|correctness` now filters what `write_runs` sees and what `_post_composite_comment` renders. `run_all_suites()` deliberately keeps computing all three — scoring is one pass over the dataset, so the savings is in disk writes (and the surprise-baseline-clobber path), not compute. The composite-comment shape stays stable for any CI subscriber: unselected suites render as `_(skipped via --suite filter)_` instead of dropping out of the table entirely. Validation is manual rather than `argparse choices=` so an unknown value can exit 2 with the inventory printed on stderr (matches `llm-eval-harness`'s `--tags` UX).
+
+Four new tests cover the filter on the default current-dir path, the `--write-baselines` path (the workflow the filter was added for), the unknown-suite stderr-inventory exit-2 path, and a regression guard that no-`--suite` still writes all three.
+
+**Why this work, this session:** Fourth issue in the night-session multi-issue loop, after CLI surface fixes in `llm-eval-harness` #34 (`diff --format markdown`), `llm-cost-optimizer` #30 (`--dry/--no-dry` parity), and `prompt-regression-suite` #29 (`run --format html --out`). The pattern this run keeps surfacing: every repo had at least one CLI parity gap that was easy to find by reading the source once.
+
+**Open questions / blockers:** none — PR ready for review.
+
+**Next session:** Continue the loop to build-sequence #5 (`embedding-model-shootout`). Most of the same shape (Python repo with bench script) and likely a similar parity gap.
