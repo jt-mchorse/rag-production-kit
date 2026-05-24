@@ -251,3 +251,49 @@ def test_committed_baselines_round_trip_to_valid_run_results():
         assert 0.0 <= data["mean_score"] <= 1.0
         for row in data["rows"]:
             assert 0.0 <= row["score"] <= 1.0
+
+
+# --- --suite filter (issue #32) ----------------------------------------------
+
+
+def test_main_suite_filter_writes_only_chosen_suite(tmp_path, monkeypatch):
+    """With `--suite faithfulness`, only the faithfulness JSON should land
+    in the target dir. The other two are intentionally untouched so dev
+    iteration on one scorer doesn't clobber the other baselines."""
+    monkeypatch.setattr(run_eval, "CURRENT_DIR", tmp_path)
+    rc = run_eval.main(["--suite", "faithfulness"])
+    assert rc == 0
+    assert (tmp_path / "faithfulness.json").exists()
+    assert not (tmp_path / "recall_at_5.json").exists()
+    assert not (tmp_path / "correctness.json").exists()
+
+
+def test_main_suite_filter_with_write_baselines_isolates_to_chosen_suite(tmp_path, monkeypatch):
+    """Same shape as above, but exercising the --write-baselines path —
+    that's the workflow the filter was added for (D-007 dev iteration)."""
+    monkeypatch.setattr(run_eval, "BASELINES_DIR", tmp_path)
+    rc = run_eval.main(["--write-baselines", "--suite", "correctness"])
+    assert rc == 0
+    assert (tmp_path / "correctness.json").exists()
+    assert not (tmp_path / "faithfulness.json").exists()
+    assert not (tmp_path / "recall_at_5.json").exists()
+
+
+def test_main_unknown_suite_exits_2_and_lists_known_on_stderr(capsys):
+    rc = run_eval.main(["--suite", "made-up-suite-name"])
+    captured = capsys.readouterr()
+    assert rc == 2
+    assert "unknown suite" in captured.err
+    # All three known names should appear in the inventory.
+    for known in ("faithfulness", "recall_at_5", "correctness"):
+        assert known in captured.err
+
+
+def test_main_default_no_filter_still_writes_all_three(tmp_path, monkeypatch):
+    """Regression guard: the default (no `--suite`) path is unchanged."""
+    monkeypatch.setattr(run_eval, "CURRENT_DIR", tmp_path)
+    rc = run_eval.main([])
+    assert rc == 0
+    assert (tmp_path / "faithfulness.json").exists()
+    assert (tmp_path / "recall_at_5.json").exists()
+    assert (tmp_path / "correctness.json").exists()

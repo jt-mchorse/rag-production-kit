@@ -409,9 +409,29 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--token-env", default="GITHUB_TOKEN", help="Env var to read the API token from."
     )
+    parser.add_argument(
+        "--suite",
+        default=None,
+        help=(
+            "Write / diff only one suite of "
+            f"{{{', '.join(SUITES)}}}. Default: all three. "
+            "Useful for iterative scorer dev (e.g. updating one baseline without clobbering others)."
+        ),
+    )
     args = parser.parse_args(argv)
 
+    if args.suite is not None and args.suite not in SUITES:
+        print(
+            f"--suite {args.suite!r}: unknown suite. Known: {', '.join(SUITES)}",
+            file=sys.stderr,
+        )
+        return 2
+
     runs = run_all_suites()
+    if args.suite is not None:
+        # Compute is one pass over the dataset (scoring is cheap); the
+        # filter applies to disk writes + comment rendering only.
+        runs = [r for r in runs if r.suite == args.suite]
 
     target_dir = BASELINES_DIR if args.write_baselines else CURRENT_DIR
     written = write_runs(runs, target_dir, dataset_version="rag-qa-v0.1")
@@ -432,6 +452,12 @@ def main(argv: list[str] | None = None) -> int:
         token = os.environ.get(args.token_env)
         deltas: dict[str, str] = {}
         for suite in SUITES:
+            if args.suite is not None and suite != args.suite:
+                # Keep the composite-comment shape stable for CI consumers;
+                # the unselected rows render as a clear skip note rather
+                # than dropping out of the table entirely.
+                deltas[suite] = "_(skipped via --suite filter)_"
+                continue
             cur = CURRENT_DIR / f"{suite}.json"
             base = BASELINES_DIR / f"{suite}.json"
             if not base.exists():
