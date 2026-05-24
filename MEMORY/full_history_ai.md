@@ -393,3 +393,24 @@ context_for_next_session:
   - pattern_so_far_each_repo_got_one_cli_surface_parity_fix_either_format_out_addition_or_filter_or_dead_code_revival
 followups: []
 ---
+
+---
+session: 2026-05-24T21:00Z
+duration_min: 20
+issue: 34
+focus: retriever_k_rrf_construction_time_validation
+delta:
+  files_changed: 1   # rag_kit/retriever.py
+  files_added: 0
+  tests_added: 8   # zero + 3 negative param + default pin + 3 positive param
+  test_pass_rate: "190_passed_7_skipped"
+decisions_made: []
+context_for_next_session:
+  - retriever_init_accepted_k_rrf_without_validation_reciprocal_rank_fusion_at_call_time_caught_it_but_trace_pointed_at_fusion_py_38_not_constructor
+  - guard_at_construction_site_hoists_failure_to_misconfiguration_site_message_names_k_rrf_not_k
+  - fusion_py_validation_kept_defense_in_depth_fusion_is_also_public_surface_programmatic_callers_passing_k_0_directly_still_caught_there
+  - parametrize_lock_for_negative_sweep_minus_1_minus_60_minus_1000_plus_positive_acceptance_sweep_1_60_120
+  - sixth_phase_bc_target_in_today_180_min_day_session_pattern_now_four_repos_in_a_row_constructor_or_boundary_validation_uniformity
+  - test_pattern_pyfakeconn_obviates_database_url_so_construction_tests_run_in_default_hermetic_suite
+followups: []
+---

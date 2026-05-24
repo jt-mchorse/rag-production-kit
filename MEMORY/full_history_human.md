@@ -272,3 +272,16 @@ Four new tests cover the filter on the default current-dir path, the `--write-ba
 **Open questions / blockers:** none — PR ready for review.
 
 **Next session:** Continue the loop to build-sequence #5 (`embedding-model-shootout`). Most of the same shape (Python repo with bench script) and likely a similar parity gap.
+
+## 2026-05-24 — Issue #34: Retriever validates k_rrf > 0 at construction
+**Duration:** ~20 min · **Branch:** `session/2026-05-24-issue-34`
+
+- `Retriever.__init__` at `rag_kit/retriever.py:72` accepted `k_rrf: int = DEFAULT_K` without validation. The value flowed to `reciprocal_rank_fusion(rankings, k=self.k_rrf)` which raises at call time — but the operator's stack trace pointed at `fusion.py:38` and named `k`, not the constructor-side `k_rrf`. A `Retriever(k_rrf=0)` typo wasn't caught until the first `search()` call, with an error message that required chasing a variable rename.
+- Added a single `if k_rrf <= 0: raise ValueError(f"k_rrf must be positive, got {k_rrf}")` before the assignment. Inline comment documents the defense-in-depth trade: `reciprocal_rank_fusion` keeps its call-time guard because the function is also part of the public surface; programmatic callers passing `k=0` directly still get caught there.
+- Eight new tests in `tests/test_retriever_rewriter.py` under a `#34` block: zero raises with `k_rrf` in the message; parametrized negative sweep over `-1, -60, -1000`; default constructor regression pin; parametrized positive acceptance over `1, 60, 120` (boundary + default-equivalent + above-default). Reused the existing `_FakeConn` fixture so the tests stay hermetic (no `DATABASE_URL` dependency).
+
+**Why this work, this session:** Brings `Retriever` in line with the rest of the `rag_kit` surface — `HashEmbedder.__init__` validates `dim > 0` and `dim % 8 == 0`; `TemplateGenerator.__init__` validates `max_chunks > 0`; `Document.__post_init__` validates `external_id` and `text`. `k_rrf` was the one constructor numeric parameter flowing through to a call-time-only guard. Sister to today's `llm-cost-optimizer` #32 and `llm-eval-harness` #38 and `prompt-regression-suite` #33 — four repos in a row, same family.
+
+**Open questions / blockers:** none — PR ready for review.
+
+**Next session:** With four iterations behind and limited time left in the 180-minute cap, check the clock before deciding whether to start a fifth. Build sequence #5 (`embedding-model-shootout`) and #6 (`chunking-strategies-lab`) are the next reasonable targets if there's time.
