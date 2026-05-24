@@ -295,3 +295,41 @@ def test_rewriter_returning_empty_raises():
     retriever = Retriever(conn, HashEmbedder())
     with pytest.raises(ValueError, match="empty sub_queries"):
         retriever.search("anything", k=1, rewriter=rewriter)
+
+
+# ----------------------------------------------------------------------
+# k_rrf construction-time guard (#34)
+# ----------------------------------------------------------------------
+# `reciprocal_rank_fusion` re-validates `k > 0` defensively at call-time,
+# but waiting for the first `search()` call to raise points the trace at
+# `fusion.py` and names the fusion-layer parameter (`k`) rather than the
+# constructor-side `k_rrf`. The construction-site guard hoists the failure
+# to where the operator made the typo.
+
+
+def test_retriever_rejects_zero_k_rrf():
+    conn = _FakeConn(lexical_by_query={}, dense_default=[])
+    with pytest.raises(ValueError, match=r"k_rrf must be positive, got 0"):
+        Retriever(conn, HashEmbedder(), k_rrf=0)
+
+
+@pytest.mark.parametrize("bad", [-1, -60, -1000])
+def test_retriever_rejects_negative_k_rrf(bad: int):
+    conn = _FakeConn(lexical_by_query={}, dense_default=[])
+    with pytest.raises(ValueError, match=r"k_rrf must be positive"):
+        Retriever(conn, HashEmbedder(), k_rrf=bad)
+
+
+def test_retriever_default_k_rrf_constructs_cleanly():
+    # Regression pin: the canonical no-kwarg construction still works.
+    conn = _FakeConn(lexical_by_query={}, dense_default=[])
+    retr = Retriever(conn, HashEmbedder())
+    assert retr.k_rrf > 0  # whatever DEFAULT_K is, it must satisfy the guard
+
+
+@pytest.mark.parametrize("good", [1, 60, 120])
+def test_retriever_accepts_positive_k_rrf(good: int):
+    # Boundary (k_rrf=1, smallest positive) + default-equivalent + above-default.
+    conn = _FakeConn(lexical_by_query={}, dense_default=[])
+    retr = Retriever(conn, HashEmbedder(), k_rrf=good)
+    assert retr.k_rrf == good

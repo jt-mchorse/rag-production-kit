@@ -70,6 +70,13 @@ class Retriever:
     """
 
     def __init__(self, conn: Any, embedder: Embedder, *, k_rrf: int = DEFAULT_K) -> None:
+        # `reciprocal_rank_fusion` re-validates `k > 0` defensively (it's part
+        # of the public surface), but waiting for the first `search()` call to
+        # raise points the stack trace at `fusion.py` and surfaces `k` rather
+        # than the constructor-side `k_rrf` name — confusing for operators
+        # mis-wiring the retriever. Hoist the failure to the construction site.
+        if k_rrf <= 0:
+            raise ValueError(f"k_rrf must be positive, got {k_rrf}")
         self.conn = conn
         self.embedder = embedder
         self.k_rrf = k_rrf
