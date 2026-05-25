@@ -83,6 +83,45 @@ def test_price_table_add_overrides_existing():
     assert prompt_usd == pytest.approx(5.0)
 
 
+# Issue #36: ModelPrice rejects negative per-million rates so a misconfigured
+# operator can't silently invert the sign of total_usd in cost dashboards.
+# Extends D-015's "no silent zero" posture to "no silent negative".
+@pytest.mark.parametrize(
+    ("field", "bad_value"),
+    [
+        ("prompt_per_million", -0.01),
+        ("prompt_per_million", -10.0),
+        ("completion_per_million", -0.01),
+        ("completion_per_million", -100.0),
+    ],
+)
+def test_model_price_rejects_negative_rate(field: str, bad_value: float):
+    kwargs: dict[str, float] = {
+        "prompt_per_million": 1.0,
+        "completion_per_million": 1.0,
+    }
+    kwargs[field] = bad_value
+    with pytest.raises(ValueError, match=rf"{field} must be >= 0\.0"):
+        ModelPrice(**kwargs)
+
+
+def test_model_price_accepts_zero_rates():
+    # Zero is meaningful: free-tier or synthetic-workload model. Inclusive
+    # bound is part of the contract.
+    p = ModelPrice(prompt_per_million=0.0, completion_per_million=0.0)
+    assert p.cost(1_000_000, 1_000_000) == (0.0, 0.0)
+
+
+def test_price_table_add_rejects_negative_rate_via_wrap_through():
+    # PriceTable.add wraps ModelPrice construction, so the guard fires
+    # through the realistic operator-supplies-bad-config path.
+    pt = PriceTable()
+    with pytest.raises(ValueError, match="prompt_per_million must be >= 0.0"):
+        pt.add("fake-bad", -1.0, 1.0)
+    with pytest.raises(ValueError, match="completion_per_million must be >= 0.0"):
+        pt.add("fake-bad", 1.0, -1.0)
+
+
 # ----------------------------------------------------------------------
 # CostRecord.build
 # ----------------------------------------------------------------------
