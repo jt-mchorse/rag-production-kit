@@ -87,7 +87,7 @@ def test_price_table_add_overrides_existing():
 # operator can't silently invert the sign of total_usd in cost dashboards.
 # Extends D-015's "no silent zero" posture to "no silent negative".
 @pytest.mark.parametrize(
-    "field,bad_value",
+    ("field", "bad_value"),
     [
         ("prompt_per_million", -0.01),
         ("prompt_per_million", -10.0),
