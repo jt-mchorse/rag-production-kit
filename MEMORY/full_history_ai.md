@@ -460,3 +460,26 @@ context_for_next_session:
   - eighth_phase_bc_target_in_360_min_night_session_after_prompt_regression_35_agent_orchestration_29_mcp_cookbook_32_nextjs_streaming_24_ai_app_integration_tests_24_llm_eval_harness_42_llm_cost_optimizer_36
 followups: []
 ---
+
+---
+session: 2026-05-25T16:00Z
+duration_min: 30
+issue: 40
+focus: retrieval_fusion_k_int_positive_sweep_five_sites_extend_sign_only
+delta:
+  files_changed: 8   # rag_kit/{fusion,retriever,reranker,streaming}.py + tests for each
+  files_added: 0
+  tests_added: 45   # parametrize tables + boundary-accept per site (205 -> 250)
+  test_pass_rate: "250_passed_7_deselected_pg"
+decisions_made: []
+context_for_next_session:
+  - five_sign_only_k_le_0_checks_at_retrieval_fusion_public_boundaries_accepted_bool_true_silently_shifts_rrf_constant_from_60_to_1_and_float_0_5_truncates_in_sql_limit_bind
+  - sites_swept_fusion_reciprocal_rank_fusion_k_retriever_init_k_rrf_retriever_search_k_rerank_delta_ndcg_k_streamingpipeline_run_k
+  - generator_max_chunks_embedder_dim_streaming_phasetimings_p_deferred_independent_failure_modes_file_separately_if_needed_dont_bundle
+  - pre_existing_tests_pinning_old_string_must_be_positive_updated_in_test_retriever_rewriter_two_sites_k_rrf_and_test_streaming_one_site_run_k_test_fusion_existing_loose_match_positive_kept_working
+  - validation_shape_isinstance_int_and_not_isinstance_bool_and_k_le_0_message_k_must_be_a_positive_integer_got_repr
+  - pattern_matches_llm_eval_harness_42_runs_py_limit_validation_shape_consistent_across_repos
+  - retrieval_side_now_aligned_with_telemetry_side_38_full_rag_production_kit_contract_tightening_arc_for_int_fields_complete
+  - third_phase_bc_target_in_180_min_day_session_after_mcp_cookbook_32_readme_drift_and_llm_cost_optimizer_38_batch_post_init
+followups: []
+---
