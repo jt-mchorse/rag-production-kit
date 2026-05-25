@@ -101,7 +101,8 @@ def test_model_price_rejects_negative_rate(field: str, bad_value: float):
         "completion_per_million": 1.0,
     }
     kwargs[field] = bad_value
-    with pytest.raises(ValueError, match=rf"{field} must be >= 0\.0"):
+    # Message tightened in #38 to "must be a finite number >= 0.0".
+    with pytest.raises(ValueError, match=rf"{field} must be a finite number >= 0\.0"):
         ModelPrice(**kwargs)
 
 
@@ -116,10 +117,35 @@ def test_price_table_add_rejects_negative_rate_via_wrap_through():
     # PriceTable.add wraps ModelPrice construction, so the guard fires
     # through the realistic operator-supplies-bad-config path.
     pt = PriceTable()
-    with pytest.raises(ValueError, match="prompt_per_million must be >= 0.0"):
+    with pytest.raises(ValueError, match="prompt_per_million must be a finite number >= 0.0"):
         pt.add("fake-bad", -1.0, 1.0)
-    with pytest.raises(ValueError, match="completion_per_million must be >= 0.0"):
+    with pytest.raises(ValueError, match="completion_per_million must be a finite number >= 0.0"):
         pt.add("fake-bad", 1.0, -1.0)
+
+
+# Issue #38: extend ModelPrice sign-only check to finiteness. A NaN rate
+# propagates through cost() → CostRecord.total_usd = NaN → aggregate() sums
+# NaN → cost dashboard renders "NaN" silently. Same harm shape as D-015's
+# silent-zero, one arithmetic layer downstream.
+@pytest.mark.parametrize(
+    ("field", "bad_value"),
+    [
+        ("prompt_per_million", float("nan")),
+        ("prompt_per_million", float("inf")),
+        ("prompt_per_million", float("-inf")),
+        ("completion_per_million", float("nan")),
+        ("completion_per_million", float("inf")),
+        ("completion_per_million", float("-inf")),
+    ],
+)
+def test_model_price_rejects_non_finite_rate(field: str, bad_value: float):
+    kwargs: dict[str, float] = {
+        "prompt_per_million": 1.0,
+        "completion_per_million": 1.0,
+    }
+    kwargs[field] = bad_value
+    with pytest.raises(ValueError, match=rf"{field} must be a finite number >= 0\.0"):
+        ModelPrice(**kwargs)
 
 
 # ----------------------------------------------------------------------
@@ -189,6 +215,29 @@ def test_costrecord_build_rejects_negative_latency():
             prompt_tokens=10,
             completion_tokens=5,
             total_latency_ms=-1.0,
+            per_phase_ms=None,
+            price_table=pt,
+        )
+
+
+# Issue #38: extend total_latency_ms sign-only check to finiteness. NaN
+# latency propagates through percentile(values, q) where the sort over NaN
+# is implementation-defined and p95/p99 silently report a meaningless number.
+@pytest.mark.parametrize(
+    "bad_latency",
+    [float("nan"), float("inf"), float("-inf")],
+)
+def test_costrecord_build_rejects_non_finite_latency(bad_latency: float):
+    pt = _fixture_prices()
+    with pytest.raises(ValueError, match=r"total_latency_ms must be a finite non-negative number"):
+        CostRecord.build(
+            ts=0.0,
+            query="q",
+            model="fake-big",
+            retrieved_count=1,
+            prompt_tokens=10,
+            completion_tokens=5,
+            total_latency_ms=bad_latency,
             per_phase_ms=None,
             price_table=pt,
         )

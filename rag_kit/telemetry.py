@@ -51,14 +51,19 @@ class ModelPrice:
 
     def __post_init__(self) -> None:
         # D-015 prevents silent-zero via UnknownModelError; this guard extends
-        # the same posture to silent-negative. A negative per-million rate
-        # silently inverts the sign of CostRecord.total_usd downstream.
+        # the same posture to silent-negative and silent-NaN/Infinity (#38).
+        # A NaN rate propagates through cost() into CostRecord.total_usd = NaN,
+        # which sums NaN through aggregate() and renders as "NaN" on the cost
+        # dashboard — same shape of silent corruption as the silent-zero case
+        # D-015 addressed, just one layer of arithmetic later. Tightened from
+        # sign-only to finiteness mirroring the portfolio's contract-tightening
+        # sweep (llm-cost-optimizer#37, llm-eval-harness#43, etc).
         for name, value in (
             ("prompt_per_million", self.prompt_per_million),
             ("completion_per_million", self.completion_per_million),
         ):
-            if value < 0.0:
-                raise ValueError(f"{name} must be >= 0.0; got {value}")
+            if not math.isfinite(value) or value < 0.0:
+                raise ValueError(f"{name} must be a finite number >= 0.0; got {value}")
 
     def cost(self, prompt_tokens: int, completion_tokens: int) -> tuple[float, float]:
         """Return ``(prompt_usd, completion_usd)`` rounded to 6 decimal places."""
@@ -151,8 +156,14 @@ class CostRecord:
         Raises ``UnknownModelError`` if the model is not in the price table.
         ``ts`` defaults to ``time.time()`` when ``None`` (test injection point).
         """
-        if total_latency_ms < 0:
-            raise ValueError(f"total_latency_ms must be non-negative; got {total_latency_ms}")
+        # Finiteness guard (#38): NaN latency propagates through percentile()
+        # which sorts a list with NaN — Python's sort is stable but NaN
+        # comparisons are all false, so the returned percentile is implementation-
+        # defined and silently wrong. Mirrors the ModelPrice guard above.
+        if not math.isfinite(total_latency_ms) or total_latency_ms < 0:
+            raise ValueError(
+                f"total_latency_ms must be a finite non-negative number; got {total_latency_ms}"
+            )
         prompt_usd, completion_usd = price_table.cost(model, prompt_tokens, completion_tokens)
         return CostRecord(
             ts=ts if ts is not None else time.time(),
