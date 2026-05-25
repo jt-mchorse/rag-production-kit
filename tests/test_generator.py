@@ -129,7 +129,7 @@ class TestTemplateGenerator:
         assert len(result.citations) == 2
 
     def test_invalid_max_chunks_rejected(self) -> None:
-        with pytest.raises(ValueError, match="max_chunks must be positive"):
+        with pytest.raises(ValueError, match="max_chunks must be a positive integer"):
             TemplateGenerator(max_chunks=0)
 
 
