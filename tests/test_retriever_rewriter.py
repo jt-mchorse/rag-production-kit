@@ -309,14 +309,14 @@ def test_rewriter_returning_empty_raises():
 
 def test_retriever_rejects_zero_k_rrf():
     conn = _FakeConn(lexical_by_query={}, dense_default=[])
-    with pytest.raises(ValueError, match=r"k_rrf must be positive, got 0"):
+    with pytest.raises(ValueError, match=r"k_rrf must be a positive integer, got 0"):
         Retriever(conn, HashEmbedder(), k_rrf=0)
 
 
 @pytest.mark.parametrize("bad", [-1, -60, -1000])
 def test_retriever_rejects_negative_k_rrf(bad: int):
     conn = _FakeConn(lexical_by_query={}, dense_default=[])
-    with pytest.raises(ValueError, match=r"k_rrf must be positive"):
+    with pytest.raises(ValueError, match=r"k_rrf must be a positive integer"):
         Retriever(conn, HashEmbedder(), k_rrf=bad)
 
 
@@ -333,3 +333,39 @@ def test_retriever_accepts_positive_k_rrf(good: int):
     conn = _FakeConn(lexical_by_query={}, dense_default=[])
     retr = Retriever(conn, HashEmbedder(), k_rrf=good)
     assert retr.k_rrf == good
+
+
+# ----------------------------------------------------------------------
+# #40 — extend k_rrf and search.k from sign-only to isinstance(int)+positive
+# ----------------------------------------------------------------------
+
+
+class TestRetrieverKRrfValidationExtended:
+    @pytest.mark.parametrize("bad", [True, False, 0.5, 1.5, 60.0, "60", None])
+    def test_rejects_non_int_k_rrf(self, bad) -> None:
+        conn = _FakeConn(lexical_by_query={}, dense_default=[])
+        with pytest.raises(ValueError, match=r"k_rrf must be a positive integer"):
+            Retriever(conn, HashEmbedder(), k_rrf=bad)  # type: ignore[arg-type]
+
+    def test_accepts_one_minimum_k_rrf(self) -> None:
+        conn = _FakeConn(lexical_by_query={}, dense_default=[])
+        retr = Retriever(conn, HashEmbedder(), k_rrf=1)
+        assert retr.k_rrf == 1
+
+
+class TestRetrieverSearchKValidation:
+    @pytest.mark.parametrize("bad", [0, -1, -5])
+    def test_rejects_non_positive_int(self, bad: int) -> None:
+        conn = _FakeConn(lexical_by_query={}, dense_default=[])
+        retr = Retriever(conn, HashEmbedder())
+        with pytest.raises(ValueError, match=r"k must be a positive integer"):
+            retr.search("q", k=bad)
+
+    @pytest.mark.parametrize("bad", [True, False, 0.5, 2.5, "5", None])
+    def test_rejects_non_int(self, bad) -> None:
+        # `Retriever.search(k=2.5)` would propagate `LIMIT 2.5` into the SQL
+        # bind and surface as an opaque psycopg2 error far from the call site.
+        conn = _FakeConn(lexical_by_query={}, dense_default=[])
+        retr = Retriever(conn, HashEmbedder())
+        with pytest.raises(ValueError, match=r"k must be a positive integer"):
+            retr.search("q", k=bad)  # type: ignore[arg-type]

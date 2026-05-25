@@ -75,8 +75,8 @@ class Retriever:
         # raise points the stack trace at `fusion.py` and surfaces `k` rather
         # than the constructor-side `k_rrf` name — confusing for operators
         # mis-wiring the retriever. Hoist the failure to the construction site.
-        if k_rrf <= 0:
-            raise ValueError(f"k_rrf must be positive, got {k_rrf}")
+        if not isinstance(k_rrf, int) or isinstance(k_rrf, bool) or k_rrf <= 0:
+            raise ValueError(f"k_rrf must be a positive integer, got {k_rrf!r}")
         self.conn = conn
         self.embedder = embedder
         self.k_rrf = k_rrf
@@ -89,8 +89,8 @@ class Retriever:
         reranker: Reranker | None = None,
         rewriter: Rewriter | None = None,
     ) -> list[RetrievalResult]:
-        if k <= 0:
-            raise ValueError(f"k must be positive, got {k}")
+        if not isinstance(k, int) or isinstance(k, bool) or k <= 0:
+            raise ValueError(f"k must be a positive integer, got {k!r}")
         if not query:
             raise ValueError("query must be non-empty")
 

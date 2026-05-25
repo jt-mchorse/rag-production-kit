@@ -311,3 +311,18 @@ Four new tests cover the filter on the default current-dir path, the `--write-ba
 **Open questions / blockers:** none — PR ready for review.
 
 **Next session:** Continue the loop. Remaining unvisited-tonight-for-second-iteration: `embedding-model-shootout`, `chunking-strategies-lab`, `vector-search-at-scale`, `python-async-llm-pipelines`. Each had a fixup-merge today but no Phase B+C finiteness sweep.
+
+## 2026-05-25 — Issue #40: retrieval-fusion k → isinstance(int) + reject bool sweep
+**Duration:** ~30 min · **Branch:** `session/2026-05-25-1545-issue-40`
+
+- Five sign-only `k <= 0` checks at retrieval-fusion public boundaries accepted `bool` (True/False are `int` subclasses in Python) and `float` (0.5 silently truncated in SQL LIMIT bind; 60.0 looked fine but is contractually wrong). Telemetry side landed in #38; this PR closes the retrieval side.
+- Sites tightened, all to `"k must be a positive integer, got {k!r}"` shape: `fusion.reciprocal_rank_fusion` k (True silently shifted the RRF constant from 60 to 1, distorting the `1/(k+rank)` score curve), `Retriever.__init__` k_rrf, `Retriever.search` k (float k=2.5 propagated into `LIMIT 2.5`, surfacing as an opaque psycopg2 error far from the call site), `rerank_delta_ndcg` k, `StreamingPipeline.run` k.
+- Deferred to a follow-up issue if needed: `generator.max_chunks`, `embedder.dim`, and `streaming.PhaseTimings.percentile` p — independent failure modes (not retrieval-fusion math).
+- Pre-existing tests pinning the old `"must be positive"` string updated in `test_retriever_rewriter.py` (two k_rrf sites) and `test_streaming.py` (run k). `test_fusion.py`'s existing loose match `"positive"` continued to work unchanged.
+- 45 new parametrized tests across four test files (250 total, was 205); ruff clean.
+
+**Why this work, this session:** Third Phase B+C target in the 180-min day session. After fixing the README test-count drift in `mcp-server-cookbook` and filing+closing `llm-cost-optimizer#38` (BatchRequest/Result/Job __post_init__), I noticed via grep that the rag-production-kit retrieval surface still had sign-only int checks that the recent telemetry-side sweep #38 hadn't reached. The pattern from `llm-eval-harness#42 runs.py limit` validation transfers cleanly.
+
+**Open questions / blockers:** none — PR ready for review.
+
+**Next session:** Continue the loop. If `generator.max_chunks` / `embedder.dim` / `streaming.PhaseTimings.percentile` p turn out to matter, file as a separate follow-up issue with its own session plan. Don't bundle.

@@ -187,8 +187,8 @@ class StreamingPipeline:
         self.timings = timings
 
     def run(self, query: str, k: int = 5) -> Iterator[StreamEvent]:
-        if k <= 0:
-            raise ValueError(f"k must be positive, got {k}")
+        if not isinstance(k, int) or isinstance(k, bool) or k <= 0:
+            raise ValueError(f"k must be a positive integer, got {k!r}")
         if not query:
             raise ValueError("query must be non-empty")
 

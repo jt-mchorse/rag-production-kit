@@ -246,7 +246,7 @@ def test_error_during_reranking_emits_error_after_retrieved() -> None:
 
 def test_invalid_k_raises_before_event_loop_starts() -> None:
     pipe = StreamingPipeline(FakeRetriever([("a", "alpha")]))
-    with pytest.raises(ValueError, match="k must be positive"):
+    with pytest.raises(ValueError, match="k must be a positive integer"):
         list(pipe.run("q", k=0))
 
 
@@ -385,3 +385,22 @@ def test_phase_timings_rejects_unknown_phase() -> None:
         t.record("invalid_phase_name", 1.0)
     with pytest.raises(ValueError, match="unknown phase"):
         t.percentile("invalid_phase_name", 50)
+
+
+# ----------------------------------------------------------------------
+# #40 — StreamingPipeline.run k validation extended
+# ----------------------------------------------------------------------
+
+
+class TestStreamingPipelineRunKValidation:
+    @pytest.mark.parametrize("bad", [True, False, 0.5, 2.5, "5", None])
+    def test_rejects_non_int_k(self, bad) -> None:
+        pipe = StreamingPipeline(FakeRetriever([("a", "alpha")]))
+        with pytest.raises(ValueError, match=r"k must be a positive integer"):
+            list(pipe.run("q", k=bad))  # type: ignore[arg-type]
+
+    def test_accepts_one_minimum(self) -> None:
+        pipe = StreamingPipeline(FakeRetriever([("a", "alpha")]))
+        events = list(pipe.run("q", k=1))
+        # First event is retrieving, last is done (or error if something throws).
+        assert events[0].type == "retrieving"
