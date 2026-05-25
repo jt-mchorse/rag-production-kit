@@ -237,8 +237,8 @@ def rerank_delta_ndcg(
     before vs. top-k after — useful when nDCG hides large reordering inside
     the top set.
     """
-    if k <= 0:
-        raise ValueError(f"k must be positive, got {k}")
+    if not isinstance(k, int) or isinstance(k, bool) or k <= 0:
+        raise ValueError(f"k must be a positive integer, got {k!r}")
 
     before_list = list(before)
     after_list = list(after)

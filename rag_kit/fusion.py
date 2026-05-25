@@ -34,8 +34,12 @@ def reciprocal_rank_fusion(
         1-indexed rank each method gave the doc (missing methods omitted)
         so the retriever can show callers exactly why a doc surfaced.
     """
-    if k <= 0:
-        raise ValueError(f"k must be positive, got {k}")
+    # Pre-#40 sign-only: bool (True=1) silently shifted the RRF constant from
+    # 60 to 1, and float (0.5) silently changed the 1/(k+rank) score curve.
+    # Mirrors the portfolio-wide finiteness/integer-positive sweep (#38 here,
+    # llm-eval-harness#42, etc.).
+    if not isinstance(k, int) or isinstance(k, bool) or k <= 0:
+        raise ValueError(f"k must be a positive integer, got {k!r}")
 
     scores: dict[str, float] = {}
     ranks: dict[str, dict[str, int]] = {}

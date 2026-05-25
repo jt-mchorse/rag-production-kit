@@ -78,3 +78,29 @@ def test_descending_order():
     )
     scores = [s for _, s, _ in fused]
     assert scores == sorted(scores, reverse=True)
+
+
+# ----------------------------------------------------------------------
+# #40 — extend sign-only k > 0 to isinstance(int) + reject bool + positive
+# ----------------------------------------------------------------------
+
+
+class TestFusionKValidation:
+    @pytest.mark.parametrize("bad", [0, -1, -60])
+    def test_rejects_non_positive_int(self, bad: int) -> None:
+        with pytest.raises(ValueError, match=r"k must be a positive integer"):
+            reciprocal_rank_fusion({"a": ["d1"]}, k=bad)
+
+    @pytest.mark.parametrize("bad", [True, False, 0.5, 1.5, 60.0, "60", None])
+    def test_rejects_non_int(self, bad) -> None:
+        # bool is an int subclass in Python — must be rejected explicitly because
+        # True=1 silently shifts the RRF constant from 60 to 1, distorting scores.
+        # Float 0.5 silently changes the score curve, 60.0 looks fine but is
+        # contractually wrong (the constant is an integer per Cormack et al. 2009).
+        with pytest.raises(ValueError, match=r"k must be a positive integer"):
+            reciprocal_rank_fusion({"a": ["d1"]}, k=bad)  # type: ignore[arg-type]
+
+    def test_accepts_one_minimum(self) -> None:
+        out = reciprocal_rank_fusion({"a": ["d1"]}, k=1)
+        assert out
+        assert out[0][0] == "d1"

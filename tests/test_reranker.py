@@ -235,3 +235,31 @@ def test_rerank_delta_handles_empty():
 def test_rerank_delta_rejects_zero_k():
     with pytest.raises(ValueError, match="positive"):
         rerank_delta_ndcg(["a"], ["a"], k=0)
+
+
+# ----------------------------------------------------------------------
+# #40 — rerank_delta_ndcg k validation extended to isinstance(int)+positive
+# ----------------------------------------------------------------------
+
+
+class TestRerankDeltaNdcgKValidation:
+    @pytest.mark.parametrize("bad", [0, -1, -5])
+    def test_rejects_non_positive(self, bad: int) -> None:
+        from rag_kit.reranker import rerank_delta_ndcg
+
+        with pytest.raises(ValueError, match=r"k must be a positive integer"):
+            rerank_delta_ndcg(["a", "b"], ["b", "a"], k=bad)
+
+    @pytest.mark.parametrize("bad", [True, False, 0.5, 1.5, "5", None])
+    def test_rejects_non_int(self, bad) -> None:
+        from rag_kit.reranker import rerank_delta_ndcg
+
+        with pytest.raises(ValueError, match=r"k must be a positive integer"):
+            rerank_delta_ndcg(["a", "b"], ["b", "a"], k=bad)  # type: ignore[arg-type]
+
+    def test_accepts_one_minimum(self) -> None:
+        from rag_kit.reranker import rerank_delta_ndcg
+
+        delta = rerank_delta_ndcg(["a", "b"], ["b", "a"], k=1)
+        # Just confirm the call succeeded with the minimum valid k.
+        assert delta.top_k_size == 1
