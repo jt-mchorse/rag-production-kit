@@ -298,3 +298,16 @@ Four new tests cover the filter on the default current-dir path, the `--write-ba
 **Open questions / blockers:** none — PR ready for review.
 
 **Next session:** Time remaining in the 180-min cap permits another iteration. Build sequence #5 (`embedding-model-shootout`) or #6 (`chunking-strategies-lab`) are the natural next pickups; both have public-surface numeric parameters worth scanning.
+
+## 2026-05-25 — Issue #38: ModelPrice and CostRecord finiteness guards
+**Duration:** ~20 min · **Branch:** `session/2026-05-24-issue-38`
+
+- Two existing sign-only range checks in telemetry let `NaN`/`+/-Infinity` through. `ModelPrice.__post_init__` (`telemetry.py:60-61`) accepted NaN rates that propagated through `ModelPrice.cost` → `CostRecord.total_usd = NaN` → `aggregate` sums NaN across the window → cost dashboard renders "NaN" silently. Same harm shape as D-015's silent-zero, one arithmetic layer downstream. `CostRecord.build.total_latency_ms` (`telemetry.py:154-155`) accepted NaN latency that propagated through `percentile(values, q)` where the sort over NaN is implementation-defined → p95/p99 silently wrong.
+- Tightened both to finiteness using `math.isfinite`. Error messages updated from "must be >= 0.0" / "must be non-negative" to "must be a finite number >= 0.0" / "must be a finite non-negative number" so callers can grep the new contract. Two pre-existing tests pinning the old strings updated in place.
+- 9 new parametrized tests in `tests/test_telemetry.py` under a `#38` block: rejection per field over `[NaN, +Infinity, -Infinity]` for both ModelPrice fields and `total_latency_ms`. Test count 212 (was 203). Ruff + format clean.
+
+**Why this work, this session:** Eighth Phase B+C target in the 360-min night session. Second PR in rag-production-kit tonight; the first was via the Phase A fixup-merge of #37 (`ModelPrice` negative-rate `__post_init__`). That covered sign; this covers NaN/Infinity, completing the D-015 silent-zero → silent-negative → silent-NaN/Infinity arc on the telemetry surface.
+
+**Open questions / blockers:** none — PR ready for review.
+
+**Next session:** Continue the loop. Remaining unvisited-tonight-for-second-iteration: `embedding-model-shootout`, `chunking-strategies-lab`, `vector-search-at-scale`, `python-async-llm-pipelines`. Each had a fixup-merge today but no Phase B+C finiteness sweep.
