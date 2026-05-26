@@ -188,14 +188,8 @@ class TemplateGenerator:
         # `False` raised the old "must be positive" message but masked the
         # type bug) and accepted float (`2.5` silently bound, then surfaced
         # as `TypeError: slice indices must be integers` deep in `generate`).
-        if (
-            not isinstance(max_chunks, int)
-            or isinstance(max_chunks, bool)
-            or max_chunks <= 0
-        ):
-            raise ValueError(
-                f"max_chunks must be a positive integer; got {max_chunks!r}"
-            )
+        if not isinstance(max_chunks, int) or isinstance(max_chunks, bool) or max_chunks <= 0:
+            raise ValueError(f"max_chunks must be a positive integer; got {max_chunks!r}")
         self.max_chunks = max_chunks
 
     def generate(

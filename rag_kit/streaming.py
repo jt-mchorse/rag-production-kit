@@ -128,11 +128,7 @@ class PhaseTimings:
         # were silently interpreted as 1/0 percentiles via bool-is-int.
         # Out-of-range finite values continue to clamp (existing contract,
         # matches numpy's default) — see `test_phase_timings_percentile_clamps_edges`.
-        if (
-            not isinstance(p, (int, float))
-            or isinstance(p, bool)
-            or math.isnan(p)
-        ):
+        if not isinstance(p, (int, float)) or isinstance(p, bool) or math.isnan(p):
             raise ValueError(f"p must be a finite number; got {p!r}")
         values = sorted(getattr(self, phase))
         if not values:

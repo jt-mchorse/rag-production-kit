@@ -32,13 +32,13 @@ from rag_kit.streaming import PhaseTimings
 @pytest.mark.parametrize(
     "bad_value",
     [
-        True,           # bool: silently bound self.max_chunks=True, sliced [:True] → 1 chunk.
-        False,          # bool: would slice [:False] → 0 chunks.
-        0,              # zero: meaningless top-k.
-        -1,             # negative.
-        0.5,            # non-int float.
-        1.0,            # whole float, still not int.
-        2.5,            # would surface as TypeError deep in generate.
+        True,  # bool: silently bound self.max_chunks=True, sliced [:True] → 1 chunk.
+        False,  # bool: would slice [:False] → 0 chunks.
+        0,  # zero: meaningless top-k.
+        -1,  # negative.
+        0.5,  # non-int float.
+        1.0,  # whole float, still not int.
+        2.5,  # would surface as TypeError deep in generate.
         math.nan,
         math.inf,
         -math.inf,
@@ -72,13 +72,13 @@ def test_generator_accepts_positive_int_max_chunks(good_value):
 @pytest.mark.parametrize(
     "bad_value",
     [
-        True,           # bool=1: also fails % 8 — wrong error message before this fix.
-        False,          # bool=0: was caught by sign-only but masked the type bug.
+        True,  # bool=1: also fails % 8 — wrong error message before this fix.
+        False,  # bool=0: was caught by sign-only but masked the type bug.
         0,
-        -8,             # negative multiple of 8 (only this fix catches it cleanly).
+        -8,  # negative multiple of 8 (only this fix catches it cleanly).
         -32,
-        8.0,            # whole float, multiple of 8: silently bound to self.dim=8.0
-                         # → range(8.0) TypeError deep in embed().
+        8.0,  # whole float, multiple of 8: silently bound to self.dim=8.0
+        # → range(8.0) TypeError deep in embed().
         16.0,
         0.5,
         math.nan,
@@ -127,9 +127,9 @@ def populated_timings():
 @pytest.mark.parametrize(
     "bad_p",
     [
-        math.nan,       # slipped both p <= 0 and p >= 100 branches → int(NaN) raised.
-        True,           # bool-is-int: silently treated as 1st percentile.
-        False,          # bool-is-int: silently returned values[0].
+        math.nan,  # slipped both p <= 0 and p >= 100 branches → int(NaN) raised.
+        True,  # bool-is-int: silently treated as 1st percentile.
+        False,  # bool-is-int: silently returned values[0].
         None,
         "50",
         [],
