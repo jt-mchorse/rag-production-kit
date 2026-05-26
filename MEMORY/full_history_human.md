@@ -353,3 +353,15 @@ Four new tests cover the filter on the default current-dir path, the `--write-ba
 **Open questions / blockers:** none — PR ready for review.
 
 **Next session:** Atomicity arc closed for Python. Four consecutive same-shape PRs in one day session has made the helper shape a documented portfolio pattern with four independent concrete instances. Next sessions can pivot to a different harm class — TypeScript repos for atomicity (different ergonomics), or a fresh harm class entirely (concurrency safety, signal handling, error path quality, cross-file invariants).
+
+## 2026-05-26 — Issue #46: README decision-range upper-bound lock
+**Duration:** ~7 min · **Branch:** `session/2026-05-26-2326-issue-46`
+
+- Added `tests/test_readme_decision_range.py` with the active-decision-range upper-bound invariant.
+- Replaced README placeholder `D-NNN` with explicit `D-002…D-016` bound.
+
+**Why this work, this session:** Propagation 4 of 10 of the cross-portfolio drift class authored in chunking-strategies-lab.
+
+**Open questions / blockers:** none.
+
+**Next session:** Continue propagation to embedding-model-shootout.

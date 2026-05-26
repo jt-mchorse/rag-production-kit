@@ -534,3 +534,19 @@ context_for_next_session:
   - four_consecutive_same_shape_prs_in_one_day_session_helper_shape_is_now_a_documented_portfolio_pattern_with_four_independent_concrete_instances
 followups: []
 ---
+
+---
+session: 2026-05-26T23:40Z
+duration_min: 7
+issue: 46
+focus: readme_decision_range_upper_bound_lock_propagation_4_of_10
+delta:
+  files_changed: 2
+  tests_added: 1
+context_for_next_session:
+  - readme_decision_range_lock_pattern_now_five_repos_chunking_lab_eval_harness_cost_optimizer_prompt_regression_rag_kit
+  - seven_more_repos_pending_emb_shootout_vector_search_async_pipelines_agent_orch_mcp_cookbook_nextjs_streaming_ai_integration_tests
+  - rag_kit_readme_had_a_d_nnn_placeholder_phrase_replaced_with_concrete_d_002_to_d_016_lock_now_traps_future_drift_at_this_exact_phrase
+decisions_made: []
+followups: []
+---
