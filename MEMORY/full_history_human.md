@@ -339,3 +339,17 @@ Four new tests cover the filter on the default current-dir path, the `--write-ba
 **Open questions / blockers:** none — PR ready for review.
 
 **Next session:** `embedding-model-shootout#34`'s deferred list (`hash_embedder.dim/ngram`, `synthesize_queries n/min/max`) is the natural next target — explicit deferred-list entry, same pattern, build-sequence position #5.
+
+## 2026-05-26 — Issue #44: Atomic `write_runs` closes the Python atomicity arc
+**Duration:** ~20 min · **Branch:** `session/2026-05-26-1528-issue-44`
+
+- `evals/run_eval.py::write_runs` wrote the three per-suite eval JSONs (faithfulness, recall_at_5, correctness) via `path.write_text(...)` in a loop. The eval GitHub Action's composite sticky PR comment (`_post_composite_comment`, run_eval.py:301) parses all three; a SIGINT mid-eval leaves a half-written suite JSON that either crashes the comment-posting step or silently posts a corrupt comment.
+- Added `rag_kit/io_utils.py` with `atomic_write_text(path, text)` — natural home keeping the public surface tight, module can grow other IO utilities. Same shape as the helpers in `llm-eval-harness#48`, `llm-cost-optimizer#42`, and `prompt-regression-suite#39` filed and merged earlier today.
+- Routed `write_runs` through it; dropped the orphaned `out_dir.mkdir(...)` (helper auto-creates parent dirs).
+- 8 new tests in `tests/test_atomic_write.py`: six unit invariants on the helper plus two integration tests on `write_runs`. The load-bearing integration test uses a **selective monkeypatch** that raises only on the *second* of the three `os.replace` calls, proving four invariants in one test: (a) the first file is fully replaced atomically with valid suite JSON, (b) the second file's pre-existing stale content is bitwise preserved (helper never touched destination before rename), (c) the third file is never reached, (d) no `.tmp` leftovers in `out_dir`. Full suite 308 → 316 (7 hybrid_pg skips pre-existing). Lint + format green.
+
+**Why this work, this session:** Fourth Phase B+C target in today's 180-min DAY session, completing the portfolio-wide atomicity arc across all four Python repos with artifact-emitting CLI or script chains. The TypeScript repos (`agent-orchestration-platform`, `mcp-server-cookbook`, `nextjs-streaming-ai-patterns`, `ai-app-integration-tests`) also write artifacts but with different ergonomics — those would be a separate arc if pursued. Cross-file inconsistent-state harm (`out_dir` mixing fresh + stale suite JSONs after partial-success) is documented in the issue body but explicitly out of scope here.
+
+**Open questions / blockers:** none — PR ready for review.
+
+**Next session:** Atomicity arc closed for Python. Four consecutive same-shape PRs in one day session has made the helper shape a documented portfolio pattern with four independent concrete instances. Next sessions can pivot to a different harm class — TypeScript repos for atomicity (different ergonomics), or a fresh harm class entirely (concurrency safety, signal handling, error path quality, cross-file invariants).

@@ -44,6 +44,7 @@ from rag_kit import (
     TemplateGenerator,
     enforce_citations,
 )
+from rag_kit.io_utils import atomic_write_text
 from rag_kit.retriever import RetrievalResult
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -284,12 +285,12 @@ def run_all_suites() -> list[_SuiteRun]:
 
 
 def write_runs(runs: list[_SuiteRun], out_dir: Path, *, dataset_version: str) -> dict[str, Path]:
-    out_dir.mkdir(parents=True, exist_ok=True)
     paths: dict[str, Path] = {}
     for run in runs:
         path = out_dir / f"{run.suite}.json"
-        path.write_text(
-            json.dumps(run.to_run_result(dataset_version=dataset_version), indent=2) + "\n"
+        atomic_write_text(
+            path,
+            json.dumps(run.to_run_result(dataset_version=dataset_version), indent=2) + "\n",
         )
         paths[run.suite] = path
     return paths
