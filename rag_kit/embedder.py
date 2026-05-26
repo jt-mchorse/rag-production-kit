@@ -52,8 +52,16 @@ class HashEmbedder:
     """
 
     def __init__(self, dim: int = EMBEDDING_DIM) -> None:
-        if dim <= 0:
-            raise ValueError(f"dim must be positive, got {dim}")
+        # Extend #41 sign-only contract to this construction site. Sign-only
+        # accepted `dim=True` (= 1): `1 <= 0` False, then `1 % 8 == 1` raised
+        # "must be a multiple of 8" — wrong message for the underlying type
+        # bug. `dim=8.0`: `8.0 <= 0` False, `8.0 % 8 == 0.0` False, so
+        # `self.dim = 8.0` was silently bound, then `range(self.dim)` raised
+        # `TypeError: 'float' object cannot be interpreted as an integer`
+        # deep inside `embed()`. Type contract must fire first so the
+        # multiple-of-8 check only sees real ints.
+        if not isinstance(dim, int) or isinstance(dim, bool) or dim <= 0:
+            raise ValueError(f"dim must be a positive integer; got {dim!r}")
         if dim % 8 != 0:
             # SHA-256 gives 32 bytes; we want clean multiples for the struct expansion.
             raise ValueError(f"dim must be a multiple of 8, got {dim}")

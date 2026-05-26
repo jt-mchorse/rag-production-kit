@@ -182,8 +182,14 @@ class TemplateGenerator:
     """
 
     def __init__(self, max_chunks: int = 3) -> None:
-        if max_chunks <= 0:
-            raise ValueError(f"max_chunks must be positive, got {max_chunks}")
+        # Extend #41 sign-only contract to this construction site. Sign-only
+        # accepted bool (`True` silently bound `self.max_chunks = True`, then
+        # `list(retrieved)[: self.max_chunks]` sliced to first item only;
+        # `False` raised the old "must be positive" message but masked the
+        # type bug) and accepted float (`2.5` silently bound, then surfaced
+        # as `TypeError: slice indices must be integers` deep in `generate`).
+        if not isinstance(max_chunks, int) or isinstance(max_chunks, bool) or max_chunks <= 0:
+            raise ValueError(f"max_chunks must be a positive integer; got {max_chunks!r}")
         self.max_chunks = max_chunks
 
     def generate(

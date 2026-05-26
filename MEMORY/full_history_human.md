@@ -326,3 +326,16 @@ Four new tests cover the filter on the default current-dir path, the `--write-ba
 **Open questions / blockers:** none — PR ready for review.
 
 **Next session:** Continue the loop. If `generator.max_chunks` / `embedder.dim` / `streaming.PhaseTimings.percentile` p turn out to matter, file as a separate follow-up issue with its own session plan. Don't bundle.
+
+## 2026-05-25 — Issue #42: Close #41's deferred validation gaps (generator, embedder, streaming)
+**Duration:** ~30 min · **Branch:** `session/2026-05-25-1700-issue-42`
+
+- `Generator.max_chunks` and `HashEmbedder.dim`: replaced sign-only `<= 0` with the portfolio positive-int contract (`not isinstance(int) or isinstance(bool) or <= 0`), matching `runs.list_runs.limit` (`llm-eval-harness#42`) and #41's retrieval-side k validators. For `dim`, the multiple-of-8 check now runs after the type contract, so `dim=True` no longer surfaces "must be a multiple of 8" (wrong error message for the underlying type bug).
+- `PhaseTimings.percentile.p`: narrower fix — reject `NaN`, non-numeric types, and `bool`. Preserved the documented clamp contract for out-of-range finite values (`-5` → values[0], `110` → values[-1]) plus `inf`/`-inf`, per the explicit "match numpy's well-behaved default" intent pinned by `test_phase_timings_percentile_clamps_edges`. The real failure mode was NaN slipping both clamp branches and reaching `int(NaN)` deep in interpolation.
+- 63 new parametrize tests in `tests/test_deferred_validation_sweep.py`. Pre-existing `test_invalid_max_chunks_rejected` updated to the new error-message shape. Test suite 250 → 308 (non-pg). Ruff clean.
+
+**Why this work, this session:** Second Phase B+C target in today's 180-min DAY session. PR #41 explicitly listed these three sites as "Deferred to a follow-up if needed — independent failure modes, not retrieval-fusion math." Closing the deferred list keeps the contract uniform across the repo's construction sites.
+
+**Open questions / blockers:** none — PR ready for review.
+
+**Next session:** `embedding-model-shootout#34`'s deferred list (`hash_embedder.dim/ngram`, `synthesize_queries n/min/max`) is the natural next target — explicit deferred-list entry, same pattern, build-sequence position #5.

@@ -24,6 +24,7 @@ Design choices (logged as D-010, D-011 in MEMORY/):
 from __future__ import annotations
 
 import json
+import math
 import time
 from collections.abc import Iterable, Iterator, Sequence
 from dataclasses import dataclass, field
@@ -120,6 +121,15 @@ class PhaseTimings:
         """Return p-th percentile of recorded ms for `phase`, or None if empty."""
         if phase not in self._PHASES:
             raise ValueError(f"unknown phase: {phase!r}")
+        # Validate p at the boundary. Before this, NaN slipped both
+        # `p <= 0` (NaN <= 0 is False) and `p >= 100` (NaN >= 100 is False),
+        # reached `int(rank)` with rank=NaN, and surfaced a far-from-call-site
+        # `ValueError: cannot convert float NaN to integer`. `True/False`
+        # were silently interpreted as 1/0 percentiles via bool-is-int.
+        # Out-of-range finite values continue to clamp (existing contract,
+        # matches numpy's default) — see `test_phase_timings_percentile_clamps_edges`.
+        if not isinstance(p, (int, float)) or isinstance(p, bool) or math.isnan(p):
+            raise ValueError(f"p must be a finite number; got {p!r}")
         values = sorted(getattr(self, phase))
         if not values:
             return None
