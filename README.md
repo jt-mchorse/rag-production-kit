@@ -110,7 +110,7 @@ a Python backend ([#8]).
 
 ## Architecture
 
-Eight runtime layers ship today: hybrid retrieval + RRF fusion (#1), opt-in cross-encoder reranking (#2), pre-retrieval query rewriting (#3), generator + citation enforcement + structured refusal (#4), typed SSE streaming pipeline (#5), cost telemetry with a 24-hour dashboard (#6), eval-harness integration with composite PR comments (#7), and a Next.js demo speaking the same SSE protocol as the Python demo (#8). Index and query paths, the full per-layer detail, and the D-NNN design decisions behind each one live in **[docs/architecture.md](docs/architecture.md)**.
+Eight runtime layers ship today: hybrid retrieval + RRF fusion (#1), opt-in cross-encoder reranking (#2), pre-retrieval query rewriting (#3), generator + citation enforcement + structured refusal (#4), typed SSE streaming pipeline (#5), cost telemetry with a 24-hour dashboard (#6), eval-harness integration with composite PR comments (#7), and a Next.js demo speaking the same SSE protocol as the Python demo (#8). Index and query paths, the full per-layer detail, and the design decisions behind each one (D-002…D-016) live in **[docs/architecture.md](docs/architecture.md)**.
 
 ## Quickstart
 
