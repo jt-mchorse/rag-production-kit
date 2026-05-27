@@ -550,3 +550,18 @@ context_for_next_session:
 decisions_made: []
 followups: []
 ---
+
+---
+session: 2026-05-27T04:00Z
+duration_min: 3
+issue: 48
+focus: contributing_md_cap_wording_propagation_d_008_d_004
+delta:
+  files_changed: 1   # CONTRIBUTING.md
+  tests_added: 0
+context_for_next_session:
+  - portfolio_wide_propagation_of_portfolio_ops_3_contributing_seed_update_to_d_008_caps_180_360_min_plus_d_004_phase_a_auto_merge_wording_one_pr_per_repo
+  - pre_d_008_stale_60_min_cap_wording_originated_in_bootstrap_template_init_portfolio_repo_sh_line_102
+decisions_made: []
+followups: []
+---
