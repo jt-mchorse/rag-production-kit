@@ -255,6 +255,14 @@ Dashboard is independently runnable; eval harness (#7) reuses the same
   `UnknownModelError`. Silent zero-cost is the worst failure mode for a
   cost telemetry surface — operators must declare the rates they're
   billing against. No fabricated benchmarks (handoff §10).
+- **Aggregate observability (#50).** `Aggregate.to_dict()` returns the
+  seven fields as a stable JSON dict; `TelemetryStore.dump_aggregate_json(path, *, since_ts=None)`
+  writes via `rag_kit.io_utils.atomic_write_text` so a SIGINT / disk-
+  full / OOM mid-write doesn't corrupt a log-tailer's view. `since_ts`
+  defaults to the last-24h window the dashboard already uses. Byte-
+  shape parity with the cost-optimizer's `dump_aggregate_json` /
+  `dump_stats_json` so one log-parsing config consumes all portfolio
+  observability artifacts.
 
 ---
 

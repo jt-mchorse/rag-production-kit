@@ -27,6 +27,9 @@ import time
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Any
+
+from rag_kit.io_utils import atomic_write_text
 
 # ----------------------------------------------------------------------
 # Price table
@@ -300,6 +303,35 @@ class TelemetryStore:
         cutoff = (now if now is not None else time.time()) - 24 * 3600
         return self.since(cutoff)
 
+    def dump_aggregate_json(self, path: str | Path, *, since_ts: float | None = None) -> None:
+        """Write the current window aggregate to ``path`` as JSON (#50).
+
+        Atomic on POSIX via ``rag_kit.io_utils.atomic_write_text`` —
+        the same helper the eval-action's composite sticky comment
+        relies on (#44) — so a SIGINT / disk-full / OOM between
+        truncate and flush can't leave the log-tailer (or the
+        ``scripts/telemetry_dashboard.py`` build artifact) reading a
+        half-written file.
+
+        ``since_ts`` defaults to last-24h (the same window
+        ``last_24h()`` returns and the dashboard renders), so an
+        operator wiring a cron job that simply writes
+        ``telemetry.json`` every minute gets the rolling 24-hour
+        aggregate by default. Pass an explicit ``since_ts`` to widen
+        or narrow the window.
+
+        On-disk shape is ``Aggregate.to_dict()`` with sorted keys,
+        indent=2, trailing newline — byte-shape parity with the
+        cost-optimizer's ``dump_aggregate_json`` and
+        ``dump_stats_json`` so one log-parsing config consumes all
+        portfolio observability artifacts.
+        """
+        floor = since_ts if since_ts is not None else (time.time() - 24 * 3600)
+        records = self.since(floor)
+        agg = aggregate(records)
+        payload = json.dumps(agg.to_dict(), sort_keys=True, indent=2) + "\n"
+        atomic_write_text(path, payload)
+
 
 # ----------------------------------------------------------------------
 # Aggregation
@@ -317,6 +349,27 @@ class Aggregate:
     latency_p50_ms: float
     latency_p95_ms: float
     latency_p99_ms: float
+
+    def to_dict(self) -> dict[str, Any]:
+        """JSON-stable dict for observability/logging sinks (#50).
+
+        Mirrors the pattern set by ``CacheTelemetry.to_dict`` in
+        ``llm-cost-optimizer`` (#50 there) and ``CacheStats.to_dict``
+        (#52 there): one stable-keys dict per long-lived state object,
+        consumed by metric backends or written to disk via
+        ``TelemetryStore.dump_aggregate_json``. The seven fields match
+        the dataclass exactly so a future addition without serializer
+        update is caught loud by the field-set lock test.
+        """
+        return {
+            "n": self.n,
+            "total_prompt_tokens": self.total_prompt_tokens,
+            "total_completion_tokens": self.total_completion_tokens,
+            "total_usd": self.total_usd,
+            "latency_p50_ms": self.latency_p50_ms,
+            "latency_p95_ms": self.latency_p95_ms,
+            "latency_p99_ms": self.latency_p99_ms,
+        }
 
 
 def percentile(values: Sequence[float], q: float) -> float:
