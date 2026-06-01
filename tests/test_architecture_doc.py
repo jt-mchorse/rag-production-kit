@@ -77,7 +77,7 @@ OPERATOR_SUPPLIED_PATHS: tuple[str, ...] = ()
 
 # Core deliverables (handoff §2). Each shipped surface is annotated in
 # the doc with its origin issue number; this set is the inventory.
-KNOWN_SHIPPED_ISSUES = (1, 2, 3, 4, 5, 6, 7, 8)
+KNOWN_SHIPPED_ISSUES = (1, 2, 3, 4, 5, 6, 7, 8, 50)
 
 
 MIN_ACTIVE_DECISION_ID = 2
@@ -221,7 +221,7 @@ def test_resolvable_prefixes_hard_pin_set() -> None:
 
 
 def test_known_shipped_issues_hard_pin_set() -> None:
-    assert KNOWN_SHIPPED_ISSUES == (1, 2, 3, 4, 5, 6, 7, 8)
+    assert KNOWN_SHIPPED_ISSUES == (1, 2, 3, 4, 5, 6, 7, 8, 50)
 
 
 def test_min_active_decision_id_hard_pin() -> None:

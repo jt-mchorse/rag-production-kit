@@ -376,3 +376,17 @@ Four new tests cover the filter on the default current-dir path, the `--write-ba
 **Open questions / blockers:** none.
 
 **Next session:** continue portfolio propagation.
+
+## 2026-06-01 — Issue #50: `Aggregate.to_dict` + `TelemetryStore.dump_aggregate_json` (observability parity)
+**Duration:** ~30 min · **Branch:** `session/2026-06-01-1944-issue-50`
+
+- Added `Aggregate.to_dict()` to `rag_kit/telemetry.py` returning the seven fields as a stable JSON dict. Field set is locked exhaustively via `dataclasses.fields` so a future addition without a serializer update is caught loudly. The pattern mirrors `CacheTelemetry.to_dict` and `CacheStats.to_dict` from llm-cost-optimizer's #50 and #52.
+- Added `TelemetryStore.dump_aggregate_json(path, *, since_ts=None)` writing the current rolling aggregate via the package-level `rag_kit.io_utils.atomic_write_text` (the same helper #44 wired for the eval-action sticky comment, so the atomic-write story is now portfolio-wide). When `since_ts` is omitted the writer defaults to the last-24h window the dashboard already renders, so a cron-driven observability sink gets sensible behavior with no arguments. On-disk shape is sorted-keys JSON + `indent=2` + trailing newline — byte-shape parity with the cost-optimizer's `dump_aggregate_json` and `dump_stats_json`, so a single log-parsing config consumes all portfolio observability artifacts.
+- 10 new tests in `tests/test_telemetry_dump.py` mirror the cost-optimizer matrix: field-set lock via `dataclasses.fields`, JSON round-trip, empty-aggregate zero-state (`latency_p*_ms=0.0` not NaN — locked explicitly), on-disk shape with sorted-keys check, parent-dir auto-create (from `atomic_write_text`), atomic overwrite with no tempfile leftovers, `since_ts` window correctness (a record below the floor is excluded), default-window correctness (a 25-hour-old record is excluded with no `since_ts` passed), zero-state canary writer, plus a regression check that the existing `aggregate` function export is unaffected.
+- README cost-telemetry paragraph extended with one sentence on the new observability shape citing #50. `docs/architecture.md` layer-6 invariants section gains a parallel paragraph naming the parity with the cost-optimizer's #50/#52. `tests/test_architecture_doc.py::KNOWN_SHIPPED_ISSUES` extends to `(..., 8, 50)`; the hard-pin assertion updated to match.
+
+**Why this work, this session:** Iteration 4 of today's DAY session. Iterations 1, 2, 3 closed `llm-eval-harness#58`, `prompt-regression-suite#49`, `llm-cost-optimizer#52`. The natural Phase B follow-on was the rag-kit Aggregate dataclass, which had the same gap — runtime state, no `to_dict`, no atomic-write companion. With this PR, three repos and four state objects share one observability shape.
+
+**Open questions / blockers:** none — full pytest pass (Postgres-dependent tests skipped as expected), ruff check + format clean, live smoke shows the on-disk JSON has the expected shape and the `since_ts` window actually filters.
+
+**Next session:** with the observability arc landed across two repos and three state objects, the next clean parity target is `agent-orchestration-platform`'s trace store — same shape question (does its rollup expose a `to_dict` + atomic writer?). Out of scope here; would be one more clean iteration if this pattern continues to be the right unit of work.

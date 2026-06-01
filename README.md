@@ -78,7 +78,12 @@ model that isn't in the table raises `UnknownModelError` rather than
 silently emitting `$0.00`. A dep-free local dashboard
 (`scripts/telemetry_dashboard.py`, stdlib `http.server` + inline SVG)
 renders the last 24 hours with p50 / p95 / p99 latency, total USD,
-and the most recent 20 records — works air-gapped.
+and the most recent 20 records — works air-gapped. `Aggregate.to_dict()`
+and `TelemetryStore.dump_aggregate_json(path, since_ts=…)` (#50) emit
+a JSON-stable observability shape — atomic-written so a log-tailer
+or a CI artifact never reads a half-written file; byte-shape parity
+with the cost-optimizer's dump surfaces so one log-parsing config
+consumes both.
 
 **Eval-harness integration** is wired through the sibling
 [llm-eval-harness] repo (imported, not vendored — D-002). Three
