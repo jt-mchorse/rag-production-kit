@@ -46,6 +46,9 @@ dev = [
   "pytest>=8.0",
   "pytest-cov>=4.1",
   "ruff>=0.5",
+  # Powers tests/test_workflows_yaml_parseable.py (#52), the inverse
+  # safety net for the 21-day silent CI outage closed in portfolio-ops#27.
+  "pyyaml>=6.0",
 ]
 
 [project.urls]
