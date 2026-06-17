@@ -390,3 +390,26 @@ Four new tests cover the filter on the default current-dir path, the `--write-ba
 **Open questions / blockers:** none — full pytest pass (Postgres-dependent tests skipped as expected), ruff check + format clean, live smoke shows the on-disk JSON has the expected shape and the `since_ts` window actually filters.
 
 **Next session:** with the observability arc landed across two repos and three state objects, the next clean parity target is `agent-orchestration-platform`'s trace store — same shape question (does its rollup expose a `to_dict` + atomic writer?). Out of scope here; would be one more clean iteration if this pattern continues to be the right unit of work.
+
+## 2026-06-17 — Issue #52: Workflow YAML-parseability lock
+**Duration:** ~12 min · **Branch:** `session/2026-06-17-1912-issue-52`
+
+Added `tests/test_workflows_yaml_parseable.py` and pulled `pyyaml>=6.0`
+into `[project.optional-dependencies].dev`. The test parametrizes
+`yaml.safe_load` plus a non-empty `jobs:` assertion over every `*.yml`
+under `.github/workflows/` — today that's `ci.yml` and `eval.yml`, so
+5 tests total (1 smoke + 2 parse + 2 jobs).
+
+**Why this work, this session:** Same justification as `llm-eval-harness#60`
+— `portfolio-ops#27` closed a 21-day silent CI outage from one
+unquoted colon-space in a `run:` value, and the followup explicitly
+calls for propagating the lock to all 12 portfolio repos. This is the
+second hop. `rag-production-kit`'s workflows are YAML-safe today (they
+use the `run: |` block-scalar form) — the lock makes that *cannot*
+drift.
+
+**Open questions / blockers:** none — full `pytest` (332 → 337) +
+`ruff` clean locally; PR #53 open and waiting for CI.
+
+**Next session:** continue propagation to the remaining 10 portfolio
+repos.
