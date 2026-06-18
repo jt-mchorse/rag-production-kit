@@ -20,6 +20,14 @@ on:
   pull_request:
     branches: [main]
 
+# Cancel the in-flight eval sticky comment when a newer commit lands on
+# the PR — older runs' results are stale by construction since the
+# sticky tracks the latest commit's deltas. Distinct group from ci so
+# the two run concurrently on the same ref.
+concurrency:
+  group: eval-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   eval-suite:
     runs-on: ubuntu-latest
