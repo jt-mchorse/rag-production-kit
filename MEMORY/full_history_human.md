@@ -413,3 +413,37 @@ drift.
 
 **Next session:** continue propagation to the remaining 10 portfolio
 repos.
+
+## 2026-06-18 — Issue #54: timeout-minutes guard + lock test
+**Duration:** ~25 min · **Branch:** `session/2026-06-18-0313-issue-54`
+
+- Added `timeout-minutes` to every job in `ci.yml` (`lint`, `unit`,
+  `memory-check` at 15; `integration-pg` at 20 — pg container start
+  plus pgvector setup plus the full `pytest -m pg` suite is the
+  longest-running job in the repo and deserves headroom) and `eval.yml`
+  (`eval-suite` at 15, mirroring llm-eval-harness's eval workflow).
+- Added `tests/test_workflows_timeout_minutes.py` — 16 new tests: 1
+  smoke + 5 jobs × 3 parametrized invariants (`timeout-minutes` is
+  present, is an int (not bool/str), is in policy band `[1, 30]`). Each
+  invariant fails as its own line so a regression names the offending
+  job exactly, not a single rolled-up summary.
+
+**Why this work, this session:** GitHub Actions defaults to 360 min/job
+when `timeout-minutes` is unset, so a hung job (network stall during
+`pip install`, infinite test loop, pgvector health-check loop) burns
+the full 6-hour ceiling before the runner kills it. `llm-eval-harness`
+PR #63 shipped the canonical first hop and the portfolio-ops audit (#36)
+added a `--check missing-timeout` fingerprint that surfaces every
+unprotected repo weekly. This PR is the propagation hop for
+`rag-production-kit`; the audit will drop this repo from its findings
+once #54 merges.
+
+**Open questions / blockers:** none. Test count 337 → 353. Full pytest
+clean; ruff check + ruff format --check clean; 7 pg integration tests
+remain skipped because no local Postgres is configured (unchanged).
+
+**Next session:** continue propagation across the remaining 8 unprotected
+repos. Priority-tier order per D-009: chunking-strategies-lab,
+nextjs-streaming-ai-patterns next; then build-sequence: embedding-model-shootout,
+vector-search-at-scale, python-async-llm-pipelines, agent-orchestration-platform,
+mcp-server-cookbook, ai-app-integration-tests, plus portfolio-ops itself.

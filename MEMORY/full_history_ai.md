@@ -611,3 +611,26 @@ context_for_next_session:
 decisions_made: []
 followups: []
 ---
+
+---
+session: 2026-06-18T03:13Z
+duration_min: 25
+issue: 54
+focus: workflow_timeout_minutes_lock_propagation_from_llm_eval_harness_63
+phase: night_session_phase_b_iteration_1
+delta:
+  files_added: 1   # tests/test_workflows_timeout_minutes.py
+  files_changed: 2 # .github/workflows/ci.yml + .github/workflows/eval.yml
+  tests_added: 16  # 1 smoke + 5 jobs * 3 invariants (has, int, in band)
+context_for_next_session:
+  - second_silent_rot_lock_in_rag_production_kit_after_yaml_parseability_52_now_timeout_minutes_54_companion_pattern_per_repo_post_deploy_safety_net_audit_phase_a_py_check_missing_timeout_fingerprint
+  - ci_yml_lint_unit_memory_check_get_15_min_integration_pg_gets_20_min_pg_container_start_plus_pgvector_setup_plus_pytest_m_pg_is_the_longest_running_job_in_repo
+  - eval_yml_eval_suite_gets_15_min_mirrors_llm_eval_harness_63_eval_yml_ceiling_for_similar_anthropic_api_touching_jobs
+  - policy_band_1_to_30_matches_llm_eval_harness_canonical_propagation_uniformity_across_repos_simplifies_audit_thresholds
+  - test_file_modeled_on_llm_eval_harness_tests_test_workflows_timeout_minutes_py_three_parametrized_invariants_has_int_in_band_split_so_each_failure_mode_surfaces_as_its_own_failure_line_not_single_summary
+  - lock_test_failure_messages_explain_silent_failure_mode_6_hour_quota_burn_on_hung_jobs_plus_propagation_arc_back_to_52_and_portfolio_ops_30_31
+  - test_count_pre_branch_337_post_branch_353_full_pytest_clean_7_pg_skips_unchanged_ruff_check_plus_format_check_clean
+  - audit_phase_a_py_will_drop_rag_production_kit_from_missing_timeout_finding_set_after_this_pr_merges_per_dogfood_in_portfolio_ops_session_2026_06_17_2329
+decisions_made: []
+followups: []
+---
