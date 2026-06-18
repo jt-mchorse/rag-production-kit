@@ -447,3 +447,22 @@ repos. Priority-tier order per D-009: chunking-strategies-lab,
 nextjs-streaming-ai-patterns next; then build-sequence: embedding-model-shootout,
 vector-search-at-scale, python-async-llm-pipelines, agent-orchestration-platform,
 mcp-server-cookbook, ai-app-integration-tests, plus portfolio-ops itself.
+
+## 2026-06-18 — Issue #56: concurrency guard + lock test
+**Duration:** ~12 min · **Branch:** `session/2026-06-18-1522-issue-56`
+
+- Added top-level `concurrency:` to `ci.yml` (`ci-${{ github.ref }}`)
+  and `eval.yml` (`eval-${{ github.ref }}`, distinct groups so they run
+  concurrently on the same ref).
+- Copied `tests/test_workflows_concurrency.py` from llm-eval-harness;
+  docstring origin updated to this repo's #56.
+
+**Why this work, this session:** third per-repo hop in the
+concurrency-lock propagation arc (after llm-eval-harness #64 and
+llm-cost-optimizer #60). Audit fingerprint shipped in portfolio-ops #41
+surfaces every workflow missing the lock; after this PR merges, this
+repo drops off that finding set.
+
+**Open questions / blockers:** none. Test count 348 → 355.
+
+**Next session:** continue propagation to remaining 9 unprotected repos.
