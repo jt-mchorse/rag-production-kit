@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import Iterable, Sequence
+from pathlib import Path
 
 import pytest
 
@@ -385,6 +386,97 @@ def test_phase_timings_rejects_unknown_phase() -> None:
         t.record("invalid_phase_name", 1.0)
     with pytest.raises(ValueError, match="unknown phase"):
         t.percentile("invalid_phase_name", 50)
+
+
+# ----------------------------------------------------------------------
+# #58 — PhaseTimings.to_dict + dump_summary_json (observability parity)
+# ----------------------------------------------------------------------
+
+
+def test_phase_timings_to_dict_matches_summary_shape() -> None:
+    """``to_dict()`` is the canonical observability-surface alias for
+    ``summary()`` — same shape, byte-identical payload. Sibling-of-#50
+    (Aggregate.to_dict) and llm-cost-optimizer trio (CacheTelemetry,
+    CacheStats, RouterStats)."""
+    t = PhaseTimings()
+    t.record("retrieving", 10.0)
+    t.record("retrieving", 20.0)
+    t.record("reranking", 5.0)
+    assert t.to_dict() == t.summary()
+
+
+def test_phase_timings_to_dict_round_trips_through_json_dumps() -> None:
+    """Round-trip safety — every value in the per-phase dict must
+    survive a ``json.dumps`` / ``json.loads`` cycle. Anything else
+    would silently lose precision or fail at the sink."""
+    t = PhaseTimings()
+    t.record("retrieving", 12.5)
+    t.record("total", 100.0)
+    serialized = json.dumps(t.to_dict(), sort_keys=True)
+    parsed = json.loads(serialized)
+    assert parsed == t.to_dict()
+
+
+def test_phase_timings_dump_summary_json_writes_file_with_summary_shape(tmp_path: Path) -> None:
+    """Writer produces the dict shape on disk with sorted keys and a
+    trailing newline. The file is a self-contained JSON document a
+    log-tailer can parse."""
+    t = PhaseTimings()
+    t.record("retrieving", 10.0)
+    t.record("retrieving", 20.0)
+
+    out = tmp_path / "phase-timings.json"
+    t.dump_summary_json(out)
+    body = out.read_text(encoding="utf-8")
+    assert body.endswith("\n"), "must end with a trailing newline"
+    payload = json.loads(body)
+    assert set(payload) == {"retrieving", "reranking", "generating", "total"}
+    assert payload["retrieving"]["n"] == 2
+    assert payload["reranking"]["n"] == 0
+
+
+def test_phase_timings_dump_summary_json_creates_parent_dirs(tmp_path: Path) -> None:
+    """``atomic_write_text`` does ``parent.mkdir(parents=True)``;
+    confirm the writer inherits that behavior so callers don't have
+    to pre-create a nested observability directory."""
+    t = PhaseTimings()
+    out = tmp_path / "nested" / "sink" / "phase-timings.json"
+    t.dump_summary_json(out)
+    assert out.exists()
+    assert out.parent.is_dir()
+
+
+def test_phase_timings_dump_summary_json_overwrites_atomically(tmp_path: Path) -> None:
+    """Two successive dumps to the same path leave the second payload —
+    not the concatenation, not a half-written file. No tempfile
+    leftovers under the destination's parent."""
+    t = PhaseTimings()
+    out = tmp_path / "phase-timings.json"
+    t.dump_summary_json(out)
+    body1 = out.read_text(encoding="utf-8")
+    t.record("retrieving", 12.0)
+    t.dump_summary_json(out)
+    body2 = out.read_text(encoding="utf-8")
+    assert body1 != body2
+    leftovers = [p.name for p in tmp_path.iterdir() if p.name.endswith(".tmp")]
+    assert leftovers == [], leftovers
+    leftovers = [p.name for p in tmp_path.iterdir() if p.name.startswith(".phase-timings.json.")]
+    assert leftovers == [], leftovers
+
+
+def test_phase_timings_dump_summary_json_zero_state_writes_full_shape(tmp_path: Path) -> None:
+    """A PhaseTimings that's never been recorded into still produces
+    a valid JSON document with all four phase keys present — useful
+    for canary-mode observability checks."""
+    t = PhaseTimings()
+    out = tmp_path / "phase-timings.json"
+    t.dump_summary_json(out)
+    payload = json.loads(out.read_text(encoding="utf-8"))
+    assert set(payload) == {"retrieving", "reranking", "generating", "total"}
+    for phase in payload:
+        assert payload[phase]["n"] == 0
+        assert payload[phase]["p50_ms"] is None
+        assert payload[phase]["p95_ms"] is None
 
 
 # ----------------------------------------------------------------------
