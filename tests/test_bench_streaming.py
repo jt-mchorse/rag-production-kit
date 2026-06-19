@@ -138,7 +138,8 @@ def test_bench_streaming_out_overwrites_atomically(tmp_path: Path) -> None:
     assert set(payload2) == set(_PHASES)
     # The second write should not preserve any unique substring of the
     # first beyond the JSON document boundary — same shape, fresh data.
-    assert body2.startswith("{") and body2.endswith("}\n")
+    assert body2.startswith("{")
+    assert body2.endswith("}\n")
     assert body2.count("{") == body1.count("{"), (
         "second JSON document has a different brace count than the first; "
         "either the writer is no longer atomic or the payload shape "
