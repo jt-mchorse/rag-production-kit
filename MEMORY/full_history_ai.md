@@ -653,3 +653,24 @@ context_for_next_session:
 decisions_made: []
 followups: [#56]
 ---
+
+---
+session: 2026-06-19T05:10Z
+duration_min: 25
+issue: 58
+focus: phase_timings_to_dict_plus_dump_summary_json_observability_parity_propagation
+phase: night_session_phase_b_iteration_6
+delta:
+  files_changed: 2 # rag_kit/streaming.py + tests/test_streaming.py
+  tests_added: 6   # to_dict matches summary + round-trip + dump file shape + parent-dir + atomic overwrite + zero-state
+context_for_next_session:
+  - closes_last_runtime_aggregate_state_observability_gap_in_rag_production_kit_after_aggregate_to_dict_plus_telemetry_store_dump_aggregate_json_50_phase_timings_was_the_remaining_runtime_aggregate_state_lacking_the_canonical_observability_surface
+  - to_dict_is_a_thin_alias_for_summary_both_methods_coexist_so_summary_keeps_its_semantic_name_and_no_caller_breaks_bench_streaming_py_unchanged
+  - dump_summary_json_routes_through_rag_kit_io_utils_atomic_write_text_byte_shape_parity_with_telemetry_store_dump_aggregate_json_sorted_keys_indent_2_trailing_newline
+  - sibling_of_llm_cost_optimizer_runtime_trio_shipped_this_hour_cache_telemetry_50_cache_stats_52_router_stats_62
+  - test_count_355_to_361_six_new_full_pytest_clean_361_passed_7_skipped_postgres_unchanged_ruff_clean
+  - both_runtime_aggregate_state_classes_aggregate_phase_timings_now_expose_same_observability_shape_same_io_utils_helper_same_on_disk_byte_shape
+  - followup_potential_bench_streaming_py_could_optionally_take_out_path_to_call_dump_summary_json_separate_issue_per_session_plan
+decisions_made: []
+followups: []
+---
