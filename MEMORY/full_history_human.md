@@ -532,3 +532,16 @@ this repo is genuinely saturated. Pivot to another priority-tier
 repo's followup hint — `llm-cost-optimizer` has a "plumb RouterStats
 into the savings dashboard" hint; `llm-eval-harness` has a
 `drift --output` normalization decision pending.
+
+## 2026-06-19 — Issue #60: PR #61 lint fix-up to unblock merge
+**Duration:** ~10 min · **Branch:** `session/2026-06-19-issue-60` (existing PR branch)
+
+- Phase A PR-review pass caught a single ruff PT018 failure in PR #61 (a previous iteration of the same multi-issue day session). The remaining 5 of 6 CI jobs (unit ×2, integration-pg, eval-suite, memory-check) were already green; only `lint` blocked merge.
+- Split the compound `assert body2.startswith("{") and body2.endswith("}\n")` at `tests/test_bench_streaming.py:141` into two independent assertions. Pushed the one-line fix to the existing branch rather than opening a new session branch — the change is pure lint repair with zero behavioral diff.
+- All 6 jobs green post-push. PR #61 squash-merged into main; branch deleted; issue #60 auto-closed via `Closes #60` in the PR body.
+
+**Why this work, this session:** Phase A review-and-merge pass surfaced the blocker; the fix was a 1-line lint repair, so it was faster to push the fix directly to PR #61 and complete the merge than to open a separate fix-up PR. Continues the multi-issue, multi-repo day-session loop.
+
+**Open questions / blockers:** none.
+
+**Next session:** continue the day-session loop on the next priority-tier repo with actionable unblocked work (`llm-cost-optimizer` #66 follow-on, or a new substantive issue elsewhere).
