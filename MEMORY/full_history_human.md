@@ -491,3 +491,44 @@ open and ready.
 
 **Next session:** consider plumbing `--out PATH` into `bench_streaming.py`
 to call `dump_summary_json` directly so benchmark capture is hermetic.
+
+## 2026-06-19 — Issue #60: `bench_streaming.py --out PATH` for hermetic JSON capture
+**Duration:** ~25 min · **Branch:** `session/2026-06-19-issue-60`
+
+- Added `--out PATH` argparse arg to `scripts/bench_streaming.py::main`.
+  When set, the bench runs as usual, prints the stdout table as usual,
+  then calls `timings.dump_summary_json(args.out)` to atomic-write the
+  per-phase summary as JSON. `--out` is a sink, not a replacement —
+  stdout behavior is unchanged so existing local-runner workflows
+  don't drift.
+- New `tests/test_bench_streaming.py` (10 tests) exercises the real
+  CLI via `subprocess.run([sys.executable, "-m",
+  "scripts.bench_streaming", ...])`: per-phase shape on disk, stdout
+  unsuppressed when `--out` is set, no file created without `--out`,
+  parent-dir auto-create, atomic-overwrite shape (assert by brace
+  count + payload-parses-cleanly + no `.tmp` leftovers, since
+  wall-clock p50/p95 prevent byte-identity assertions across runs),
+  `--help` references the writer, parametrized phase-key coverage.
+- Initial `byte_identity_across_runs` assertion failed on first
+  pytest run — wall-clock measurements always vary. Pivoted to
+  shape-based assertions so the test is hermetic against the
+  bench's own nondeterminism while still catching real append /
+  partial-write regressions.
+
+**Why this work, this session:** closes the explicit "Next session"
+follow-up from #58. After this PR the runtime-aggregate-state
+observability arc in this repo is complete — both classes
+(`Aggregate`, `PhaseTimings`) have `to_dict` + `dump_*_json` writers,
+and the bench script that drives `PhaseTimings` exposes the writer to
+operators as `--out`. Continues the same observability-sink-parity
+arc that landed earlier today across 6 repos (`validate --out` x5 +
+PhaseTimings#58).
+
+**Open questions / blockers:** none. 361 → 371 pytest passes (7
+DB-dependent skips unchanged). PR #61 open and ready.
+
+**Next session:** the runtime-aggregate-state observability arc in
+this repo is genuinely saturated. Pivot to another priority-tier
+repo's followup hint — `llm-cost-optimizer` has a "plumb RouterStats
+into the savings dashboard" hint; `llm-eval-harness` has a
+`drift --output` normalization decision pending.
