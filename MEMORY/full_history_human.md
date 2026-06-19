@@ -466,3 +466,28 @@ repo drops off that finding set.
 **Open questions / blockers:** none. Test count 348 → 355.
 
 **Next session:** continue propagation to remaining 9 unprotected repos.
+
+## 2026-06-19 — Issue #58: PhaseTimings observability parity
+**Duration:** ~25 min · **Branch:** `session/2026-06-19-0334-issue-58`
+
+- Added `to_dict()` to `rag_kit.streaming.PhaseTimings` as the canonical
+  alias for `summary()`. Both methods coexist; `summary()` keeps its
+  semantic name and no caller breaks.
+- Added `dump_summary_json(path)` routing through
+  `rag_kit/io_utils.atomic_write_text` with byte-shape parity to
+  `TelemetryStore.dump_aggregate_json` (sorted keys, `indent=2`,
+  trailing newline).
+- 6 new tests mirroring the canonical six shapes.
+
+**Why this work, this session:** closes the last runtime-aggregate-state
+observability gap in this repo. After this PR, both runtime aggregate-
+state classes (`Aggregate`, `PhaseTimings`) expose the same
+observability shape — same `to_dict()` name, same atomic-write helper,
+same on-disk byte shape. Sibling of the llm-cost-optimizer runtime trio
+shipped this hour.
+
+**Open questions / blockers:** none. 355 → 361 pytest passes. PR #59
+open and ready.
+
+**Next session:** consider plumbing `--out PATH` into `bench_streaming.py`
+to call `dump_summary_json` directly so benchmark capture is hermetic.

@@ -28,8 +28,10 @@ import math
 import time
 from collections.abc import Iterable, Iterator, Sequence
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any, Literal, Protocol
 
+from .io_utils import atomic_write_text
 from .reranker import Candidate, Reranker
 from .retriever import RetrievalResult
 
@@ -152,6 +154,32 @@ class PhaseTimings:
             }
             for phase in self._PHASES
         }
+
+    def to_dict(self) -> dict[str, dict[str, float | int | None]]:
+        """JSON-stable dict for observability/logging sinks (#58).
+
+        Canonical alias for `summary()` under the portfolio's
+        observability surface name. Mirrors `Aggregate.to_dict` (#50)
+        in this repo and the runtime trio in llm-cost-optimizer
+        (CacheTelemetry #50, CacheStats #52, RouterStats #62). Pairs
+        with `dump_summary_json` for the on-disk path; metric backends
+        like statsd/prometheus consume the in-process dict directly.
+        """
+        return self.summary()
+
+    def dump_summary_json(self, path: str | Path) -> None:
+        """Write the current per-phase summary to ``path`` as JSON.
+
+        Atomic on POSIX — uses ``rag_kit.io_utils.atomic_write_text``
+        so a Ctrl-C / disk-full / OOM between truncate and flush can't
+        leave a log-tailer reading a half-written file. Byte-shape
+        parity with `TelemetryStore.dump_aggregate_json` (#50) and the
+        llm-cost-optimizer runtime trio: sorted keys, indent=2,
+        trailing newline. Operators can tail / diff the file across
+        restarts.
+        """
+        payload = json.dumps(self.to_dict(), sort_keys=True, indent=2) + "\n"
+        atomic_write_text(path, payload)
 
 
 def _chunk_to_event(r: RetrievalResult) -> dict[str, Any]:
