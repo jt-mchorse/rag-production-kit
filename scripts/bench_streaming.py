@@ -178,6 +178,18 @@ def main() -> None:
     ap = argparse.ArgumentParser(description="Benchmark StreamingPipeline phases")
     ap.add_argument("--n", type=int, default=200, help="number of queries to run")
     ap.add_argument("--k", type=int, default=3, help="final top-k after rerank")
+    ap.add_argument(
+        "--out",
+        type=Path,
+        default=None,
+        help=(
+            "Optional path to write the per-phase summary as JSON via "
+            "`PhaseTimings.dump_summary_json`. The atomic-write helper "
+            "creates parent dirs and writes byte-shape parity with the "
+            "rest of the portfolio's measurement sinks (sorted keys, "
+            "indent=2, trailing newline). Stdout table prints regardless."
+        ),
+    )
     args = ap.parse_args()
 
     t0 = time.perf_counter()
@@ -193,6 +205,9 @@ def main() -> None:
     print(f"Streaming pipeline benchmark · n={args.n} · k={args.k}{extra}")
     print()
     print_table(timings)
+
+    if args.out is not None:
+        timings.dump_summary_json(args.out)
 
 
 if __name__ == "__main__":
