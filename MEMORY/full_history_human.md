@@ -558,3 +558,16 @@ into the savings dashboard" hint; `llm-eval-harness` has a
 **Open questions / blockers:** none.
 
 **Next session:** `AnthropicGenerator` default model is `claude-opus-4-7` (no date suffix) while the eval-harness judge default pins a dated id (`claude-haiku-4-5-20251001`); worth a consistency pass on default model pinning across the portfolio if a future session needs filler here.
+
+## 2026-06-22 — Issue #65: fusion — dedupe a doc duplicated within one method's ranking
+**Duration:** ~25 min · **Branch:** `session/2026-06-22-1106-issue-65`
+
+- Found during Phase A code-reading: `reciprocal_rank_fusion` assumed each method ranks each doc at most once. A duplicate `doc_id` within one method's list double-added the `1/(k+rank)` term (corrupting the fused score) and overwrote the recorded per-method rank with the worse (last) one. Real inputs produce this — a union of two SQL paths, a hybrid surfacing one row via two routes, or an upstream dedup bug — and the result was a silently mis-ordered list with no error.
+- Fix: per-method `seen` set; count only the first (best-rank) occurrence per method, matching Cormack et al. (2009)'s "one term per ranker per doc". Cross-method fusion is unchanged.
+- 3 new tests (score-once-at-best-rank, records-first-rank, cross-method-ordering-preserved). Suite 383 → 386, 7 pg tests skipped locally. Ruff clean. PR #66 ready.
+
+**Why this work, this session:** the portfolio is saturated (only binary demo-capture tasks open). This was a real correctness bug in the repo's core hybrid-retrieval math, untested before now — strictly higher value than a synthetic fill.
+
+**Open questions / blockers:** none.
+
+**Next session:** `PhaseTimings.to_dict()` + `Aggregate.to_dict()` shipped without symmetric `from_json`/`from_dict` readers (flagged in eval-harness session memory as the third hop of the from_json propagation chain). Verify a real consumer needs the reader before filling it — otherwise it's API-completeness, not a bug. The equal-fused-score tie-break ordering is also undocumented (deterministic insertion order today).
