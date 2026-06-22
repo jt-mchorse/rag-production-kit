@@ -106,12 +106,13 @@ def _top_score(retrieved: Sequence[RetrievalResult]) -> float:
     """
     if not retrieved:
         return 0.0
-    best = 0.0
-    for r in retrieved:
-        score = r.rerank_score if r.rerank_score is not None else r.fused_score
-        if score > best:
-            best = score
-    return best
+    # Take the actual maximum — seeding `best` at 0.0 clamped a genuinely
+    # negative maximum up to 0.0. `LexicalOverlapReranker` can score a long,
+    # low-overlap chunk negative (overlap - length_penalty·len(text)), so an
+    # all-negative set used to report top_score=0.0 in the refusal and, at a
+    # non-positive `threshold`, pass the `top < threshold` gate and answer
+    # from chunks that should have been refused as insufficient context.
+    return max(r.rerank_score if r.rerank_score is not None else r.fused_score for r in retrieved)
 
 
 def split_sentences(text: str) -> list[str]:

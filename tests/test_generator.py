@@ -15,6 +15,7 @@ from rag_kit.generator import (
     GeneratedAnswer,
     Refusal,
     TemplateGenerator,
+    _top_score,
     enforce_citations,
     split_sentences,
 )
@@ -147,6 +148,39 @@ class TestTemplateGenerator:
         result = gen.generate("?", retrieved, threshold=0.5)
         assert isinstance(result, GeneratedAnswer)
         assert result.top_score == pytest.approx(0.9)
+
+    def test_top_score_returns_true_negative_max(self) -> None:
+        # `LexicalOverlapReranker` can score a long, low-overlap chunk negative.
+        # `_top_score` must report the true (negative) maximum, not clamp to 0.0.
+        retrieved = [
+            _result("A", "x", fused=0.05, rerank=-0.20),
+            _result("B", "y", fused=0.04, rerank=-0.30),
+        ]
+        assert _top_score(retrieved) == pytest.approx(-0.20)
+
+    def test_refusal_reports_real_negative_top_score(self) -> None:
+        # Under the default-style positive threshold an all-negative set still
+        # refuses, but the reported top_score must be the real value, not 0.0 —
+        # otherwise the "top_score=… below threshold=…" detail lies to operators.
+        retrieved = [_result("A", "x", fused=0.05, rerank=-0.20)]
+        gen = TemplateGenerator()
+        result = gen.generate("?", retrieved, threshold=0.02)
+        assert isinstance(result, Refusal)
+        assert result.top_score == pytest.approx(-0.20)
+
+    def test_refuses_when_all_scores_negative_at_zero_threshold(self) -> None:
+        # The decision-flip: with all-negative scores the old 0.0-clamp made
+        # `0.0 < 0.0` False, so the kit answered from chunks it should reject.
+        # The true max (-0.20) is below a 0.0 threshold and must refuse.
+        retrieved = [
+            _result("A", "x", fused=0.05, rerank=-0.20),
+            _result("B", "y", fused=0.04, rerank=-0.30),
+        ]
+        gen = TemplateGenerator()
+        result = gen.generate("?", retrieved, threshold=0.0)
+        assert isinstance(result, Refusal)
+        assert result.reason == "insufficient_context"
+        assert result.top_score == pytest.approx(-0.20)
 
     def test_max_chunks_limits_citations(self) -> None:
         retrieved = [
