@@ -545,3 +545,16 @@ into the savings dashboard" hint; `llm-eval-harness` has a
 **Open questions / blockers:** none.
 
 **Next session:** continue the day-session loop on the next priority-tier repo with actionable unblocked work (`llm-cost-optimizer` #66 follow-on, or a new substantive issue elsewhere).
+
+## 2026-06-22 — Issue #63: guard PhaseTimings.record against non-finite/negative ms
+**Duration:** ~20 min · **Branch:** `session/2026-06-22-0405-issue-63`
+
+- Found by reading `telemetry.py` then `streaming.py` side by side: `CostRecord.build` rejects a non-finite/negative `total_latency_ms` (a #38 finiteness guard, with a comment explaining that a NaN poisons `percentile` because sorting a list containing NaN is undefined), but the streaming layer's own ingestion point — `PhaseTimings.record` — had no such guard. A NaN/Inf/negative `ms` was appended silently and read back as a silently-wrong p50/p95/p99.
+- Demonstrated the bug empirically (recording a NaN made `percentile("retrieving", 50)` return `nan`), then added the matching `not math.isfinite(ms) or ms < 0` guard so a corrupt timing fails loud at the record site. `bool` is intentionally not rejected — the telemetry sibling accepts it (bool-is-int) and exact parity is the point of the change.
+- 12 new cases in the canonical `test_deferred_validation_sweep.py` (which already held the `PhaseTimings.percentile.p` finiteness tests). Suite 371 → 383, ruff clean. PR #64 ready.
+
+**Why this work, this session:** the portfolio is saturated; this was a real silent-corruption bug in the cost-telemetry/streaming p50/p95/p99 path, found as a concrete asymmetry against an existing sibling guard — not a synthetic fill. I again declined the alternative `from_dict` reader for `Aggregate`/`PhaseTimings` `to_dict` for the same reason as in llm-cost-optimizer: nothing hand-rolls typed reconstruction from those artifacts.
+
+**Open questions / blockers:** none.
+
+**Next session:** `AnthropicGenerator` default model is `claude-opus-4-7` (no date suffix) while the eval-harness judge default pins a dated id (`claude-haiku-4-5-20251001`); worth a consistency pass on default model pinning across the portfolio if a future session needs filler here.

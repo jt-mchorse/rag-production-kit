@@ -180,3 +180,47 @@ def test_percentile_empty_phase_still_validates_p_first():
         empty.percentile("retrieving", math.nan)
     # A valid p on an empty phase still returns None (existing contract).
     assert empty.percentile("retrieving", 50) is None
+
+
+# ----------------------------------------------------------------------
+# PhaseTimings.record.ms — finiteness contract at the ingestion site (#63)
+# parity with CostRecord.build's total_latency_ms guard in rag_kit.telemetry
+# ----------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "bad_ms",
+    [
+        math.nan,  # poisons sorted() in percentile → silently-wrong p50/p95/p99
+        math.inf,
+        -math.inf,
+        -1.0,  # negative latency is nonsensical and would distort the curve
+        -0.0001,
+    ],
+)
+def test_record_rejects_non_finite_or_negative_ms(bad_ms):
+    t = PhaseTimings()
+    with pytest.raises(ValueError, match="ms must be a finite non-negative number"):
+        t.record("retrieving", bad_ms)
+
+
+@pytest.mark.parametrize("good_ms", [0.0, 0, 1, 1.5, 12.0, 1_000_000.0])
+def test_record_accepts_finite_non_negative_ms(good_ms):
+    t = PhaseTimings()
+    t.record("retrieving", good_ms)
+    assert t.retrieving == [good_ms]
+
+
+def test_record_guard_keeps_percentile_uncorrupted():
+    # The reproduction from #63: a NaN in the sample used to make percentile
+    # return NaN. The guard now rejects it at the record site, so the
+    # surviving sample yields a correct, finite percentile.
+    t = PhaseTimings()
+    for ms in (10.0, 20.0, 30.0, 40.0):
+        t.record("retrieving", ms)
+    with pytest.raises(ValueError, match="ms must be a finite non-negative number"):
+        t.record("retrieving", math.nan)
+    p50 = t.percentile("retrieving", 50)
+    assert p50 is not None
+    assert math.isfinite(p50)
+    assert p50 == 25.0  # NIST type-7 median of [10, 20, 30, 40]
