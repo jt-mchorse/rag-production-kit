@@ -104,3 +104,45 @@ class TestFusionKValidation:
         out = reciprocal_rank_fusion({"a": ["d1"]}, k=1)
         assert out
         assert out[0][0] == "d1"
+
+
+# ----------------------------------------------------------------------
+# #65 — a doc duplicated within one method's ranking must contribute one
+# 1/(k+rank) term (at its best rank), not double-count.
+# ----------------------------------------------------------------------
+
+
+class TestIntraMethodDuplicates:
+    def test_duplicate_within_method_counts_once_at_best_rank(self) -> None:
+        # d1 appears at rank 1 and again at rank 3 within the same method.
+        # RRF must count it once, at the best (first) rank → 1/(60+1).
+        fused = reciprocal_rank_fusion({"a": ["d1", "d2", "d1"]}, k=60)
+        by_doc = {doc: score for doc, score, _ in fused}
+        assert math.isclose(by_doc["d1"], 1 / 61, abs_tol=1e-12)
+        # d2 is unaffected at rank 2.
+        assert math.isclose(by_doc["d2"], 1 / 62, abs_tol=1e-12)
+        # d1 (best rank 1) still outranks d2 (rank 2).
+        assert [doc for doc, _, _ in fused] == ["d1", "d2"]
+
+    def test_duplicate_within_method_records_first_rank(self) -> None:
+        fused = reciprocal_rank_fusion({"a": ["d1", "d2", "d1"]})
+        by_doc = {doc: ranks for doc, _, ranks in fused}
+        # The recorded rank is the first (best) occurrence, not the last.
+        assert by_doc["d1"] == {"a": 1}
+
+    def test_duplicate_does_not_perturb_cross_method_ordering(self) -> None:
+        # Without dedup, the duplicate d1 in lexical would double-count and
+        # lift d1 above d2 (which is ranked by both methods). With dedup,
+        # d2's two-method score must still win.
+        fused = reciprocal_rank_fusion(
+            {
+                "lexical": ["d1", "d2", "d1"],
+                "dense": ["d2", "d3"],
+            }
+        )
+        by_doc = {doc: score for doc, score, _ in fused}
+        # d1: one term at rank 1 = 1/61. d2: rank 2 lexical + rank 1 dense.
+        assert math.isclose(by_doc["d1"], 1 / 61, abs_tol=1e-12)
+        assert math.isclose(by_doc["d2"], 1 / 62 + 1 / 61, abs_tol=1e-12)
+        ranking = {doc: i for i, (doc, _, _) in enumerate(fused)}
+        assert ranking["d2"] < ranking["d1"]

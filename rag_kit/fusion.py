@@ -45,7 +45,17 @@ def reciprocal_rank_fusion(
     ranks: dict[str, dict[str, int]] = {}
 
     for method, ids in rankings.items():
+        # RRF contributes exactly one 1/(k+rank) term per (method, doc)
+        # (Cormack et al. 2009). A method may still emit the same doc twice —
+        # a union of two SQL paths, a hybrid surfacing one row via two routes,
+        # or an upstream dedup bug. Counting both occurrences would double-add
+        # the score and overwrite the recorded rank with the worse one, so we
+        # keep only the first (best-rank) occurrence per method.
+        seen_in_method: set[str] = set()
         for rank, doc_id in enumerate(ids, start=1):
+            if doc_id in seen_in_method:
+                continue
+            seen_in_method.add(doc_id)
             scores[doc_id] = scores.get(doc_id, 0.0) + 1.0 / (k + rank)
             ranks.setdefault(doc_id, {})[method] = rank
 
