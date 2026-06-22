@@ -584,3 +584,16 @@ into the savings dashboard" hint; `llm-eval-harness` has a
 **Open questions / blockers:** none for this issue. Separately: the naive sentence split mis-handles abbreviations (`U.S.`, `e.g.`) on a real Anthropic generator path — deliberately deferred as a larger design question (the docstring documents the simple split as a generator-cooperation contract).
 
 **Next session:** citation enforcement now tolerates claim-less fragments. The abbreviation-aware-splitting question is the remaining lead if a future session wants to harden the real-generator path.
+
+## 2026-06-22 — Issue #69: generator — _top_score clamped negative rerank scores to 0.0
+**Duration:** ~20 min · **Branch:** `session/2026-06-22-2339-issue-69`
+
+- Found via a Phase A dogfood Explore agent over the RAG core, then verified end-to-end myself. `_top_score` seeded `best = 0.0` and only updated on `score > best`, so an all-negative score set returned `0.0` instead of the true (negative) maximum — contradicting its "Return the maximum confidence score" docstring. Negative scores are reachable with the shipped `LexicalOverlapReranker` (`overlap − length_penalty·len(text)`); a real 200-char zero-overlap chunk scores `-1.0`. `fused_score` (RRF) is always positive, so the bug bites only when rerank scores are present and all negative.
+- Impact: (1) the `Refusal.top_score` was reported as `0.0` instead of the real negative value (misleading telemetry under the default 0.02 threshold), and (2) at a non-positive `threshold` the `0.0` clamp made `top < threshold` False, so the kit generated an answer from chunks it should have refused as insufficient context (a decision flip).
+- Fix: return `max(...)` over `rerank_score` (or `fused_score`) across chunks, preserving the empty-list → 0.0 behavior. 3 regression tests (true negative max; refusal reports real negative top_score; `threshold=0.0` all-negative refuses). All three fail pre-fix. Suite 390 → 393, ruff clean. PR #70 ready.
+
+**Why this work, this session:** rag-production-kit is a priority-tier repo with no open issues; a dogfood sweep surfaced a real correctness defect in a headline feature (the weak-context refusal gate) — strictly higher value than synthetic filler.
+
+**Open questions / blockers:** none.
+
+**Next session:** no specific `generator.py` lead remains; the refusal gate now reports and compares the true max. (The earlier abbreviation-aware-splitting lead from #67 is still open as a larger design question.)
