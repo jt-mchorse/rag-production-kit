@@ -117,12 +117,20 @@ def _top_score(retrieved: Sequence[RetrievalResult]) -> float:
 def split_sentences(text: str) -> list[str]:
     """Split text into claim sentences for citation validation.
 
-    Whitespace-only fragments are dropped. The split is intentionally simple
-    — generators are instructed to produce one claim per sentence ending in
-    `.`/`!`/`?`, and we don't need a full NLP tokenizer for that contract.
+    Fragments with no claim content are dropped: whitespace-only, and also
+    punctuation-only (no alphanumeric character). A stray terminator can split
+    off a claim-less fragment like ``"."`` — keeping it made `enforce_citations`
+    demand a `[cite:...]` marker on something that asserts nothing, falsely
+    refusing an otherwise fully-cited answer. A real claim requires a
+    word/number, and digits are alphanumeric, so a bare-number fragment stays
+    under enforcement — dropping word-less fragments can't mask an uncited claim.
+
+    The split is intentionally simple — generators are instructed to produce one
+    claim per sentence ending in `.`/`!`/`?`, and we don't need a full NLP
+    tokenizer for that contract.
     """
     parts = _SENTENCE_SPLIT.split(text.strip())
-    return [p for p in parts if p.strip()]
+    return [p for p in parts if any(ch.isalnum() for ch in p)]
 
 
 def enforce_citations(

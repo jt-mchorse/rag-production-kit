@@ -46,6 +46,23 @@ class TestSplitSentences:
     def test_drops_whitespace_only_fragments(self) -> None:
         assert split_sentences("   \n\n  ") == []
 
+    def test_drops_claimless_punctuation_only_fragments(self) -> None:
+        # A stray terminator splits off a fragment that asserts nothing (no
+        # alphanumeric content). It must not survive as a "sentence" that then
+        # demands a citation (#67). The real claim sentences are kept intact.
+        assert split_sentences("First claim. . Second claim.") == [
+            "First claim.",
+            "Second claim.",
+        ]
+
+    def test_drops_fragment_with_only_punctuation_but_keeps_numbers(self) -> None:
+        # Digits are alphanumeric: a number-bearing fragment is a potential
+        # claim and stays under enforcement; a pure-punctuation one is dropped.
+        assert split_sentences("Pi is 3.14 [cite:A]. !? Done [cite:A].") == [
+            "Pi is 3.14 [cite:A].",
+            "Done [cite:A].",
+        ]
+
 
 class TestEnforceCitations:
     def test_accepts_every_sentence_cited(self) -> None:
@@ -72,6 +89,21 @@ class TestEnforceCitations:
         retrieved = [_result("A", "alpha")]
         with pytest.raises(CitationError):
             enforce_citations("   ", retrieved)
+
+    def test_accepts_fully_cited_answer_with_stray_terminator(self) -> None:
+        # #67: a stray "." between two cited claims used to split off a claim-less
+        # fragment and falsely refuse an otherwise fully-cited answer.
+        retrieved = [_result("A", "alpha")]
+        text = "Alpha is the first letter [cite:A]. . It comes before beta [cite:A]."
+        citations = enforce_citations(text, retrieved)
+        assert [c.external_id for c in citations] == ["A"]
+
+    def test_rejects_text_with_only_claimless_fragments(self) -> None:
+        # The "no sentences" guard must still fire when nothing in the text is a
+        # claim — claim-less fragments are dropped, leaving zero sentences.
+        retrieved = [_result("A", "alpha")]
+        with pytest.raises(CitationError):
+            enforce_citations(". . !?", retrieved)
 
     def test_deduplicates_repeated_citations(self) -> None:
         retrieved = [_result("A", "alpha")]

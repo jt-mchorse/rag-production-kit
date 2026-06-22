@@ -571,3 +571,16 @@ into the savings dashboard" hint; `llm-eval-harness` has a
 **Open questions / blockers:** none.
 
 **Next session:** `PhaseTimings.to_dict()` + `Aggregate.to_dict()` shipped without symmetric `from_json`/`from_dict` readers (flagged in eval-harness session memory as the third hop of the from_json propagation chain). Verify a real consumer needs the reader before filling it — otherwise it's API-completeness, not a bug. The equal-fused-score tie-break ordering is also undocumented (deterministic insertion order today).
+
+## 2026-06-22 — Issue #67: enforce_citations — false refusal on a claim-less fragment
+**Duration:** ~25 min · **Branch:** `session/2026-06-22-1943-issue-67`
+
+- Found via a Phase A Explore-subagent sweep over the RAG core (fusion/retriever/reranker/generator/streaming/telemetry); rag-production-kit picked as a priority-tier repo under the D-009 loop bias after mcp-server-cookbook#54 was skipped (a `decision-revisit` security-guard change deliberately gated for JT, D-007 fall-through). RRF in `fusion.py` was verified correct (1-indexed rank, per-method dedup, validated k). The real bug: `split_sentences` only dropped whitespace-only fragments, so a stray terminator that splits off a punctuation-only fragment (a lone `.`) survived as a "sentence"; `enforce_citations` then demanded a `[cite:...]` marker on it and refused an otherwise fully-cited answer — a false refusal in the D-009 citation guard.
+- Fix: drop fragments with no alphanumeric content. A real claim requires a word/number and digits stay alphanumeric, so a bare-number fragment remains enforced — this can't mask an uncited claim. The "contained no sentences" guard and the missing-marker / dangling-id / whitespace behavior are preserved.
+- 4 tests (claim-less fragment dropped, number fragment kept, fully-cited answer with stray terminator accepted, all-claim-less text still refused). The 3 behavior-change tests fail pre-fix. Suite 386 → 390, ruff clean. PR #68 ready.
+
+**Why this work, this session:** the repo had zero open issues; a dogfood sweep of a priority-tier repo surfaced a real false-refusal bug in a headline RAG feature (citation enforcement) — higher value than no work.
+
+**Open questions / blockers:** none for this issue. Separately: the naive sentence split mis-handles abbreviations (`U.S.`, `e.g.`) on a real Anthropic generator path — deliberately deferred as a larger design question (the docstring documents the simple split as a generator-cooperation contract).
+
+**Next session:** citation enforcement now tolerates claim-less fragments. The abbreviation-aware-splitting question is the remaining lead if a future session wants to harden the real-generator path.
