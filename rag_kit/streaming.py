@@ -117,6 +117,16 @@ class PhaseTimings:
     def record(self, phase: str, ms: float) -> None:
         if phase not in self._PHASES:
             raise ValueError(f"unknown phase: {phase!r}")
+        # Finiteness guard (#63), parity with `CostRecord.build`'s
+        # `total_latency_ms` check in `rag_kit.telemetry`: a NaN/Inf/negative
+        # ms is otherwise appended silently and later poisons `percentile`
+        # (sorting a list containing NaN is undefined — all NaN comparisons
+        # are False), so the p50/p95/p99 read back silently wrong. Fail at the
+        # ingestion site instead. `bool` is intentionally not rejected here —
+        # the telemetry sibling accepts it (bool-is-int) and parity is the
+        # whole point of this guard.
+        if not math.isfinite(ms) or ms < 0:
+            raise ValueError(f"ms must be a finite non-negative number; got {ms!r}")
         getattr(self, phase).append(ms)
 
     def percentile(self, phase: str, p: float) -> float | None:
