@@ -220,14 +220,24 @@ class TemplateGenerator:
             )
 
         chosen = list(retrieved)[: self.max_chunks]
+        # Emit one cited template sentence per sentence *inside* each chunk,
+        # using the same splitter `enforce_citations` validates with. A chunk's
+        # `text` is whole-document prose (the indexer does no sentence-level
+        # chunking), so wrapping it in a single template sentence would let
+        # `split_sentences` fragment it and leave every sentence but the last
+        # uncited — a false "unparseable_output" refusal. Each chunk still
+        # yields exactly one deduped Citation.
         sentences = [
-            f"Per the retrieved context, {c.text.strip().rstrip('.')} [cite:{c.external_id}]."
+            f"Per the retrieved context, {s.strip().rstrip('.!?')} [cite:{c.external_id}]."
             for c in chosen
+            for s in split_sentences(c.text)
         ]
         text = " ".join(sentences)
         try:
             citations = enforce_citations(text, retrieved)
-        except CitationError as e:  # pragma: no cover - template can't violate its own contract
+        # pragma: no cover - defensive: only reachable if every chosen chunk is
+        # empty / punctuation-only, which yields no cited sentences.
+        except CitationError as e:  # pragma: no cover
             return _refusal(e.reason, e.detail, threshold, top)
         return GeneratedAnswer(
             text=text,
