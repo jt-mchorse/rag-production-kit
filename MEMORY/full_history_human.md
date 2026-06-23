@@ -597,3 +597,15 @@ into the savings dashboard" hint; `llm-eval-harness` has a
 **Open questions / blockers:** none.
 
 **Next session:** no specific `generator.py` lead remains; the refusal gate now reports and compares the true max. (The earlier abbreviation-aware-splitting lead from #67 is still open as a larger design question.)
+
+## 2026-06-23 — Issue #71: TemplateGenerator falsely refused multi-sentence chunks
+**Duration:** ~25 min · **Branch:** `session/2026-06-23-0349-issue-71`
+
+- Fixed a false-refusal bug in `TemplateGenerator`. It emitted one `[cite:id]` marker per chunk by wrapping the whole chunk text in a single template sentence. Since the indexer stores whole-document prose, a retrieved chunk is routinely multi-sentence; `enforce_citations`' `split_sentences` then fragmented the output and left every sentence but the last uncited, yielding a false `unparseable_output` refusal. The in-repo corpus only avoided it because every chunk was hand-authored as a single period-less sentence.
+- Now emits one cited sentence per sentence inside each chunk (same splitter the validator uses); each chunk still yields one deduped Citation. Corrected the false `# pragma: no cover` note. Added a multi-sentence-chunk test. Red pre-fix, green post-fix. Suite 393 → 394 (7 Postgres-gated skips), ruff clean.
+
+**Why this work, this session:** found by a second-pass deep read in the night session's Phase A dogfood wave (the first pass on this repo came back clean). A real correctness bug on the shipped `TemplateGenerator` path used by `evals/run_eval.py`.
+
+**Open questions / blockers:** none.
+
+**Next session:** `TemplateRewriter` sub-query dedup (redundant-but-correct) left out of scope.
