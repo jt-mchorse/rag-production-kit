@@ -9,6 +9,8 @@ Three things to test hermetically:
 
 from __future__ import annotations
 
+import math
+
 import pytest
 
 from rag_kit.reranker import (
@@ -85,8 +87,33 @@ def test_lexical_overlap_length_penalty_breaks_ties_toward_shorter():
 
 
 def test_lexical_overlap_rejects_negative_length_penalty():
-    with pytest.raises(ValueError, match="non-negative"):
+    with pytest.raises(ValueError, match=r"finite number >= 0.0"):
         LexicalOverlapReranker(length_penalty=-0.1)
+
+
+@pytest.mark.parametrize("bad", [float("nan"), float("inf"), float("-inf")])
+def test_lexical_overlap_rejects_non_finite_length_penalty(bad):
+    # Sign-only `length_penalty < 0` let NaN/Inf through (both comparisons are
+    # False), poisoning every score → all-NaN sorts as a no-op so the relevant
+    # chunk is silently not surfaced first. Mirror the repo's finiteness sweep
+    # (fusion.k #38, telemetry.ModelPrice, CostRecord latency).
+    with pytest.raises(ValueError, match=r"finite number >= 0.0"):
+        LexicalOverlapReranker(length_penalty=bad)
+
+
+def test_lexical_overlap_finite_penalty_still_ranks_relevant_first():
+    # The clean path is unaffected: a finite penalty produces a sane, real
+    # ordering (the regression a non-finite penalty silently caused).
+    rr = LexicalOverlapReranker(length_penalty=0.001)
+    cands = _make_candidates(
+        [
+            ("irrelevant", "the sky is blue and very far away today"),
+            ("relevant", "python async pipelines tutorial"),
+        ]
+    )
+    out = rr.rerank("python async pipelines", cands)
+    assert out[0].external_id == "relevant"
+    assert all(math.isfinite(c.rerank_score) for c in out)
 
 
 def test_lexical_overlap_rejects_empty_query():
