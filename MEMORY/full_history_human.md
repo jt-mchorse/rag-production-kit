@@ -609,3 +609,15 @@ into the savings dashboard" hint; `llm-eval-harness` has a
 **Open questions / blockers:** none.
 
 **Next session:** `TemplateRewriter` sub-query dedup (redundant-but-correct) left out of scope.
+
+## 2026-06-23 — Issue #73: single-sub-query rewrite reranked against the rewritten query, not the original
+**Duration:** ~25 min · **Branch:** `session/2026-06-23-1910-issue-73`
+
+- A Phase A dogfood sweep of the retriever path found that `Retriever.search(rewriter=..., reranker=...)` reranked against the wrong query when the rewriter returns a single sub-query (the common no-decomposition case). `_hybrid_search` uses its `query` arg for both retrieval and reranking, and the single-sub-query branch passed the rewritten query — so the reranker scored candidates against the reformulated string instead of the user's original query.
+- The multi-hop path already reranks against the original query (with a comment and a locking test); this makes the single-sub-query path honor the same contract. Added a `rerank_query` param to `_hybrid_search` (defaults to `query`, so other callers are untouched) and a spy-reranker regression test. Suite 395 passed / 7 pg-skipped, ruff clean.
+
+**Why this work, this session:** the portfolio's only open `priority:high` issues elsewhere were operator-blocked or `decision-revisit` security work; a parallel dogfood pass over three priority-tier repos surfaced this real, well-grounded correctness gap on a documented public seam.
+
+**Open questions / blockers:** none.
+
+**Next session:** none specific to this issue.
