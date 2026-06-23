@@ -108,9 +108,7 @@ class Retriever:
             # contract the multi-hop path follows (intent is the user's query, not
             # the reformulation). Without this, a normalizing/paraphrasing rewriter
             # silently re-orders results against the rewritten string.
-            return self._hybrid_search(
-                sub_queries[0], k, reranker=reranker, rerank_query=query
-            )
+            return self._hybrid_search(sub_queries[0], k, reranker=reranker, rerank_query=query)
 
         return self._multi_hop_search(
             original_query=query,

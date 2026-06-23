@@ -292,9 +292,7 @@ def test_single_sub_query_rewrite_with_reranker_uses_original_query():
             ]
 
     retriever = Retriever(conn, HashEmbedder())
-    results = retriever.search(
-        "original query", k=2, rewriter=rewriter, reranker=_SpyReranker()
-    )
+    results = retriever.search("original query", k=2, rewriter=rewriter, reranker=_SpyReranker())
     # Reranker saw the original query, not "rewritten query".
     assert seen_rerank_queries == ["original query"]
     # Retrieval still used the rewritten query (the point of rewriting).
