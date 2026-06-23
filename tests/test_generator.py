@@ -149,6 +149,27 @@ class TestTemplateGenerator:
         assert isinstance(result, GeneratedAnswer)
         assert result.top_score == pytest.approx(0.9)
 
+    def test_handles_multi_sentence_chunk_text(self) -> None:
+        # The indexer stores whole-document prose, so a retrieved chunk is
+        # routinely multi-sentence. The template must cite every sentence it
+        # emits, not just the chunk's last one — otherwise enforce_citations
+        # fragments the output and falsely refuses a fully-citable answer.
+        retrieved = [
+            _result(
+                "c1",
+                "Paris is the capital of France. It has about two million residents",
+                fused=0.9,
+            )
+        ]
+        gen = TemplateGenerator(max_chunks=3)
+        result = gen.generate("about paris", retrieved, threshold=0.1)
+        assert isinstance(result, GeneratedAnswer)
+        assert {c.external_id for c in result.citations} == {"c1"}
+        # Every sentence in the rendered answer carries the citation marker.
+        for sentence in result.text.split("[cite:c1].")[:-1]:
+            assert sentence.strip()
+        assert result.text.count("[cite:c1]") == 2
+
     def test_top_score_returns_true_negative_max(self) -> None:
         # `LexicalOverlapReranker` can score a long, low-overlap chunk negative.
         # `_top_score` must report the true (negative) maximum, not clamp to 0.0.
