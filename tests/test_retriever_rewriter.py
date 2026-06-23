@@ -256,6 +256,54 @@ def test_multi_hop_path_with_reranker_uses_original_query():
         assert r.rerank_score is not None
 
 
+def test_single_sub_query_rewrite_with_reranker_uses_original_query():
+    """A non-decomposing rewrite (1 sub-query) + reranker must rerank against
+    the *original* query, not the rewritten one — same contract as the
+    multi-hop path. Retrieval still uses the rewritten query.
+    """
+    conn = _FakeConn(
+        lexical_by_query={
+            "rewritten query": [("doc-x", "x text", {})],
+        },
+        dense_default=[("doc-y", "y text", {})],
+    )
+    rewriter = _StubRewriter(
+        RewriteResult(sub_queries=("rewritten query",), reasoning="no_decomposition")
+    )
+
+    seen_rerank_queries: list[str] = []
+
+    class _SpyReranker:
+        def rerank(
+            self,
+            query: str,
+            candidates,  # type: ignore[no-untyped-def]
+        ):
+            seen_rerank_queries.append(query)
+            return [
+                ScoredCandidate(
+                    external_id=c.external_id,
+                    text=c.text,
+                    metadata=c.metadata,
+                    rerank_score=1.0 - i * 0.1,
+                    rerank_rank=i + 1,
+                )
+                for i, c in enumerate(candidates)
+            ]
+
+    retriever = Retriever(conn, HashEmbedder())
+    results = retriever.search("original query", k=2, rewriter=rewriter, reranker=_SpyReranker())
+    # Reranker saw the original query, not "rewritten query".
+    assert seen_rerank_queries == ["original query"]
+    # Retrieval still used the rewritten query (the point of rewriting).
+    lex_params = [entry[1] for entry in conn.query_log if "PLAINTO_TSQUERY" in entry[0].upper()]
+    assert lex_params, "lexical channel was not called"
+    assert lex_params[0][0] == "rewritten query"
+    for r in results:
+        assert r.rerank_rank is not None
+        assert r.rerank_score is not None
+
+
 def test_multi_hop_path_with_lexical_overlap_reranker_orders_top_to_original_query():
     """End-to-end: rewriter expands, then a real (dep-free) reranker
     re-scores against the original query. The doc that matches the

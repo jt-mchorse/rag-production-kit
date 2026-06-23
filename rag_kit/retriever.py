@@ -103,8 +103,12 @@ class Retriever:
             raise ValueError("rewriter returned empty sub_queries")
         if len(sub_queries) == 1:
             # Single-sub-query rewrites collapse to the existing single-shot path
-            # using the (possibly normalized) rewritten query.
-            return self._hybrid_search(sub_queries[0], k, reranker=reranker)
+            # using the (possibly normalized) rewritten query for *retrieval*, but
+            # the reranker must score against the *original* user query — same
+            # contract the multi-hop path follows (intent is the user's query, not
+            # the reformulation). Without this, a normalizing/paraphrasing rewriter
+            # silently re-orders results against the rewritten string.
+            return self._hybrid_search(sub_queries[0], k, reranker=reranker, rerank_query=query)
 
         return self._multi_hop_search(
             original_query=query,
@@ -124,7 +128,13 @@ class Retriever:
         k: int,
         *,
         reranker: Reranker | None,
+        rerank_query: str | None = None,
     ) -> list[RetrievalResult]:
+        # `query` drives retrieval (lexical + dense channels). `rerank_query`
+        # is what the reranker scores against; it defaults to `query` so the
+        # `rewriter=None` and multi-hop-per-sub-query callers are unchanged,
+        # and the single-sub-query rewrite path overrides it with the original
+        # user query (see `search`).
         candidate_k = k * _CANDIDATE_MULTIPLIER
 
         # --- Lexical channel ------------------------------------------------
@@ -187,7 +197,7 @@ class Retriever:
             Candidate(external_id=r.external_id, text=r.text, metadata=r.metadata)
             for r in pre_rerank
         ]
-        scored = reranker.rerank(query, candidates)
+        scored = reranker.rerank(rerank_query if rerank_query is not None else query, candidates)
 
         # Re-attach the pre-rerank fused metadata to the reranked output.
         pre_by_id = {r.external_id: r for r in pre_rerank}
