@@ -7,6 +7,8 @@ isolation from the retriever.
 
 from __future__ import annotations
 
+import math
+
 import pytest
 
 from rag_kit.generator import (
@@ -219,6 +221,27 @@ class TestTemplateGenerator:
         with pytest.raises(ValueError, match="max_chunks must be a positive integer"):
             TemplateGenerator(max_chunks=0)
 
+    # Issue #82: a non-finite threshold silently breaks the refusal gate.
+    # `top < NaN` and `top < -inf` are both False so the kit answers from
+    # chunks it should refuse; `+inf` forces an unconditional refusal. Reject
+    # at the boundary, matching the fusion.k (#38) / length_penalty (#75)
+    # finiteness guards. A *finite* negative threshold stays valid (#69).
+    @pytest.mark.parametrize("bad", [math.nan, math.inf, -math.inf])
+    def test_rejects_non_finite_threshold(self, bad: float) -> None:
+        retrieved = [_result("A", "Alpha facts", fused=0.8)]
+        gen = TemplateGenerator()
+        with pytest.raises(ValueError, match="threshold must be a finite number"):
+            gen.generate("?", retrieved, threshold=bad)
+
+    def test_finite_negative_threshold_still_accepted(self) -> None:
+        # _top_score can be genuinely negative (#69); a negative floor that
+        # accepts low-overlap chunks is a legitimate config, not corruption.
+        retrieved = [_result("A", "x", fused=0.05, rerank=-0.20)]
+        gen = TemplateGenerator()
+        result = gen.generate("?", retrieved, threshold=-0.5)
+        assert isinstance(result, GeneratedAnswer)
+        assert result.top_score == pytest.approx(-0.20)
+
 
 class _FakeContentBlock:
     def __init__(self, text: str) -> None:
@@ -259,6 +282,15 @@ class TestAnthropicGenerator:
         result = gen.generate("?", retrieved, threshold=0.5)
         assert isinstance(result, Refusal)
         assert result.reason == "insufficient_context"
+
+    def test_rejects_non_finite_threshold_before_calling_client(self) -> None:
+        # The guard runs before any client call, so a misconfigured threshold
+        # fails loud rather than spending an API request on a broken gate.
+        retrieved = [_result("A", "alpha", fused=0.8)]
+        sentinel = _FakeClient("Should never be returned [cite:A].")
+        gen = AnthropicGenerator(client=sentinel)
+        with pytest.raises(ValueError, match="threshold must be a finite number"):
+            gen.generate("?", retrieved, threshold=math.nan)
 
     def test_converts_citation_error_to_refusal(self) -> None:
         retrieved = [_result("A", "alpha", fused=0.4)]
