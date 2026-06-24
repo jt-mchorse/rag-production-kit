@@ -33,6 +33,7 @@ harness; see issue #7).
 
 from __future__ import annotations
 
+import math
 import os
 import re
 from collections.abc import Sequence
@@ -176,6 +177,23 @@ def enforce_citations(
     return tuple(seen.values())
 
 
+def _validate_threshold(threshold: float) -> None:
+    """Reject a non-finite refusal threshold at the generator boundary.
+
+    The gate is `top < threshold`. A `NaN` threshold makes that comparison
+    `False` for every `top`, silently bypassing the refusal path so the
+    generator answers from chunks it should have refused; `-inf` does the
+    same, and `+inf` forces an unconditional refusal. None of those are a
+    meaningful confidence floor, so fail loud — matching the finiteness/sign
+    guards on `fusion.k` (#38), `LexicalOverlapReranker.length_penalty`
+    (#75), and `max_chunks` (#41). A *finite* negative threshold stays
+    valid: `_top_score` can be genuinely negative (#69), so a negative floor
+    is a legitimate "accept low-overlap chunks" configuration.
+    """
+    if not math.isfinite(threshold):
+        raise ValueError(f"threshold must be a finite number; got {threshold!r}")
+
+
 def _refusal(reason: str, detail: str, threshold: float, top: float) -> Refusal:
     return Refusal(reason=reason, detail=detail, used_threshold=threshold, top_score=top)
 
@@ -208,6 +226,7 @@ class TemplateGenerator:
         *,
         threshold: float = _DEFAULT_THRESHOLD,
     ) -> GeneratedAnswer | Refusal:
+        _validate_threshold(threshold)
         top = _top_score(retrieved)
         if not retrieved:
             return _refusal("insufficient_context", "no chunks retrieved", threshold, top)
@@ -300,6 +319,7 @@ class AnthropicGenerator:
         *,
         threshold: float = _DEFAULT_THRESHOLD,
     ) -> GeneratedAnswer | Refusal:
+        _validate_threshold(threshold)
         top = _top_score(retrieved)
         if not retrieved:
             return _refusal("insufficient_context", "no chunks retrieved", threshold, top)
