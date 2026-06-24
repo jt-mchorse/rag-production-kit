@@ -634,3 +634,17 @@ into the savings dashboard" hint; `llm-eval-harness` has a
 **Open questions / blockers:** none.
 
 **Next session:** `CohereReranker`'s `batch_size` / `timeout` are a separate path, not audited this session — a possible follow-up only if a concrete gap surfaces.
+
+---
+## 2026-06-24 — Issue #78: non-finite threshold silently bypassed the generator refusal gate
+**Duration:** ~24 min · **Branch:** `session/2026-06-24-0335-issue-78`
+
+- Both `TemplateGenerator.generate` and `AnthropicGenerator.generate` used `threshold` in the gate `if top < threshold:` without validating finiteness. A NaN (or -Inf) threshold made the comparison False, bypassing the gate and answering from chunks that should be refused; +Inf forced an unconditional refusal. No diagnostic.
+- Added a shared `_validate_threshold` helper rejecting non-finite thresholds with a descriptive ValueError, wired into both generators. Finite negative thresholds stay valid (`_top_score` can be negative, #69). Added the missing `import math`.
+- 5 new tests (parametrized NaN/±Inf, finite-negative still answers, Anthropic rejects NaN before client call). Red via `git stash`, green after. Suite 399 → 404, ruff clean.
+
+**Why this work, this session:** rag-production-kit was the next priority-tier repo by build-sequence tie-break; the reranker/retriever/fusion/telemetry paths were saturated, so a dogfood sweep surfaced the generator's unguarded refusal threshold.
+
+**Open questions / blockers:** none. Process note: I started editing before cutting the session branch this round — caught it at the red-check (stash showed "WIP on main"), moved the changes onto the branch, and filed the issue + plan before committing. Watch the branch-first ordering next time.
+
+**Next session:** embedder.py / indexer.py / streaming.py remain the dogfood frontier in this repo.
