@@ -338,6 +338,45 @@ def test_percentile_rejects_out_of_range_q():
         percentile([1.0, 2.0], 1.5)
 
 
+# Issue #80: percentile guards empty + q-range but not values finiteness. A NaN
+# in `values` sorts into an implementation-defined slot (all NaN comparisons are
+# False), so the returned percentile is silently wrong and position-dependent,
+# and dump_aggregate_json then emits the bare token `NaN` (invalid JSON). Reject
+# it at the metric boundary, same posture as PhaseTimings.record / CostRecord.build.
+@pytest.mark.parametrize("bad", [math.nan, math.inf, -math.inf], ids=["nan", "inf", "-inf"])
+def test_percentile_rejects_non_finite_values(bad: float):
+    with pytest.raises(ValueError, match="finite numbers"):
+        percentile([10.0, bad, 30.0], 0.5)
+
+
+def test_percentile_still_accepts_all_finite_values():
+    # Regression guard: the finiteness check must not reject legitimate samples.
+    assert percentile([10.0, 20.0, 30.0], 0.5) == pytest.approx(20.0)
+
+
+def test_aggregate_with_non_finite_latency_raises_not_nan_metric():
+    # A CostRecord constructed directly (no __post_init__) bypasses the
+    # build() latency guard; aggregate must fail loud rather than report a
+    # `nan` latency_p50_ms and serialize an invalid-JSON `NaN` token.
+    def _rec(lat: float) -> CostRecord:
+        return CostRecord(
+            ts=1.0,
+            query="q",
+            model="m",
+            retrieved_count=1,
+            prompt_tokens=10,
+            completion_tokens=5,
+            prompt_usd=0.001,
+            completion_usd=0.001,
+            total_usd=0.002,
+            total_latency_ms=lat,
+            per_phase_ms={},
+        )
+
+    with pytest.raises(ValueError, match="finite numbers"):
+        aggregate([_rec(10.0), _rec(20.0), _rec(math.nan), _rec(40.0)])
+
+
 def test_aggregate_empty_returns_zeros():
     agg = aggregate([])
     assert agg == Aggregate(0, 0, 0, 0.0, 0.0, 0.0, 0.0)
