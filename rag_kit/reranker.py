@@ -83,8 +83,8 @@ class LexicalOverlapReranker:
 
     def __init__(self, *, length_penalty: float = 0.001) -> None:
         # Tiny coefficient so the penalty only shows up as a tie-breaker.
-        if length_penalty < 0:
-            raise ValueError("length_penalty must be non-negative")
+        if not math.isfinite(length_penalty) or length_penalty < 0:
+            raise ValueError("length_penalty must be finite and non-negative")
         self.length_penalty = length_penalty
 
     def rerank(self, query: str, candidates: Sequence[Candidate]) -> list[ScoredCandidate]:

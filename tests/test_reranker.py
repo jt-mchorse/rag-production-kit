@@ -89,6 +89,21 @@ def test_lexical_overlap_rejects_negative_length_penalty():
         LexicalOverlapReranker(length_penalty=-0.1)
 
 
+def test_lexical_overlap_rejects_nan_length_penalty():
+    with pytest.raises(ValueError, match="finite"):
+        LexicalOverlapReranker(length_penalty=float("nan"))
+
+
+def test_lexical_overlap_rejects_inf_length_penalty():
+    with pytest.raises(ValueError, match="finite"):
+        LexicalOverlapReranker(length_penalty=float("inf"))
+
+
+def test_lexical_overlap_rejects_neg_inf_length_penalty():
+    with pytest.raises(ValueError, match="finite"):
+        LexicalOverlapReranker(length_penalty=float("-inf"))
+
+
 def test_lexical_overlap_rejects_empty_query():
     rr = LexicalOverlapReranker()
     with pytest.raises(ValueError, match="non-empty"):
