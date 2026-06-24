@@ -41,9 +41,10 @@ def test_to_pgvector_error_names_first_offending_index():
 def test_to_pgvector_accepts_all_finite_vector():
     # Regression guard: the finiteness check must not reject legitimate
     # vectors, and the formatted literal shape is unchanged.
-    assert to_pgvector([1.0, 2.0, 3.0]) == "[" + ",".join(
-        repr(float(v)) for v in (1.0, 2.0, 3.0)
-    ) + "]"
+    assert (
+        to_pgvector([1.0, 2.0, 3.0])
+        == "[" + ",".join(repr(float(v)) for v in (1.0, 2.0, 3.0)) + "]"
+    )
 
 
 def test_to_pgvector_accepts_negative_and_zero_components():
