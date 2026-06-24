@@ -918,3 +918,26 @@ context_for_next_session:
 decisions_made: []
 followups: []
 ---
+
+---
+session: 2026-06-24T19:15Z
+duration_min: 20
+issue: 82
+focus: to_pgvector_embedding_finiteness_guard_nan_inf_reaching_pgvector
+phase: day_session_phase_b_iteration_1
+delta:
+  files_changed: 1 # rag_kit/db.py
+  files_added: 1   # tests/test_db_to_pgvector.py
+  tests_added: 5   # nan/inf/-inf rejected + first-offending-index + all-finite/negative-zero/empty regression guards
+context_for_next_session:
+  - continues_the_dogfood_frontier_the_80_session_close_named_explicitly_embedder_indexer_the_embed_seam_was_next
+  - root_cause_db_to_pgvector_formatted_repr_float_v_with_no_finiteness_validation_both_embed_entry_points_funnel_through_it_indexer_add_documents_line_63_write_path_and_retriever_hybrid_search_line_153_query_path
+  - byo_embedder_protocol_non_finite_component_from_normalization_divide_by_zero_inf_overflow_or_nan_poisoned_model_renders_bare_token_nan_inf_reaches_pgvector_errors_opaque_nan_not_allowed_in_vector_far_from_seam_or_silently_corrupts_dense_channel_cosine_distance_ordering_on_tolerant_build
+  - fix_validate_finiteness_in_to_pgvector_itself_the_single_chokepoint_both_paths_share_raise_valueerror_naming_offending_index_before_literal_reaches_postgres
+  - direct_rag_kit_sibling_of_llm_cost_optimizer_88_validate_embedding_at_put_lookup_seam_merged_same_run_in_phase_a_consistent_with_finiteness_arc_80_79_76_63
+  - to_pgvector_had_zero_dedicated_test_coverage_before_this_first_test_file_added
+  - empty_vector_dimension_mismatch_deferred_pgvector_own_dimension_check_surfaces_it_clearly_kept_fix_surgical_to_finiteness
+  - full_suite_green_locally_pg_integration_tests_skip_without_live_db_ruff_clean_after_splitting_pt018_composite_asserts
+decisions_made: []
+followups: []
+---

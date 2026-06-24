@@ -661,3 +661,16 @@ into the savings dashboard" hint; `llm-eval-harness` has a
 **Open questions / blockers:** none.
 
 **Next session:** a `CostRecord.__post_init__` finiteness guard (the data-boundary fix for direct construction) is a narrower follow-up; the `bool`-`q` coercion is a low-impact runner-up (q only ever passed internally as 0.5/0.95/0.99).
+
+---
+## 2026-06-24 — Issue #82: NaN/Inf embedding components reached pgvector unvalidated
+**Duration:** ~20 min · **Branch:** `session/2026-06-24-1915-issue-82`
+
+- `db.to_pgvector()` formatted an embedding vector with `repr(float(v))` and did no finiteness check. Both embedding entry points funnel BYO-`Embedder` output through it — the indexer write-path (`add_documents`) and the retriever query-path (`_hybrid_search`) — so a non-finite component (normalization divide-by-zero, `Inf` overflow, or a NaN-poisoned model) reached pgvector as the bare token `nan`/`inf`, surfacing either as an opaque `NaN not allowed in vector` error far from the embedder seam or as silent dense-channel ordering corruption on a tolerant build.
+- Validated finiteness in `to_pgvector` itself (the single chokepoint both paths share), raising a `ValueError` that names the offending index. Added the first dedicated `to_pgvector` tests (5). Full suite green locally (pg-integration skips without a live DB), ruff clean.
+
+**Why this work, this session:** the #80 session close explicitly named embedder/indexer as the next dogfood frontier; this is the direct rag-kit sibling of the `llm-cost-optimizer` `_validate_embedding` fix (#88) that was merged in this same run's Phase A review pass. rag-production-kit is in the D-009 priority tier.
+
+**Open questions / blockers:** none.
+
+**Next session:** empty-vector / dimension-mismatch validation at `to_pgvector` is a possible narrow follow-up, but pgvector's own dimension check already surfaces it clearly; streaming.py remains on the dogfood frontier.
