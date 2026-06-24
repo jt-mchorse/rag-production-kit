@@ -83,8 +83,14 @@ class LexicalOverlapReranker:
 
     def __init__(self, *, length_penalty: float = 0.001) -> None:
         # Tiny coefficient so the penalty only shows up as a tie-breaker.
-        if length_penalty < 0:
-            raise ValueError("length_penalty must be non-negative")
+        # Finiteness, not just sign: `NaN < 0` and `inf < 0` are both False, so
+        # a non-finite penalty slips the sign check and poisons every score
+        # (`overlap - length_penalty * len(text)` → NaN/-Inf). All-NaN scores
+        # sort as a no-op (NaN comparisons are false), so the relevant chunk is
+        # silently not surfaced first. Mirrors the finiteness sweep already
+        # applied to fusion's `k`, `telemetry.ModelPrice`, and latency.
+        if not math.isfinite(length_penalty) or length_penalty < 0:
+            raise ValueError(f"length_penalty must be a finite number >= 0.0; got {length_penalty}")
         self.length_penalty = length_penalty
 
     def rerank(self, query: str, candidates: Sequence[Candidate]) -> list[ScoredCandidate]:

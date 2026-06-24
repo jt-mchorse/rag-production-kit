@@ -621,3 +621,16 @@ into the savings dashboard" hint; `llm-eval-harness` has a
 **Open questions / blockers:** none.
 
 **Next session:** none specific to this issue.
+
+## 2026-06-24 — Issue #75: LexicalOverlapReranker.length_penalty had a sign-only guard (NaN/Inf slipped through)
+**Duration:** ~20 min · **Branch:** `session/2026-06-23-2345-issue-75`
+
+- A Phase A dogfood code-read of the reranker path found that `LexicalOverlapReranker.__init__` validated `length_penalty` with a sign-only `length_penalty < 0` check. `NaN < 0` and `inf < 0` are both `False`, so a non-finite penalty was accepted and then poisoned every candidate's score (`overlap - length_penalty * len(text)` → NaN/-Inf). All-NaN scores sort as a no-op (NaN comparisons are false), so the relevant chunk was silently *not* surfaced first — a plausible-looking but wrong ranking with no error.
+- Reproduced: `LexicalOverlapReranker(length_penalty=NaN)` constructs, and reranking ranks the irrelevant doc first (scores `[nan, nan]`) vs a finite penalty ranking the relevant doc first (`0.969` vs `-0.039`). `+inf` accepted too.
+- Fix: widened the guard to `not math.isfinite(length_penalty) or length_penalty < 0`, mirroring the repo's finiteness sweep on `fusion.k` (#38), `telemetry.ModelPrice`, and `CostRecord` latency. Updated the existing negative-penalty test's message match and added NaN/+Inf/-Inf rejection tests plus a finite-penalty-ranks-relevant-first regression test. Red pre-fix / green post-fix. Suite 399 passed / 7 pg-skipped, ruff clean.
+
+**Why this work, this session:** 4th issue of a multi-issue DAY run; after three core fixes (`llm-eval-harness` #85, `llm-cost-optimizer` #83, `agent-orchestration-platform` #53) the priority-tier data/loader paths were saturated, and this was the one reranker knob still on a sign-only check — a genuine deviation from the repo's own documented finiteness sweep, not a fabricated find.
+
+**Open questions / blockers:** none.
+
+**Next session:** `CohereReranker`'s `batch_size` / `timeout` are a separate path, not audited this session — a possible follow-up only if a concrete gap surfaces.
