@@ -378,9 +378,21 @@ def percentile(values: Sequence[float], q: float) -> float:
     Matches `rag_kit.streaming.PhaseTimings.percentile` so a 24-hour
     aggregate window and a streaming-pipeline snapshot agree on the
     number when given the same sample. Edges (q=0, q=1) clamp.
+
+    A non-finite value (NaN / +/-Infinity) is rejected (#80). `CostRecord.build`
+    already guards `total_latency_ms` finiteness at ingestion (#38), but a
+    record constructed directly (the dataclass has no `__post_init__`) bypasses
+    it, and this function is exported on its own. Unguarded, `sorted()` leaves
+    the NaN in an implementation-defined slot (all NaN comparisons are False),
+    so the returned percentile is silently wrong and position-dependent, and
+    `dump_aggregate_json` then serializes the `nan` as the bare token `NaN` —
+    invalid JSON a strict log-tailer rejects whole. Fail loud at the metric
+    boundary, the same posture as the q-range guard below and `PhaseTimings.record`.
     """
     if not values:
         return 0.0
+    if any(not math.isfinite(v) for v in values):
+        raise ValueError(f"values must all be finite numbers; got {list(values)!r}")
     if not 0.0 <= q <= 1.0:
         raise ValueError(f"q must be in [0.0, 1.0]; got {q}")
     s = sorted(values)

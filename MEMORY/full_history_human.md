@@ -648,3 +648,16 @@ into the savings dashboard" hint; `llm-eval-harness` has a
 **Open questions / blockers:** none. Process note: I started editing before cutting the session branch this round — caught it at the red-check (stash showed "WIP on main"), moved the changes onto the branch, and filed the issue + plan before committing. Watch the branch-first ordering next time.
 
 **Next session:** embedder.py / indexer.py / streaming.py remain the dogfood frontier in this repo.
+
+---
+## 2026-06-24 — Issue #80: non-finite latency corrupted the p50 metric and emitted invalid JSON
+**Duration:** ~25 min · **Branch:** `session/2026-06-24-1532-issue-80`
+
+- The public `telemetry.percentile(values, q)` validated empty input and the `q` range but not the finiteness of `values`. A non-finite `total_latency_ms` flowed into `aggregate()`, where `sorted()` put the NaN in an implementation-defined slot, so `latency_p50_ms` came back `nan` (position-dependent) and `dump_aggregate_json` serialized the bare `NaN` token — invalid JSON a strict log-tailer rejects whole. `CostRecord.build` already guards latency (#38), but direct dataclass construction (no `__post_init__`) bypasses it and `percentile` is exported on its own.
+- Added a finiteness guard on `values` in `percentile()` (raise after the empty-check), matching the q-range guard and the `PhaseTimings.record`/`CostRecord.build` posture. 5 tests, red-without / green-with, full suite 409 pass / 7 Postgres-skip, ruff clean.
+
+**Why this work, this session:** found via a Phase A dogfood sweep (targeting the less-recently-touched fusion/telemetry/streaming modules) and reproduced end-to-end; rag-production-kit was next in build sequence among the priority tier (D-009) this run.
+
+**Open questions / blockers:** none.
+
+**Next session:** a `CostRecord.__post_init__` finiteness guard (the data-boundary fix for direct construction) is a narrower follow-up; the `bool`-`q` coercion is a low-impact runner-up (q only ever passed internally as 0.5/0.95/0.99).
