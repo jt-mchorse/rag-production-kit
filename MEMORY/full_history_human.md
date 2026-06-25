@@ -674,3 +674,16 @@ into the savings dashboard" hint; `llm-eval-harness` has a
 **Open questions / blockers:** none.
 
 **Next session:** empty-vector / dimension-mismatch validation at `to_pgvector` is a possible narrow follow-up, but pgvector's own dimension check already surfaces it clearly; streaming.py remains on the dogfood frontier.
+
+---
+## 2026-06-25 — Issue #84: deterministic RRF tie-breaking
+**Duration:** ~20 min · **Branch:** `session/2026-06-25-1921-issue-84`
+
+- `reciprocal_rank_fusion` sorted by fused score alone, so tied docs fell back to `scores` dict insertion order — which depends on the incidental order methods appear in the `rankings` mapping and the order doc ids appear within each list. RRF ties are common (`1/(k+rank)` sums collide for any symmetric rank configuration), so the same rankings could produce a different top-k purely from how the caller ordered the methods. For a production retriever feeding top-k into an LLM, that's a reproducibility bug.
+- Added a doc-id-ascending secondary sort key (`key=lambda row: (-row[1], row[0])`). Same class as the chunking-strategies-lab cosine-tie fix (#69) merged earlier this run. 4 red-green tests (permutation-invariance and within-method-order fail without the fix; the other two pass coincidentally because their tie data already aligns with insertion order). Full suite 420 passed / 7 skipped, ruff clean.
+
+**Why this work, this session:** rag-production-kit was the next priority-tier repo in build sequence this multi-issue day session and had zero open issues; dogfooding the fusion math surfaced a real, reachable determinism bug in the same tie-break class the portfolio just fixed elsewhere.
+
+**Open questions / blockers:** none.
+
+**Next session:** rag-production-kit has no open issues again; dogfood another core module (reranker/retriever/streaming) for the next edge-case fix.

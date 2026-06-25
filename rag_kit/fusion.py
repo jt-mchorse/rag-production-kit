@@ -59,6 +59,13 @@ def reciprocal_rank_fusion(
             scores[doc_id] = scores.get(doc_id, 0.0) + 1.0 / (k + rank)
             ranks.setdefault(doc_id, {})[method] = rank
 
+    # RRF ties are common: 1/(k+rank) sums collide for any symmetric rank
+    # configuration. Sorting on score alone leaves tied docs in `scores`
+    # insertion order, which depends on the incidental order methods appear in
+    # `rankings` and the order doc ids appear within each list -- so the same
+    # rankings can yield a different top-k just from caller method-ordering.
+    # Break ties by doc id (ascending) for a stable, caller-order-independent
+    # ranking. Same class as the chunking-strategies-lab cosine-tie fix (#69).
     fused = [(doc_id, scores[doc_id], ranks[doc_id]) for doc_id in scores]
-    fused.sort(key=lambda row: row[1], reverse=True)
+    fused.sort(key=lambda row: (-row[1], row[0]))
     return fused

@@ -941,3 +941,23 @@ context_for_next_session:
 decisions_made: []
 followups: []
 ---
+
+---
+session: 2026-06-25T19:22Z
+duration_min: 20
+issue: 84
+focus: reciprocal_rank_fusion_tie_break_by_doc_id_deterministic_top_k
+phase: day_session_phase_b_iteration_3
+delta:
+  files_changed: 2 # rag_kit/fusion.py + tests/test_fusion.py
+  tests_added: 4   # tied-order-by-doc-id + permutation-invariance + within-method-order + score-still-primary
+context_for_next_session:
+  - reciprocal_rank_fusion_sorted_by_fused_score_alone_no_tie_break_tied_docs_fell_back_to_scores_dict_insertion_order_which_depends_on_method_order_in_rankings_and_doc_order_within_each_list
+  - rrf_ties_are_common_one_over_k_plus_rank_sums_collide_for_any_symmetric_rank_configuration_so_same_rankings_could_yield_different_top_k_just_from_caller_method_ordering_reproducibility_bug_for_retriever_feeding_llm
+  - fix_secondary_sort_key_doc_id_ascending_key_lambda_row_neg_row_1_comma_row_0_same_class_as_chunking_strategies_lab_cosine_tie_fix_69_merged_this_run
+  - red_green_four_tests_two_fail_without_fix_permutation_invariance_and_within_method_order_other_two_pass_coincidentally_because_their_tie_data_aligns_with_insertion_order_anyway
+  - full_suite_420_passed_7_skipped_postgres_unreachable_ruff_check_plus_format_clean
+  - phase_a_pr_review_pass_this_run_merged_5_clean_prs_across_5_repos_lco_91_vsas_54_aait_51_csl_69_nsap_55
+decisions_made: []
+followups: []
+---

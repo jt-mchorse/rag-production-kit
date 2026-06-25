@@ -146,3 +146,39 @@ class TestIntraMethodDuplicates:
         assert math.isclose(by_doc["d2"], 1 / 62 + 1 / 61, abs_tol=1e-12)
         ranking = {doc: i for i, (doc, _, _) in enumerate(fused)}
         assert ranking["d2"] < ranking["d1"]
+
+
+# ----------------------------------------------------------------------
+# #84 — tied fused scores must break deterministically by doc id, not by
+# `scores` dict insertion order (which depends on caller method-ordering).
+# ----------------------------------------------------------------------
+
+
+class TestTieBreakDeterminism:
+    def test_tied_scores_order_by_doc_id(self) -> None:
+        # Symmetric rankings -> doc1 and doc2 get identical fused scores.
+        fused = reciprocal_rank_fusion({"bm25": ["doc1", "doc2"], "vector": ["doc2", "doc1"]})
+        assert fused[0][1] == fused[1][1], "precondition: the two docs must tie"
+        # Tie resolved by doc id ascending, not by which method came first.
+        assert [doc for doc, _, _ in fused] == ["doc1", "doc2"]
+
+    def test_permuting_method_order_yields_identical_fusion(self) -> None:
+        # Same rankings, methods supplied in two different orders. The fused
+        # output (ids, scores, and per-method ranks) must be byte-identical.
+        a = reciprocal_rank_fusion({"bm25": ["doc1", "doc2"], "vector": ["doc2", "doc1"]})
+        b = reciprocal_rank_fusion({"vector": ["doc2", "doc1"], "bm25": ["doc1", "doc2"]})
+        assert a == b
+
+    def test_within_method_doc_order_does_not_flip_a_tie(self) -> None:
+        # docA and docB tie; whichever id is smaller must come first regardless
+        # of the order they were listed inside each method.
+        fused = reciprocal_rank_fusion({"bm25": ["docB", "docA"], "vector": ["docA", "docB"]})
+        assert fused[0][1] == fused[1][1]
+        assert [doc for doc, _, _ in fused] == ["docA", "docB"]
+
+    def test_score_remains_primary_key_over_tie_break(self) -> None:
+        # A strictly higher-scoring doc must still win even when its id sorts
+        # later — the doc-id key is only a tie-break, not the primary order.
+        fused = reciprocal_rank_fusion({"bm25": ["zzz", "aaa"], "vector": ["zzz"]})
+        # zzz: 1/61 (bm25 r1) + 1/61 (vector r1); aaa: 1/62 (bm25 r2). zzz wins.
+        assert [doc for doc, _, _ in fused] == ["zzz", "aaa"]
