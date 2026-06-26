@@ -114,7 +114,16 @@ class LexicalOverlapReranker:
         for c in candidates:
             c_tokens = set(_tokenize(c.text))
             overlap = len(q_tokens & c_tokens) / len(q_tokens)
-            penalty = self.length_penalty * len(c.text)
+            # Bound the length factor to [0, 1) so the penalty stays in
+            # [0, length_penalty) — strictly below the smallest overlap quantum
+            # (1 / len(q_tokens)) for any tiny coefficient. A *raw* char-count
+            # penalty (length_penalty * len(c.text)) is unbounded and routinely
+            # exceeds the gap between distinct overlap levels at realistic chunk
+            # sizes, so a less-relevant short chunk would outrank a more-relevant
+            # long one — defeating the "penalty is only a tie-breaker" contract
+            # (#90). The factor is still strictly monotonic in length, so equal-
+            # overlap chunks still break ties toward shorter.
+            penalty = self.length_penalty * (len(c.text) / (len(c.text) + 1))
             scored.append((overlap - penalty, c))
 
         # Stable sort so equal scores preserve input order — tests rely on this.

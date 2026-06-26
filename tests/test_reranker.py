@@ -86,6 +86,35 @@ def test_lexical_overlap_length_penalty_breaks_ties_toward_shorter():
     assert [r.external_id for r in out] == ["short", "long"]
 
 
+def test_lexical_overlap_length_penalty_does_not_override_relevance():
+    # #90: the length penalty must only break ties, never override a genuine
+    # overlap difference. Pre-fix `penalty = length_penalty * len(text)` was
+    # unbounded in char count, so a more-relevant LONG chunk (overlap 0.5) was
+    # demoted below a less-relevant SHORT chunk (overlap 0.25) because the long
+    # chunk's raw-length penalty dwarfed its higher overlap.
+    rr = LexicalOverlapReranker(length_penalty=0.001)
+    candidates = _make_candidates(
+        [
+            ("more_relevant_long", "refund policy " + "x " * 233),  # overlap 2/4, ~480 chars
+            ("less_relevant_short", "refund yesterday only"),  # overlap 1/4, 21 chars
+        ]
+    )
+    out = rr.rerank("refund policy window days", candidates)
+    # The strictly-higher-overlap chunk must win despite being far longer.
+    assert [r.external_id for r in out] == ["more_relevant_long", "less_relevant_short"]
+    assert out[0].rerank_score > out[1].rerank_score
+
+
+def test_lexical_overlap_penalty_stays_below_overlap_quantum():
+    # The bounded length factor keeps the penalty in [0, length_penalty), which
+    # is strictly below the smallest overlap step (1/len(q_tokens)). Even an
+    # enormous chunk can't push the penalty past the coefficient.
+    rr = LexicalOverlapReranker(length_penalty=0.001)
+    out = rr.rerank("alpha", _make_candidates([("huge", "alpha " + "z " * 100000)]))
+    # overlap is 1.0; penalty < 0.001, so the score stays just under 1.0.
+    assert 0.999 < out[0].rerank_score < 1.0
+
+
 def test_lexical_overlap_rejects_negative_length_penalty():
     with pytest.raises(ValueError, match=r"finite number >= 0.0"):
         LexicalOverlapReranker(length_penalty=-0.1)
