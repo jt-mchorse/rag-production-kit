@@ -712,3 +712,15 @@ into the savings dashboard" hint; `llm-eval-harness` has a
 **Open questions / blockers:** none.
 
 **Next session:** citation-id matching now tolerates the common formatting variance; internal-whitespace ids (`[cite:doc 1]`) remain strict by design (a real internal space is a distinct external_id).
+
+## 2026-06-26 — Issue #90: Reranker length penalty overriding relevance
+**Duration:** ~25 min · **Branch:** `session/2026-06-26-2330-issue-90`
+
+- `LexicalOverlapReranker` scored candidates as `overlap - length_penalty * len(c.text)`. `overlap` is bounded in `[0, 1]`, but the penalty grew unbounded with raw character count, so at realistic chunk sizes (hundreds of chars) it routinely exceeded the gap between distinct overlap levels — a less-relevant short chunk outranked a more-relevant long one. That contradicts the class's documented "the penalty is only a tie-breaker" contract. Reproduced: for a 4-token query, a chunk with overlap 0.5 (~480 chars) was demoted below a chunk with overlap 0.25 (21 chars).
+- Fixed by bounding the length factor to `[0, 1)` via `len/(len+1)`, so `penalty ∈ [0, length_penalty)` — below the smallest overlap quantum for a tiny coefficient. `length_penalty=0.0` still yields `score == overlap`, and equal-overlap ties still break toward shorter (the factor is monotonic in length), but a genuine overlap difference can no longer be flipped. 2 regression tests; suite 430 → 432, ruff clean.
+
+**Why this work, this session:** third issue of a multi-issue DAY run. After llm-eval-harness #105 and llm-cost-optimizer #98 I rotated to the next priority-tier repo in build sequence (rag-production-kit), which had no open backlog, so I dogfooded it with an Explore agent and filed #90 from a reproduced finding. The existing tie-break test only used equal-overlap chunks, so it never caught a penalty that overrides a real overlap difference.
+
+**Open questions / blockers:** none.
+
+**Next session:** three dogfood runners-up remain unfiled — `split_sentences` fractures abbreviations (false `unparseable_output` refusal), `_CITE_PATTERN` rejects external_ids containing `]`, and `PhaseTimings.summary` reports only p50/p95 while `telemetry.Aggregate` adds p99. File individually if a session needs small work here.
