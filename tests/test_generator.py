@@ -115,6 +115,36 @@ class TestEnforceCitations:
         assert len(citations) == 1
         assert citations[0].external_id == "A"
 
+    @pytest.mark.parametrize(
+        "marker",
+        ["[cite: A]", "[cite:A ]", "[cite:  A  ]", "[cite:\tA]"],
+    )
+    def test_accepts_marker_with_incidental_whitespace(self, marker: str) -> None:
+        # #88: the LLM path emits incidental spaces inside an otherwise-valid
+        # marker. Stripping the captured id means a fully-grounded answer is no
+        # longer falsely refused as a dangling/unparseable citation.
+        retrieved = [_result("A", "alpha")]
+        citations = enforce_citations(f"Alpha is the first letter {marker}.", retrieved)
+        assert [c.external_id for c in citations] == ["A"]
+
+    def test_whitespace_variants_dedupe_to_one_citation(self) -> None:
+        # Padded and unpadded references to the same id are the same citation.
+        retrieved = [_result("A", "alpha")]
+        text = "Claim one [cite:A]. Claim two [cite: A ]. Claim three [cite:A ]."
+        citations = enforce_citations(text, retrieved)
+        assert len(citations) == 1
+        assert citations[0].external_id == "A"
+
+    def test_stripping_still_rejects_a_genuinely_unknown_id(self) -> None:
+        # The leniency must not mask a real dangling reference: an id that's
+        # unknown even after stripping still refuses (guards against a false
+        # accept). Mirror of test_rejects_dangling_citation_id, with padding.
+        retrieved = [_result("A", "alpha")]
+        with pytest.raises(CitationError) as exc:
+            enforce_citations("Alpha is the first letter [cite: Z ].", retrieved)
+        assert "dangling" in exc.value.detail
+        assert "'Z'" in exc.value.detail  # message reports the stripped id
+
 
 class TestTemplateGenerator:
     def test_happy_path_returns_answer_with_one_citation_per_chunk(self) -> None:

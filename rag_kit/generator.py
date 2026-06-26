@@ -161,7 +161,16 @@ def enforce_citations(
                 "unparseable_output",
                 f"sentence has no [cite:...] marker: {sentence!r}",
             )
-        for cite_id in ids_in_sentence:
+        for raw_cite_id in ids_in_sentence:
+            # Strip incidental whitespace inside the marker. The LLM path
+            # (`AnthropicGenerator`) routinely emits `[cite: doc1]` / `[cite:doc1 ]`;
+            # without this, the padded id ` doc1` mismatches the real external_id
+            # `doc1`, the marker reads as *dangling*, and a fully-grounded answer is
+            # falsely refused as `unparseable_output` (#88). Stripping is strictly
+            # more lenient and cannot create a false-accept: a genuinely-unknown id
+            # still misses `allowed`, and corpus external_ids never carry
+            # leading/trailing whitespace, so two distinct valid ids can't collide.
+            cite_id = raw_cite_id.strip()
             if cite_id not in allowed:
                 raise CitationError(
                     "unparseable_output",
