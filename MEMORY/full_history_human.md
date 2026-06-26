@@ -687,3 +687,16 @@ into the savings dashboard" hint; `llm-eval-harness` has a
 **Open questions / blockers:** none.
 
 **Next session:** rag-production-kit has no open issues again; dogfood another core module (reranker/retriever/streaming) for the next edge-case fix.
+
+## 2026-06-26 — Issue #86: guard CohereReranker relevance_score finiteness
+**Duration:** ~20 min · **Branch:** session/2026-06-26-0327-issue-86
+
+- `CohereReranker.rerank` used the Cohere API's `relevance_score` with no finiteness check. The API is an external, uncontrolled source — a malformed/erroring response can return NaN/Inf, which flows into `rerank_score` → `generator._top_score`'s `max()` → the refusal gate `top < threshold`. `NaN < threshold` is `False`, so the generator answers from chunks it should have refused.
+- `_validate_threshold` (#78) already guards the operator-supplied-threshold half of this gate; this guards the API-supplied-score half, matching the #80/#82 external-value finiteness guards. `LexicalOverlapReranker` scores are finite by construction (#75), so only the Cohere path was exposed.
+- Reject at the merge seam with a `ValueError` naming the source; 4 tests via the existing `_FakeCohereClient` scaffold. Full suite + ruff green.
+
+**Why this work, this session:** Surfaced by a Phase A dogfood Explore agent and hand-verified before filing; closes the last unguarded operand of the refusal gate.
+
+**Open questions / blockers:** none. A parallel dogfood flagged `vector-search-at-scale`'s `BenchmarkResult` lacking a `__post_init__` finiteness guard (low reachability — `ingest_seconds==0` basically never occurs with `perf_counter`); deferred as a possible low-pri follow-up.
+
+**Next session:** rag-production-kit refusal gate is now fully guarded on both operands.
