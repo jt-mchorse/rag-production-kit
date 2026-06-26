@@ -700,3 +700,15 @@ into the savings dashboard" hint; `llm-eval-harness` has a
 **Open questions / blockers:** none. A parallel dogfood flagged `vector-search-at-scale`'s `BenchmarkResult` lacking a `__post_init__` finiteness guard (low reachability — `ingest_seconds==0` basically never occurs with `perf_counter`); deferred as a possible low-pri follow-up.
 
 **Next session:** rag-production-kit refusal gate is now fully guarded on both operands.
+
+## 2026-06-26 — Issue #88: citation gate tolerates incidental whitespace in [cite:...] markers
+**Duration:** ~30 min · **Branch:** `session/2026-06-26-2006-issue-88`
+
+- `enforce_citations` matched `[cite:<id>]` and looked the captured id up without stripping. The LLM (`AnthropicGenerator`) path routinely emits incidental spaces — `[cite: doc1]`, `[cite:doc1 ]` — so the padded id mismatched the real `external_id`, read as a *dangling* citation, and a fully-grounded, correctly-cited answer was thrown away as `unparseable_output`. That's the worst RAG failure mode: a right answer surfaced as a refusal over a cosmetic quirk.
+- Fixed by stripping the captured id before the `allowed` lookup and before keying the `seen` dedup map. Strictly more lenient and can't create a false-accept: a genuinely-unknown id still misses `allowed`, and corpus external_ids never carry leading/trailing whitespace. 7 new tests (4 parametrized whitespace markers, dedupe-across-variants, padded-unknown-still-dangling). Suite 423 → 430, ruff clean.
+
+**Why this work, this session:** third repo of a multi-issue DAY run; rag-production-kit is priority-tier and ~15h stale. With no open backlog, a Phase A code-read of the headline citation-enforcement feature surfaced a real false-refusal path on the production LLM output, not just the hermetic template path.
+
+**Open questions / blockers:** none.
+
+**Next session:** citation-id matching now tolerates the common formatting variance; internal-whitespace ids (`[cite:doc 1]`) remain strict by design (a real internal space is a distinct external_id).
