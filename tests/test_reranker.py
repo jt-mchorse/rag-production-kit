@@ -203,6 +203,44 @@ def test_cohere_reranker_batches_large_inputs():
     assert len(out) == 10
 
 
+@pytest.mark.parametrize("bad", [float("nan"), float("inf"), float("-inf")])
+def test_cohere_reranker_rejects_non_finite_relevance_score(bad):
+    # An external/uncontrolled API can return a non-finite relevance_score. Left
+    # unguarded it poisons generator._top_score's max() and the refusal gate
+    # `top < threshold` (False for NaN → answers when it should refuse, #86).
+    # Sibling of the operator-threshold guard #78 on the same gate.
+    from rag_kit import reranker as reranker_mod
+
+    fake_client = _FakeCohereClient({"text-A": 0.1, "text-B": bad})
+    rr = reranker_mod.CohereReranker.__new__(reranker_mod.CohereReranker)
+    rr.client = fake_client
+    rr.model = "rerank-test"
+    rr.batch_size = 100
+    rr.timeout_s = 5.0
+
+    candidates = _make_candidates([("A", "text-A"), ("B", "text-B")])
+    with pytest.raises(ValueError, match="non-finite relevance_score"):
+        rr.rerank("query", candidates)
+
+
+def test_cohere_reranker_accepts_finite_including_negative_score():
+    # The guard must not reject a *present* finite score, including a legitimately
+    # negative one (Cohere scores aren't constrained to [0, 1] across all models).
+    from rag_kit import reranker as reranker_mod
+
+    fake_client = _FakeCohereClient({"text-A": -0.5, "text-B": 0.0, "text-C": 0.9})
+    rr = reranker_mod.CohereReranker.__new__(reranker_mod.CohereReranker)
+    rr.client = fake_client
+    rr.model = "rerank-test"
+    rr.batch_size = 100
+    rr.timeout_s = 5.0
+
+    candidates = _make_candidates([("A", "text-A"), ("B", "text-B"), ("C", "text-C")])
+    out = rr.rerank("query", candidates)
+    assert [r.external_id for r in out] == ["C", "B", "A"]
+    assert out[-1].rerank_score == -0.5
+
+
 def test_cohere_reranker_empty_input_returns_empty_no_calls():
     from rag_kit import reranker as reranker_mod
 

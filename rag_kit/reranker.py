@@ -195,7 +195,25 @@ class CohereReranker:
                 request_options={"timeout_in_seconds": self.timeout_s},
             )
             for r in response.results:
-                merged.append((float(r.relevance_score), batch[r.index]))
+                # The Cohere API is an external, uncontrolled source: a malformed
+                # or erroring response can hand back a non-finite relevance_score.
+                # Unguarded, a NaN flows into ScoredCandidate.rerank_score, then
+                # into generator._top_score's max(), then the refusal gate
+                # `top < threshold` — which is False for NaN, so the generator
+                # answers from chunks it should have refused. _validate_threshold
+                # (#78) already closed the operator-supplied-threshold half of this
+                # exact gate; this is the API-supplied-score half. Fail loud at the
+                # seam, like LexicalOverlapReranker's length_penalty guard and the
+                # #80/#82 external-value finiteness guards. (LexicalOverlap scores
+                # are finite by construction; only the Cohere path is exposed.)
+                score = float(r.relevance_score)
+                if not math.isfinite(score):
+                    raise ValueError(
+                        f"Cohere rerank returned a non-finite relevance_score ({score!r}); "
+                        "a NaN/Inf score would poison the generator's refusal gate "
+                        "(top < threshold is False for NaN, answering when it should refuse)"
+                    )
+                merged.append((score, batch[r.index]))
 
         merged.sort(key=lambda pair: pair[0], reverse=True)
         return [
