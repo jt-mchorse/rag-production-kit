@@ -175,9 +175,13 @@ def _split_question_and(query: str) -> list[str] | None:
         if not _looks_like_question(s):
             return None
         # Re-append the question mark we stripped above so each sub-query
-        # is a well-formed question.
-        if not s.endswith("?"):
-            s = s + "?"
+        # is a well-formed question. Strip any trailing sentence terminator
+        # first: a conjunct that already ends in `.` or `!` (e.g. "What is the
+        # price! and ...") would otherwise get a `?` stacked on top, yielding a
+        # malformed "What is the price!?" and breaking the well-formed-question
+        # contract. `rstrip("?.!")` is idempotent on a lone trailing `?` and
+        # leaves internal punctuation (a decimal like 3.5) untouched.
+        s = s.rstrip("?.!") + "?"
         out.append(s)
     return out if len(out) >= 2 else None
 
