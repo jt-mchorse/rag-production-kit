@@ -77,6 +77,14 @@ _COMPARE_RE = re.compile(
 # "X. Then Y." — sequential-step decomposition. Matches a sentence-ending
 # punctuation followed by "Then " (case-insensitive).
 _THEN_SPLIT = re.compile(r"(?<=[.!?])\s+(?=Then\b|then\b)")
+# Strip the leading "Then" connective from each split part. The split above
+# fires on `then\b` (a word boundary), so the connective can be followed by
+# punctuation — "Then, ...", "Then; ...", "Then- ..." — not just a space.
+# Mirror that here: consume `then` + word boundary + any following non-word
+# characters. (A bare `startswith("then ")` only handled the space case, so a
+# punctuated connective leaked into the sub-query.) `then\b` won't touch a
+# content word like "thence" (no boundary), consistent with the split. See #92.
+_THEN_PREFIX = re.compile(r"^then\b\W*", re.IGNORECASE)
 
 # Conjunction split for "X and Y" / "X, and Y" — bounded so we don't
 # over-fragment a query like "wine and cheese pairings". Only fire when
@@ -124,9 +132,10 @@ def _split_then(query: str) -> list[str] | None:
     cleaned = []
     for raw in parts:
         s = _norm(raw)
-        # Strip a leading "Then " so the sub-query reads as an independent question.
-        if s.lower().startswith("then "):
-            s = s[len("then ") :].lstrip()
+        # Strip the leading "Then" connective so the sub-query reads as an
+        # independent question — including when it's followed by punctuation
+        # rather than a space (see _THEN_PREFIX / #92).
+        s = _THEN_PREFIX.sub("", s)
         if s:
             cleaned.append(s)
     if len(cleaned) >= 2:
