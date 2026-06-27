@@ -736,3 +736,15 @@ into the savings dashboard" hint; `llm-eval-harness` has a
 **Open questions / blockers:** none.
 
 **Next session:** the `then` connective cleanup now matches its split semantics; broader connective vocabulary ("next", "after that", "finally") remains intentionally out of scope.
+
+## 2026-06-27 — Issue #94: Rewriter 'and' split emitted a malformed double terminator
+**Duration:** ~15 min · **Branch:** `session/2026-06-27-1923-issue-94`
+
+- The multi-question `and` decomposition re-appended `?` only when a conjunct didn't already end in `?`, so a question-like conjunct ending in `.` or `!` (e.g. "What is the price! and is it worth it?") got a `?` stacked on top → `What is the price!?`, breaking the documented well-formed-question contract.
+- Fixed with `s.rstrip("?.!") + "?"` (idempotent on a lone `?`; leaves a decimal like `3.5` untouched). Added two lock tests — both `.`/`!` conjuncts and a decimal-not-mangled guard; the double-terminator test fails on the pre-fix code. Same class as the just-merged #93 `Then`-connective fix.
+
+**Why this work, this session:** second issue of a multi-issue DAY run; surfaced alongside llm-cost-optimizer #102 by the same Phase A priority-tier dogfood sweep.
+
+**Open questions / blockers:** none. Severity is low (trailing punctuation is ignored downstream by `plainto_tsquery`/embedding).
+
+**Next session:** continue the multi-issue loop if time remains.
