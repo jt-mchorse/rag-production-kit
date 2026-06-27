@@ -20,7 +20,7 @@ import json
 import pytest
 
 from rag_kit import AnthropicRewriter, RewriteResult, TemplateRewriter
-from rag_kit.rewriter import Rewriter
+from rag_kit.rewriter import Rewriter, _split_then
 
 # ----------------------------------------------------------------------
 # TemplateRewriter: pattern coverage
@@ -58,6 +58,37 @@ def test_template_rewriter_then_pattern_strips_then_prefix():
         "Find the CEO of the company.",
         "describe their education.",
     )
+
+
+def test_template_rewriter_then_connective_with_punctuation_is_stripped():
+    # #92: the split fires on `then\b`, so a connective followed by punctuation
+    # ("Then,", "Then;", "Then-") still split — but the old `startswith("then ")`
+    # strip only handled a trailing space, leaking the connective into the
+    # sub-query. Each of these must strip cleanly.
+    for query, second in [
+        ("Find the CEO. Then, describe their education.", "describe their education."),
+        ("Find the CEO. Then; describe their education.", "describe their education."),
+        ("Find the CEO. Then- describe their education.", "describe their education."),
+    ]:
+        out = TemplateRewriter().rewrite(query)
+        assert out.reasoning == "sequential_then_pattern", query
+        assert out.sub_queries == ("Find the CEO.", second), query
+
+
+def test_split_then_strips_punctuated_connective_directly():
+    # Unit-level guard on the helper, covering the exact leak cases from #92.
+    assert _split_then("Do A. Then, do B.") == ["Do A.", "do B."]
+    assert _split_then("Find X. Then; find Y.") == ["Find X.", "find Y."]
+    assert _split_then("Do A. then-do B.") == ["Do A.", "do B."]
+    # The plain space case (already covered end-to-end above) still works.
+    assert _split_then("Do A. Then do B.") == ["Do A.", "do B."]
+
+
+def test_split_then_does_not_false_split_on_thence_content_word():
+    # `then\b` requires a word boundary, so a content word that merely *starts*
+    # with "then" (e.g. "thence") is not the connective: no split fires and the
+    # word is never stripped/mangled. Mirrors the split's own semantics.
+    assert _split_then("Go home. Thence to the river.") is None
 
 
 def test_template_rewriter_multi_question_and_pattern():

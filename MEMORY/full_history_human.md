@@ -724,3 +724,15 @@ into the savings dashboard" hint; `llm-eval-harness` has a
 **Open questions / blockers:** none.
 
 **Next session:** three dogfood runners-up remain unfiled — `split_sentences` fractures abbreviations (false `unparseable_output` refusal), `_CITE_PATTERN` rejects external_ids containing `]`, and `PhaseTimings.summary` reports only p50/p95 while `telemetry.Aggregate` adds p99. File individually if a session needs small work here.
+
+## 2026-06-27 — Issue #92: rewriter leaks the "Then" connective before punctuation
+**Duration:** ~20 min · **Branch:** `session/2026-06-27-0324-issue-92`
+
+- `_split_then` splits a sequential query on `_THEN_SPLIT` (lookahead `then\b` — a *word boundary*), but the per-part cleanup only stripped the connective when it was followed by a literal space (`startswith("then ")`). So `Then, ...`, `Then; ...`, `Then- ...` all split correctly but **leaked** the connective into the sub-query, contradicting the docstring and polluting the downstream BM25/dense retrieval query. Reproduced on main: `_split_then("Do A. Then, do B.")` → `['Do A.', 'Then, do B.']`.
+- Fixed with `_THEN_PREFIX = re.compile(r"^then\b\W*", re.IGNORECASE)` and `s = _THEN_PREFIX.sub("", s)`, so the cleanup mirrors exactly what the split fires on. `then\b` leaves content words like "thence" untouched (no boundary), consistent with the split. Added 3 regression tests (end-to-end punctuated connectives, direct `_split_then` leak cases, and a "thence" no-false-split guard). Suite 431 → 435, ruff clean.
+
+**Why this work, this session:** second issue of a multi-issue NIGHT run. A parallel dogfood agent surfaced this as a "borderline lead" it declined to promote (calling it heuristic-quality), but it is a genuine docstring-vs-behavior contract mismatch with a clean, minimal fix — worth closing.
+
+**Open questions / blockers:** none.
+
+**Next session:** the `then` connective cleanup now matches its split semantics; broader connective vocabulary ("next", "after that", "finally") remains intentionally out of scope.
