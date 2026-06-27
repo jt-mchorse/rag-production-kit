@@ -114,6 +114,29 @@ def test_template_rewriter_compare_pattern_takes_precedence_over_and():
     assert out.sub_queries == ("What is BM25?", "What is dense retrieval?")
 
 
+def test_template_rewriter_and_split_conjunct_with_dot_or_bang_is_well_formed():
+    """#94: a question-like conjunct ending in `.` or `!` must not get a `?`
+    stacked on top (the malformed "What is the price!?" double terminator)."""
+    for q in [
+        "What is the price. and is it worth it?",
+        "What is the price! and is it worth it?",
+    ]:
+        out = TemplateRewriter().rewrite(q)
+        assert out.reasoning == "multi_question_and_pattern", q
+        assert out.sub_queries == ("What is the price?", "is it worth it?"), q
+        for sub in out.sub_queries:
+            assert sub.endswith("?"), sub
+            assert not sub.endswith((".?", "!?", "??")), sub
+
+
+def test_template_rewriter_and_split_does_not_mangle_internal_decimal():
+    """The trailing-terminator strip must not touch internal punctuation: a
+    decimal like `3.5` only ends in a terminator if the `.` is trailing."""
+    out = TemplateRewriter().rewrite("What is 3.5 and is it worth it?")
+    assert out.reasoning == "multi_question_and_pattern"
+    assert out.sub_queries == ("What is 3.5?", "is it worth it?")
+
+
 def test_template_rewriter_three_part_and_questions():
     out = TemplateRewriter().rewrite(
         "Who is the CTO and when did they join and what did they ship?"
