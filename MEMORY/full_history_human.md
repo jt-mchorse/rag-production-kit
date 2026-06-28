@@ -748,3 +748,15 @@ into the savings dashboard" hint; `llm-eval-harness` has a
 **Open questions / blockers:** none. Severity is low (trailing punctuation is ignored downstream by `plainto_tsquery`/embedding).
 
 **Next session:** continue the multi-issue loop if time remains.
+
+## 2026-06-28 — Issue #96: `_THEN_SPLIT` was not case-insensitive despite its docstring
+**Duration:** ~20 min · **Branch:** `session/2026-06-28-1931-issue-96`
+
+- `_THEN_SPLIT` drives the sequential-step rewrite (`"X. Then Y."` → two sub-queries) and its docstring claims a case-insensitive `"Then "` match, but the pattern enumerated `Then|then` literally with no `re.IGNORECASE`. All-caps / mixed-case connectives (`"THEN"`, `"ThEn"`) silently returned `no_decomposition`. The tell was an internal inconsistency: every sibling pattern (`_THEN_PREFIX`, `_COMPARE_RE`, `_AND_SPLIT_RE`) already had the flag — only the split omitted it. Reproduced firsthand before filing.
+- Fixed by `re.compile(r"(?<=[.!?])\s+(?=then\b)", re.IGNORECASE)` and dropping the redundant alternation. The downstream `_THEN_PREFIX` strip is already case-insensitive, so any casing is cleaned once the split fires; the `then\b` boundary is unchanged so `"thence"` still doesn't false-split (#92 preserved). Added end-to-end + unit regression tests; suite 437 → 439 passed (7 Postgres skips), ruff clean.
+
+**Why this work, this session:** third substantive issue of a multi-issue DAY run, rotating to a fresh priority-tier repo each iteration (after #116 in llm-eval-harness and #104 in llm-cost-optimizer) to avoid same-repo append-only MEMORY conflicts. rag-production-kit had zero open issues, so a Phase A dogfood sweep surfaced this. Two weaker dogfood findings deferred (generator cite-marker-after-terminator false refusal; missing `CohereReranker.batch_size` guard).
+
+**Open questions / blockers:** none.
+
+**Next session:** continue the loop if time remains.
