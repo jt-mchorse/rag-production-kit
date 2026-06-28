@@ -275,6 +275,24 @@ def rerank_delta_ndcg(
 
     before_list = list(before)
     after_list = list(after)
+
+    # A valid ranking is a set of distinct ids: a reranker returns a permutation
+    # of its distinct inputs. A duplicated id is degenerate — and silently wrong,
+    # not just odd: `rel` is keyed by external_id and the ideal is dcg(before_list),
+    # so a repeated id in `after` re-adds that id's full relevance into the actual
+    # DCG while the ideal is unchanged, pushing ndcg_displacement past its
+    # documented 1.0 ceiling (a dashboard would read "improved beyond the input
+    # ideal", which is impossible); a duplicate in `before` double-counts the ideal
+    # and distorts the ratio downward. Fail loud at the seam, matching the `k`,
+    # `length_penalty`, and Cohere non-finite-score guards in this module (#98).
+    for _name, _seq in (("before", before_list), ("after", after_list)):
+        if len(set(_seq)) != len(_seq):
+            raise ValueError(
+                f"{_name} contains duplicate external_ids; rerank_delta_ndcg expects "
+                "each ranking to be distinct ids (duplicates push ndcg_displacement "
+                "past its documented [0.0, 1.0] range)"
+            )
+
     n = max(len(before_list), len(after_list))
     if n == 0:
         return RerankDelta(n_input=0, top_k_overlap=0, top_k_size=0, ndcg_displacement=1.0)

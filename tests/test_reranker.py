@@ -357,3 +357,38 @@ class TestRerankDeltaNdcgKValidation:
         delta = rerank_delta_ndcg(["a", "b"], ["b", "a"], k=1)
         # Just confirm the call succeeded with the minimum valid k.
         assert delta.top_k_size == 1
+
+
+# ----------------------------------------------------------------------
+# #98 — rerank_delta_ndcg rejects duplicate external_ids (the silently-wrong
+# telemetry path: a repeated id pushed ndcg_displacement past its [0, 1] range)
+# ----------------------------------------------------------------------
+
+
+class TestRerankDeltaNdcgDuplicateIds:
+    def test_rejects_duplicate_in_after(self) -> None:
+        # Pre-fix this returned ~1.34 — the documented ceiling is 1.0.
+        with pytest.raises(ValueError, match=r"after contains duplicate"):
+            rerank_delta_ndcg(["a", "b", "c"], ["a", "a", "a"], k=3)
+
+    def test_rejects_duplicate_in_before(self) -> None:
+        with pytest.raises(ValueError, match=r"before contains duplicate"):
+            rerank_delta_ndcg(["a", "a", "b"], ["a", "b", "c"], k=3)
+
+    @pytest.mark.parametrize(
+        ("before", "after"),
+        [
+            (["a", "b", "c", "d"], ["a", "b", "c", "d"]),
+            (["a", "b", "c", "d"], ["d", "c", "b", "a"]),
+            (["a", "b", "c"], ["c", "a", "b"]),
+            (["a", "b", "c", "d", "e"], ["e", "a", "d", "b", "c"]),
+            (["a", "b", "c"], ["x", "y", "z"]),  # disjoint, still distinct
+        ],
+    )
+    def test_distinct_id_inputs_stay_within_unit_interval(
+        self, before: list[str], after: list[str]
+    ) -> None:
+        # The [0, 1] invariant the docstring/field comment promise, locked for
+        # any distinct-id permutation (and the disjoint case).
+        delta = rerank_delta_ndcg(before, after, k=len(before))
+        assert 0.0 <= delta.ndcg_displacement <= 1.0
