@@ -75,8 +75,14 @@ _COMPARE_RE = re.compile(
 )
 
 # "X. Then Y." — sequential-step decomposition. Matches a sentence-ending
-# punctuation followed by "Then " (case-insensitive).
-_THEN_SPLIT = re.compile(r"(?<=[.!?])\s+(?=Then\b|then\b)")
+# punctuation followed by "Then " (case-insensitive). The literal `Then|then`
+# alternation only covered those two casings, so an emphatic all-caps/mixed-case
+# connective ("X. THEN Y.", "X. ThEn Y.") silently failed to decompose despite
+# the "case-insensitive" claim above. Use re.IGNORECASE like the sibling
+# patterns (_THEN_PREFIX, _COMPARE_RE, _AND_SPLIT_RE); the downstream strip is
+# already case-insensitive so any casing is cleaned. `then\b` still requires a
+# word boundary, so a content word like "thence" does not false-split.
+_THEN_SPLIT = re.compile(r"(?<=[.!?])\s+(?=then\b)", re.IGNORECASE)
 # Strip the leading "Then" connective from each split part. The split above
 # fires on `then\b` (a word boundary), so the connective can be followed by
 # punctuation — "Then, ...", "Then; ...", "Then- ..." — not just a space.

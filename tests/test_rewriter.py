@@ -91,6 +91,30 @@ def test_split_then_does_not_false_split_on_thence_content_word():
     assert _split_then("Go home. Thence to the river.") is None
 
 
+def test_template_rewriter_then_pattern_is_case_insensitive():
+    # #96: _THEN_SPLIT enumerated `Then|then` literally without re.IGNORECASE,
+    # so an emphatic all-caps / mixed-case connective silently failed to
+    # decompose — unlike the sibling case-insensitive patterns and contrary to
+    # the regex's own docstring. Every casing must decompose identically; the
+    # already-case-insensitive _THEN_PREFIX strips the connective regardless.
+    for query in [
+        "Find the CEO. THEN describe their education.",
+        "Find the CEO. ThEn describe their education.",
+        "Find the CEO. then describe their education.",
+    ]:
+        out = TemplateRewriter().rewrite(query)
+        assert out.reasoning == "sequential_then_pattern", query
+        assert out.sub_queries == ("Find the CEO.", "describe their education."), query
+
+
+def test_split_then_case_insensitive_split_and_strip():
+    # Unit-level guard: the split fires and the connective is stripped for any
+    # casing, while "thence" still never false-splits (word-boundary preserved).
+    assert _split_then("Do A. THEN do B.") == ["Do A.", "do B."]
+    assert _split_then("Do A. ThEn, do B.") == ["Do A.", "do B."]
+    assert _split_then("Go home. THENCE to the river.") is None
+
+
 def test_template_rewriter_multi_question_and_pattern():
     out = TemplateRewriter().rewrite("Who founded Anthropic and where did they work before?")
     assert out.reasoning == "multi_question_and_pattern"
