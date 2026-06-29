@@ -167,6 +167,31 @@ class CohereReranker:
         timeout_s: float | None = None,
         api_key: str | None = None,
     ) -> None:
+        # Validate the configurable construction args BEFORE importing the
+        # optional `cohere` extra. Two reasons: (1) a bad value then fails loud
+        # with a clear ValueError even when the extra isn't installed, instead of
+        # the validation being unreachable behind the ImportError; (2) it never
+        # reaches the batch loop. `batch_size <= 0` is silently wrong, not just
+        # odd: `rerank` chunks via `range(0, n, self.batch_size)`, so a negative
+        # batch_size makes that range empty and `rerank` returns [] — every
+        # candidate silently dropped, the API never called, no error. The prior
+        # `batch_size or DEFAULT` idiom additionally swallowed an explicit 0 into
+        # the default, masking operator error; an explicit `is None` check keeps
+        # `None` meaning "use the default" while rejecting 0. Guard like the `k`
+        # (fusion/rerank_delta_ndcg), `length_penalty`, and non-finite
+        # relevance_score guards elsewhere in this module — fail loud at the seam.
+        if batch_size is not None and (
+            not isinstance(batch_size, int) or isinstance(batch_size, bool) or batch_size <= 0
+        ):
+            raise ValueError(f"batch_size must be a positive integer, got {batch_size!r}")
+        if timeout_s is not None and (
+            isinstance(timeout_s, bool)
+            or not isinstance(timeout_s, (int, float))
+            or not math.isfinite(timeout_s)
+            or timeout_s <= 0
+        ):
+            raise ValueError(f"timeout_s must be a finite number > 0.0, got {timeout_s!r}")
+
         try:
             import cohere  # type: ignore[import-not-found]
         except ImportError as e:
@@ -178,7 +203,7 @@ class CohereReranker:
         self._cohere_module = cohere
         self.client = cohere.ClientV2(api_key=api_key or os.environ.get("COHERE_API_KEY"))
         self.model = model or self.DEFAULT_MODEL
-        self.batch_size = batch_size or self.DEFAULT_BATCH_SIZE
+        self.batch_size = batch_size if batch_size is not None else self.DEFAULT_BATCH_SIZE
         self.timeout_s = timeout_s if timeout_s is not None else self.DEFAULT_TIMEOUT_S
 
     def rerank(self, query: str, candidates: Sequence[Candidate]) -> list[ScoredCandidate]:
