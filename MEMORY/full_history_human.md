@@ -772,3 +772,15 @@ into the savings dashboard" hint; `llm-eval-harness` has a
 **Open questions / blockers:** none.
 
 **Next session:** continue the loop — rotate to another priority-tier repo. Two deferred findings from session #96 remain candidates: generator citation-marker-after-terminator false refusal (med), and CohereReranker batch_size missing positive-int guard (low).
+
+## 2026-06-29 — Issue #100: recall_at_5 docstring said binary, but it's fractional recall@k
+**Duration:** ~14 min · **Branch:** `session/2026-06-29-0330-issue-new`
+
+- The `evals/run_eval.py` module docstring described `recall_at_5` as binary — "per-row 1.0 iff every gold chunk id appears in the top-5; 0.0 otherwise" — but `_score_recall_at_5` computes fractional recall@k (`len(hits)/len(gold_ids)`). A half-hit scores 0.5, the intended and already-tested behavior (`test_score_recall_at_5_partial_credit`). The binary wording also contradicted the conventional recall@k definition and the sibling `correctness` suite's correct "fraction" framing.
+- Rewrote the docstring bullet to describe fractional recall@k (incl. the empty-gold → 0.0 edge) and added an inline comment at the score site cross-referencing the locking test. `faithfulness` (genuinely binary) and `correctness` (already "fraction") were correct and untouched. No behavior change.
+
+**Why this work, this session:** third issue of the night run. After the priority-tier and 36h-stale repos were exhausted/blocked, a parallel audit subagent swept rag-production-kit, found no logic bug (mature, 445 passing), and surfaced this single doc-contract drift — same class as python-async #68.
+
+**Open questions / blockers:** none.
+
+**Next session:** eval-metric docstrings now match the shipped fractional/binary semantics; recall@k partial-credit remains locked by its test.
