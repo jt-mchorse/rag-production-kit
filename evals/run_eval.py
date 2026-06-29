@@ -12,9 +12,14 @@ Three suites, one JSON per:
 - ``faithfulness``:  per-row 1.0 iff the generator output is a
   ``GeneratedAnswer`` whose ``enforce_citations`` already validated, else
   0.0 (a ``Refusal`` or a citation-error response).
-- ``recall_at_5``:   per-row 1.0 iff every gold chunk id in the example's
-  ``provenance.gold_chunk_ids`` appears among the top-5 retrieved
-  ``external_id``s; 0.0 otherwise.
+- ``recall_at_5``:   per-row *fractional* recall@k (the standard
+  definition): the fraction of the example's
+  ``provenance.gold_chunk_ids`` that appear among the top-5 retrieved
+  ``external_id``s — ``|gold ∩ top5| / |gold|`` in ``[0, 1]``. So a row
+  with one of two gold ids retrieved scores 0.5 (not 0.0); only a row
+  whose gold ids are *all* missing scores 0.0, and a row with no gold
+  ids at all is 0.0 by convention. (Partial credit is locked by
+  ``tests/test_eval_run.py::test_score_recall_at_5_partial_credit``.)
 - ``correctness``:   per-row fraction of expected-output content tokens
   that appear in the generated answer (a deterministic string-overlap
   proxy for the LLM-as-judge correctness rubric; real-judge runs land
@@ -158,6 +163,9 @@ def _score_recall_at_5(
         return 0.0, "no gold_chunk_ids in dataset row"
     top_ids = {r.external_id for r in retrieved[:5]}
     hits = [g for g in gold_ids if g in top_ids]
+    # Fractional recall@k (the standard metric), NOT a binary all-or-nothing
+    # gate: a half-hit scores 0.5. Intentional and locked by
+    # tests/test_eval_run.py::test_score_recall_at_5_partial_credit.
     score = len(hits) / len(gold_ids)
     return (
         score,
