@@ -760,3 +760,15 @@ into the savings dashboard" hint; `llm-eval-harness` has a
 **Open questions / blockers:** none.
 
 **Next session:** continue the loop if time remains.
+
+## 2026-06-28 — Issue #98: `rerank_delta_ndcg` reported displacement > 1.0 on duplicate ids
+**Duration:** ~20 min · **Branch:** `session/2026-06-28-2317-issue-98`
+
+- A duplicated `external_id` in a ranking pushed `ndcg_displacement` past its documented `1.0` ceiling (1.34 for a tripled top id): `rel` is keyed by id and the ideal is `dcg(before_list)` over the *distinct* `before` order, so a repeated id in `after` re-adds its full relevance into the actual DCG while the ideal stays put — silently-wrong telemetry that would read as "the reranker improved beyond the input ideal," which is impossible. A duplicate in `before` instead double-counts the ideal.
+- Fixed with a distinct-id guard that raises `ValueError` (matching the module's existing fail-loud seams on `k`, `length_penalty`, and the Cohere non-finite score), since a valid ranking is a set of distinct ids and a duplicate signals a caller bug worth surfacing. 7 tests added (dup-in-after / dup-in-before raise; a parametrized [0,1] invariant lock over distinct-id permutations). Suite 439 → 446, ruff check + format clean.
+
+**Why this work, this session:** first substantive issue of a multi-issue DAY run. Phase A merged 5 clean PRs across 5 repos and the audit was clean; the only priority-tier stale repo (nextjs-streaming-ai-patterns) had nothing but an interactive JT-bound demo-capture issue, so I fell through to the saturated-portfolio dogfood→issue→PR pattern on priority-tier repos.
+
+**Open questions / blockers:** none.
+
+**Next session:** continue the loop — rotate to another priority-tier repo. Two deferred findings from session #96 remain candidates: generator citation-marker-after-terminator false refusal (med), and CohereReranker batch_size missing positive-int guard (low).
