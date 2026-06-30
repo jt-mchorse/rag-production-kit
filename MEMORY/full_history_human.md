@@ -823,3 +823,15 @@ into the savings dashboard" hint; `llm-eval-harness` has a
 **Open questions / blockers:** none — ready for review.
 
 **Next session:** continue the loop on another repo (chunking-strategies-lab next in the priority-tier build sequence); #108 awaits #107 merging first.
+
+## 2026-06-30 — Issue #108: CostRecord.build guarded total_latency_ms but not per_phase_ms values → invalid JSON in the telemetry store
+**Duration:** ~20 min · **Branch:** `session/2026-06-30-1933-issue-108`
+
+- `CostRecord.build` (`rag_kit/telemetry.py`) validated `total_latency_ms` for finiteness (#38) but never checked the `per_phase_ms` *values*. A non-finite phase value reached `TelemetryStore.record`, which persists the map with `json.dumps(... allow_nan=True)` — writing the bare token `NaN`/`Infinity` (invalid JSON). `since()` then catches the `JSONDecodeError` on read-back and swallows the whole row's phases to `{}`, silently dropping the data. Same "no invalid JSON in a serialization sink" class as the `to_sse` fix (#106/#107), but the correct chokepoint here is ingestion — exactly where `total_latency_ms` is already guarded.
+- Fixed by extending the latency contract to each per-phase value: reject NaN/±Inf, negative, non-numeric, and `bool` (an `int` subclass), raising `ValueError` that names the offending phase, placed right after the existing latency guard. +8 tests: parametrized NaN/+Inf/-Inf, a negative value, and non-numeric `str`/`None`/`bool` — each naming the phase and confirmed failing pre-fix (stash-and-rerun); plus a strict-JSON lock that a finite map persists with no `NaN`/`Infinity` tokens (raw SQLite column read through `json.loads(..., parse_constant=raise)`). Suite 484 → 492 (7 PG-skipped), ruff clean.
+
+**Why this work, this session:** second issue of a DAY multi-issue run (after closing nextjs-streaming-ai-patterns #70). #108 was the followup filed during the #106 dogfood; it became actionable once #107 merged in this run's Phase A. Picked per the rule-3 tie-break (priority-tier, med-priority) after llm-cost-optimizer #97 fell through as a `decision-revisit` one-way blocker (D-007) needing JT.
+
+**Open questions / blockers:** none — ready for review.
+
+**Next session:** the read-path `since()` silent `JSONDecodeError`→`{}` swallow is now unreachable from clean ingestion but remains a latent read-side gap if a row is corrupted out-of-band — a candidate followup. Continue the loop.
