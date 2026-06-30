@@ -76,6 +76,33 @@ def test_price_table_cost_rejects_negative_tokens():
         pt.cost("fake-big", -1, 10)
 
 
+@pytest.mark.parametrize("bad", [math.nan, math.inf, -math.inf, 1.0, True])
+@pytest.mark.parametrize("side", ["prompt", "completion"])
+def test_price_table_cost_rejects_non_integer_or_non_finite_tokens(bad, side):
+    # #104: the sign-only guard let a NaN through (`NaN < 0` is False), so
+    # `NaN * rate` produced a NaN USD that serialized as the bare token `NaN`
+    # (invalid JSON) in the dashboard aggregate — the token-count seam the
+    # #38/#80 finiteness sweep missed. floats (1.0) and bool (True, an int
+    # subclass) are rejected for the same "genuine non-negative int" contract.
+    # Pre-fix `cost("fake-big", nan, 10)` returned `(nan, ...)`; this is the
+    # inverse safety net for that.
+    pt = _fixture_prices()
+    prompt, completion = (bad, 10) if side == "prompt" else (10, bad)
+    with pytest.raises(ValueError, match="non-negative integers"):
+        pt.cost("fake-big", prompt, completion)
+
+
+def test_price_table_cost_valid_int_tokens_still_finite():
+    # Over-rejection guard: ordinary non-negative int counts still compute
+    # finite USD (the tightened guard must not reject the happy path).
+    pt = _fixture_prices()
+    prompt_usd, completion_usd = pt.cost("fake-big", 1000, 500)
+    assert math.isfinite(prompt_usd)
+    assert math.isfinite(completion_usd)
+    assert prompt_usd >= 0.0
+    assert completion_usd >= 0.0
+
+
 def test_price_table_add_overrides_existing():
     pt = _fixture_prices()
     pt.add("fake-big", 5.0, 20.0)  # overwrite

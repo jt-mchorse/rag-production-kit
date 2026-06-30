@@ -70,11 +70,20 @@ class ModelPrice:
 
     def cost(self, prompt_tokens: int, completion_tokens: int) -> tuple[float, float]:
         """Return ``(prompt_usd, completion_usd)`` rounded to 6 decimal places."""
-        if prompt_tokens < 0 or completion_tokens < 0:
-            raise ValueError(
-                f"token counts must be non-negative; got prompt={prompt_tokens}, "
-                f"completion={completion_tokens}"
-            )
+        # Non-negative *integer* counts, not sign-only: a sign-only check lets a
+        # NaN through (`NaN < 0` is False), which then propagates
+        # `NaN * rate / 1_000_000` → prompt_usd → CostRecord.total_usd →
+        # aggregate().total_usd, and `dump_aggregate_json` serializes it as the
+        # bare token `NaN` — invalid JSON that a strict log-tailer rejects whole.
+        # Same silent-corruption shape the rate guard above (#38) and percentile
+        # (#80) already close; this is the token-count seam that sweep missed.
+        # Reject bool too (it is an int subclass). Mirrors the dim/max_chunks/k
+        # non-negative-int contracts elsewhere in the kit.
+        for name, value in (("prompt", prompt_tokens), ("completion", completion_tokens)):
+            if not isinstance(value, int) or isinstance(value, bool) or value < 0:
+                raise ValueError(
+                    f"token counts must be non-negative integers; got {name}={value!r}"
+                )
         prompt_usd = round(prompt_tokens * self.prompt_per_million / 1_000_000, 6)
         completion_usd = round(completion_tokens * self.completion_per_million / 1_000_000, 6)
         return prompt_usd, completion_usd
