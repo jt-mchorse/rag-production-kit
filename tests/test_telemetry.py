@@ -270,6 +270,91 @@ def test_costrecord_build_rejects_non_finite_latency(bad_latency: float):
         )
 
 
+# Issue #108: extend the total_latency_ms finiteness/sign contract to each
+# per_phase_ms value. A non-finite phase value reaches TelemetryStore.record,
+# which persists the map via json.dumps(... allow_nan=True) — writing the bare
+# token NaN/Infinity (invalid JSON) that since() then swallows on
+# JSONDecodeError, silently dropping the row's phases.
+@pytest.mark.parametrize("bad_value", [float("nan"), float("inf"), float("-inf")])
+def test_costrecord_build_rejects_non_finite_per_phase_value(bad_value: float):
+    pt = _fixture_prices()
+    with pytest.raises(
+        ValueError, match=r"per_phase_ms\['retrieve'\] must be a finite non-negative number"
+    ):
+        CostRecord.build(
+            ts=0.0,
+            query="q",
+            model="fake-big",
+            retrieved_count=1,
+            prompt_tokens=10,
+            completion_tokens=5,
+            total_latency_ms=100.0,
+            per_phase_ms={"retrieve": bad_value, "generate": 50.0},
+            price_table=pt,
+        )
+
+
+def test_costrecord_build_rejects_negative_per_phase_value():
+    pt = _fixture_prices()
+    with pytest.raises(
+        ValueError, match=r"per_phase_ms\['generate'\] must be a finite non-negative number"
+    ):
+        CostRecord.build(
+            ts=0.0,
+            query="q",
+            model="fake-big",
+            retrieved_count=1,
+            prompt_tokens=10,
+            completion_tokens=5,
+            total_latency_ms=100.0,
+            per_phase_ms={"retrieve": 50.0, "generate": -1.0},
+            price_table=pt,
+        )
+
+
+@pytest.mark.parametrize("bad_value", ["50.0", None, True])
+def test_costrecord_build_rejects_non_numeric_per_phase_value(bad_value):
+    # A str/None/bool millisecond value is not a number; bool is an int
+    # subclass so it must be rejected explicitly, not silently coerced.
+    pt = _fixture_prices()
+    with pytest.raises(
+        ValueError, match=r"per_phase_ms\['retrieve'\] must be a finite non-negative number"
+    ):
+        CostRecord.build(
+            ts=0.0,
+            query="q",
+            model="fake-big",
+            retrieved_count=1,
+            prompt_tokens=10,
+            completion_tokens=5,
+            total_latency_ms=100.0,
+            per_phase_ms={"retrieve": bad_value},
+            price_table=pt,
+        )
+
+
+def test_telemetry_store_per_phase_json_is_strict_valid_json(tmp_path):
+    # A finite per-phase map persists as strict JSON — no bare NaN/Infinity
+    # tokens reach the store. parse_constant fires only on JS-style constants
+    # (NaN/Infinity/-Infinity), so a raised value there proves invalid JSON.
+    import json
+    import sqlite3
+
+    store = TelemetryStore(tmp_path / "telemetry.db")
+    store.record(_rec(ts=1_700_000_000.0))
+    store.close()
+
+    conn = sqlite3.connect(tmp_path / "telemetry.db")
+    (raw,) = conn.execute("SELECT per_phase_json FROM cost_records").fetchone()
+    conn.close()
+
+    def _reject(_constant):  # pragma: no cover - only invoked on invalid JSON
+        raise AssertionError("stored per_phase_json contains a non-finite JSON constant")
+
+    parsed = json.loads(raw, parse_constant=_reject)
+    assert parsed == {"retrieving": pytest.approx(10.0), "generating": pytest.approx(90.0)}
+
+
 # ----------------------------------------------------------------------
 # TelemetryStore (SQLite)
 # ----------------------------------------------------------------------
