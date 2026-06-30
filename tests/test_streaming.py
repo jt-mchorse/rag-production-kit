@@ -30,6 +30,7 @@ from rag_kit.streaming import (
     PhaseTimings,
     StreamEvent,
     StreamingPipeline,
+    _json_safe,
     to_sse,
 )
 
@@ -298,6 +299,64 @@ def test_to_sse_handles_unjsonifiable_via_default_str() -> None:
     e = StreamEvent("token", {"meta": WeirdMeta()}, 0.5)
     frame = to_sse(e)
     assert "WEIRD-META" in frame
+
+
+def _parse_sse_data_strict(frame: str) -> dict:
+    """Parse the `data:` line the way a browser EventSource would — `JSON.parse`
+    rejects the bare `NaN`/`Infinity` tokens, so reject them here too."""
+    data_line = next(ln for ln in frame.splitlines() if ln.startswith("data: "))
+    return json.loads(
+        data_line[len("data: ") :],
+        parse_constant=lambda c: (_ for _ in ()).throw(ValueError(f"non-finite token {c!r}")),
+    )
+
+
+@pytest.mark.parametrize("bad", [float("nan"), float("inf"), float("-inf")])
+def test_to_sse_maps_nonfinite_float_in_metadata_to_null(bad) -> None:
+    # #106: a non-finite float in free-form caller metadata otherwise serialized
+    # as the bare token `NaN`/`Infinity` (invalid JSON), so the browser's
+    # EventSource `JSON.parse` rejected the whole frame. It must serialize as
+    # JSON `null` (JS `JSON.stringify` parity) and the frame must parse.
+    # Inverse safety net: pre-fix this emitted `NaN`/`Infinity` and the strict
+    # parse below raised.
+    e = StreamEvent(
+        "retrieved", {"chunks": [{"external_id": "d1", "metadata": {"score": bad}}]}, 1.0
+    )
+    parsed = _parse_sse_data_strict(to_sse(e))
+    assert parsed["payload"]["chunks"][0]["metadata"]["score"] is None
+
+
+@pytest.mark.parametrize("bad", [float("nan"), float("inf"), float("-inf")])
+def test_to_sse_maps_nonfinite_score_and_list_items_to_null(bad) -> None:
+    # Nested coverage: a top-level non-finite score and a non-finite item inside
+    # a list both map to null; the frame round-trips strictly.
+    e = StreamEvent("reranked", {"rerank_score": bad, "vals": [1.0, bad, 3.0]}, 2.0)
+    parsed = _parse_sse_data_strict(to_sse(e))
+    assert parsed["payload"]["rerank_score"] is None
+    assert parsed["payload"]["vals"] == [1.0, None, 3.0]
+
+
+def test_to_sse_preserves_finite_floats_and_shapes() -> None:
+    # Over-rejection guard: the sanitizer must not perturb finite floats, ints,
+    # strings, or nested container shapes.
+    e = StreamEvent(
+        "retrieved", {"fused_score": 0.0123, "n": 3, "tag": "ok", "xs": [1.5, 2.5]}, 4.5
+    )
+    parsed = _parse_sse_data_strict(to_sse(e))
+    assert parsed["payload"]["fused_score"] == pytest.approx(0.0123)
+    assert parsed["payload"]["n"] == 3
+    assert parsed["payload"]["tag"] == "ok"
+    assert parsed["payload"]["xs"] == [1.5, 2.5]
+    assert parsed["elapsed_ms"] == pytest.approx(4.5)
+
+
+def test_json_safe_unit_maps_nonfinite_and_preserves_rest() -> None:
+    assert _json_safe(float("nan")) is None
+    assert _json_safe(float("inf")) is None
+    assert _json_safe(1.5) == 1.5
+    assert _json_safe({"a": [float("-inf"), 2]}) == {"a": [None, 2]}
+    assert _json_safe("s") == "s"
+    assert _json_safe(7) == 7
 
 
 # ---------------------------------------------------------------------

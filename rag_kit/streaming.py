@@ -339,6 +339,31 @@ class StreamingPipeline:
             return
 
 
+def _json_safe(obj: Any) -> Any:
+    """Replace non-finite floats with ``None`` so the result is valid JSON.
+
+    ``json.dumps`` defaults to ``allow_nan=True``, emitting the bare tokens
+    ``NaN`` / ``Infinity`` / ``-Infinity`` — which are **invalid JSON**, so a
+    browser's ``EventSource`` (which runs ``JSON.parse`` on the ``data:`` line)
+    rejects the whole frame. ``default=str`` doesn't help: it only intercepts
+    non-serializable *objects*, never floats. We map non-finite floats to
+    ``null`` for parity with JavaScript's own ``JSON.stringify(NaN)`` /
+    ``JSON.stringify(Infinity)`` (both → ``null``), keeping the documented
+    "stream alive, don't raise" contract while guaranteeing every frame parses.
+
+    ``metadata`` / ``rerank_score`` flow verbatim from free-form caller data
+    and arbitrary reranker models, so the wire serializer is the correct single
+    chokepoint to enforce frame validity (#106).
+    """
+    if isinstance(obj, float):
+        return obj if math.isfinite(obj) else None
+    if isinstance(obj, dict):
+        return {k: _json_safe(v) for k, v in obj.items()}
+    if isinstance(obj, (list, tuple)):
+        return [_json_safe(v) for v in obj]
+    return obj
+
+
 def to_sse(event: StreamEvent) -> str:
     """Format a `StreamEvent` as one Server-Sent Events frame.
 
@@ -346,7 +371,12 @@ def to_sse(event: StreamEvent) -> str:
     a frame is `event: <type>\\ndata: <json>\\n\\n`. The browser's
     `EventSource` parses this directly; for the JS-free demo we also
     accept plain `fetch()` and a streamed text decoder.
+
+    Non-finite floats anywhere in the payload are mapped to JSON ``null`` by
+    `_json_safe` so the emitted frame is always valid JSON (#106); everything
+    else, including the `default=str` fallback for unjsonifiable objects, is
+    unchanged.
     """
     payload_obj = {"payload": event.payload, "elapsed_ms": event.elapsed_ms}
-    data = json.dumps(payload_obj, default=str, ensure_ascii=False)
+    data = json.dumps(_json_safe(payload_obj), default=str, ensure_ascii=False)
     return f"event: {event.type}\ndata: {data}\n\n"

@@ -810,3 +810,16 @@ into the savings dashboard" hint; `llm-eval-harness` has a
 **Open questions / blockers:** none — ready for review.
 
 **Next session:** continue the loop.
+
+## 2026-06-30 — Issue #106: `to_sse` emitted `NaN`/`Infinity` (invalid JSON), breaking the browser EventSource frame
+**Duration:** ~20 min · **Branch:** `session/2026-06-30-1530-issue-106`
+
+- `to_sse` (`streaming.py:342`) serialized payloads with `json.dumps(..., default=str)`. `default=str` rescues non-serializable *objects* but never floats, so the C encoder's default `allow_nan=True` emitted the bare tokens `NaN`/`Infinity`/`-Infinity` — invalid JSON. A browser's `EventSource` runs `JSON.parse` on the `data:` line and rejects the whole frame, silently breaking the stream. Reachable via free-form caller `metadata` (flows verbatim through `_chunk_to_event`) or a reranker's `rerank_score`. Reproduced firsthand.
+- Fixed with a small recursive `_json_safe(obj)` that maps non-finite floats to `None` (walking dict/list/tuple) applied before `json.dumps` — parity with JS `JSON.stringify(NaN)`/`JSON.stringify(Infinity)` (both → `null`), keeping the documented "keep streaming alive, don't raise" `to_sse` contract. Scope is `to_sse` only; non-serializable objects still fall through to `default=str`.
+- +8 tests (nested non-finite in metadata, top-level score + list item, `_json_safe` unit, finite over-rejection guard). Inverse safety net: reverting only the `to_sse` dumps line (helper kept) fails the metadata/score cases pre-fix. Suite 476 → 484 (7 PG-skipped), ruff clean.
+
+**Why this work, this session:** third issue of a DAY multi-issue run; `rag-production-kit` had **zero open issues**, so dogfood-and-file (Phase B step 5). Read `streaming.py` myself while an Explore hunter scanned the other modules in parallel — it independently confirmed the `to_sse` finding and surfaced a sibling (filed as **#108**: `CostRecord.build` guards `total_latency_ms` but not `per_phase_ms` values → invalid JSON in the telemetry store). Left #108 for a future session to avoid a same-repo append-only MEMORY conflict with this PR. Picked rag-production-kit per the priority-tier build sequence after llm-eval-harness (#126) and llm-cost-optimizer (#114), both shipped earlier this run.
+
+**Open questions / blockers:** none — ready for review.
+
+**Next session:** continue the loop on another repo (chunking-strategies-lab next in the priority-tier build sequence); #108 awaits #107 merging first.
