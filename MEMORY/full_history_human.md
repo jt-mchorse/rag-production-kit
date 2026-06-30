@@ -784,3 +784,16 @@ into the savings dashboard" hint; `llm-eval-harness` has a
 **Open questions / blockers:** none.
 
 **Next session:** eval-metric docstrings now match the shipped fractional/binary semantics; recall@k partial-credit remains locked by its test.
+
+## 2026-06-29 — Issue #102: CohereReranker construction args unguarded — `batch_size<=0` silently dropped all candidates
+**Duration:** ~25 min · **Branch:** `session/2026-06-29-2325-issue-102`
+
+- `CohereReranker.__init__` chunks candidates via `range(0, n, self.batch_size)`, so a non-positive `batch_size` makes that range empty and `rerank()` silently returns `[]` — every candidate dropped, the Cohere API never called, no error. The `batch_size or DEFAULT` idiom additionally swallowed an explicit `0` into the default `100`, masking operator error. Both were unreachable to guard because the validation sat *after* `import cohere`, so they only bit when the optional extra was installed (production). This is the twice-deferred #96/#98 finding ("batch_size missing positive-int guard … candidate for a future loop").
+- Reproduced the silent loss firsthand without the cohere extra, via the module's own `__new__`-bypass test pattern: `batch_size=-1` → `rerank` returned `[]` (len 0), `client.rerank` calls = 0, 5 candidates in / 0 out / no error.
+- Fixed by moving construction-arg validation to the top of `__init__`, before `import cohere`: reject non-`int`/`bool`/`<=0` `batch_size` (mirroring the `k` guard) and non-finite/`<=0` `timeout_s` (mirroring `length_penalty`), with `None` still meaning "use the default" (explicit `is None` check replaces the `or` idiom so `0` is rejected, not masked). A bad value now fails loud with a clear `ValueError` at construction even without the extra installed. 19 lock tests (bad `batch_size` ×7, bad `timeout_s` ×7, valid/None fall-through-to-`ImportError` ×5), hermetic because the guard precedes the import; rejection tests confirmed failing on pre-fix code. Suite 446 → 465, ruff clean.
+
+**Why this work, this session:** second substantive issue of a multi-issue DAY run (after `llm-eval-harness` #122). Rotated to priority-tier `rag-production-kit`; a dogfood hunter found the repo otherwise clean but surfaced this real silent-wrong sibling-gap it couldn't reproduce itself (no cohere extra) — already a tracked #96/#98 deferred item.
+
+**Open questions / blockers:** the generator citation-marker-after-terminator false-refusal finding (#96/#98) is still deferred — contract-ambiguous, needs a JT call on the marker-placement contract.
+
+**Next session:** continue the loop on another repo to avoid same-repo append-only MEMORY conflicts; portfolio remains saturated.

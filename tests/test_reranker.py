@@ -285,6 +285,58 @@ def test_cohere_reranker_empty_input_returns_empty_no_calls():
 
 
 # ----------------------------------------------------------------------
+# CohereReranker construction-arg validation (#102)
+#
+# `__init__` chunks via `range(0, n, self.batch_size)`, so a non-positive
+# batch_size makes the range empty and `rerank` silently returns [] — every
+# candidate dropped, API never called, no error (the twice-deferred #96/#98
+# finding). The validation also has to run BEFORE `import cohere` so it's
+# reachable/testable without the optional extra and fails fast at construction.
+# These tests exercise the real `__init__` (not the __new__ bypass) and are
+# hermetic precisely because the guard precedes the import. Pre-fix, each bad
+# value raised ImportError (cohere absent) instead of ValueError, so every
+# rejection assertion below fails on pre-fix code (inverse safety net).
+# ----------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("bad", [-1, 0, -100, 2.5, "10", True, [1]])
+def test_cohere_reranker_rejects_non_positive_or_non_int_batch_size(bad):
+    from rag_kit import reranker as reranker_mod
+
+    with pytest.raises(ValueError, match="batch_size must be a positive integer"):
+        reranker_mod.CohereReranker(batch_size=bad)
+
+
+@pytest.mark.parametrize("bad", [0, -1.0, float("nan"), float("inf"), float("-inf"), True, "5"])
+def test_cohere_reranker_rejects_non_finite_or_non_positive_timeout(bad):
+    from rag_kit import reranker as reranker_mod
+
+    with pytest.raises(ValueError, match="timeout_s must be a finite number"):
+        reranker_mod.CohereReranker(timeout_s=bad)
+
+
+@pytest.mark.parametrize(
+    "kwargs",
+    [
+        {},  # all defaults (None) → must fall through, not be rejected
+        {"batch_size": 50},
+        {"batch_size": None, "timeout_s": None},  # explicit None still means "default"
+        {"timeout_s": 5.0},
+        {"batch_size": 1, "timeout_s": 0.001},  # smallest valid positive values
+    ],
+)
+def test_cohere_reranker_valid_args_pass_guard_and_reach_import(kwargs):
+    # Over-rejection guard: valid args (and the None "use default" sentinel) must
+    # clear the construction guard and fall through to the optional-extra import.
+    # Without the cohere extra installed that surfaces as ImportError — the point
+    # is that it is NOT a ValueError, i.e. the guard did not wrongly reject.
+    from rag_kit import reranker as reranker_mod
+
+    with pytest.raises(ImportError, match="rerank-cohere"):
+        reranker_mod.CohereReranker(**kwargs)
+
+
+# ----------------------------------------------------------------------
 # rerank_delta_ndcg
 # ----------------------------------------------------------------------
 
