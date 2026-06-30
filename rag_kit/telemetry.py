@@ -176,6 +176,23 @@ class CostRecord:
             raise ValueError(
                 f"total_latency_ms must be a finite non-negative number; got {total_latency_ms}"
             )
+        # Per-phase value guard (#108): the same finiteness/sign contract as
+        # total_latency_ms above, applied to each per_phase_ms value. Without
+        # it a non-finite phase value reaches TelemetryStore.record, which
+        # persists the map via json.dumps(... allow_nan=True) — writing the
+        # bare token NaN/Infinity (invalid JSON). since() then swallows the
+        # whole row's phases on JSONDecodeError, silently dropping the data.
+        # bool is an int subclass; reject it so a stray True/False can't pose
+        # as a millisecond value.
+        for phase, value in (per_phase_ms or {}).items():
+            if isinstance(value, bool) or not isinstance(value, (int, float)):
+                raise ValueError(
+                    f"per_phase_ms[{phase!r}] must be a finite non-negative number; got {value!r}"
+                )
+            if not math.isfinite(value) or value < 0:
+                raise ValueError(
+                    f"per_phase_ms[{phase!r}] must be a finite non-negative number; got {value}"
+                )
         prompt_usd, completion_usd = price_table.cost(model, prompt_tokens, completion_tokens)
         return CostRecord(
             ts=ts if ts is not None else time.time(),
