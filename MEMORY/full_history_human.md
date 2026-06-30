@@ -797,3 +797,16 @@ into the savings dashboard" hint; `llm-eval-harness` has a
 **Open questions / blockers:** the generator citation-marker-after-terminator false-refusal finding (#96/#98) is still deferred — contract-ambiguous, needs a JT call on the marker-placement contract.
 
 **Next session:** continue the loop on another repo to avoid same-repo append-only MEMORY conflicts; portfolio remains saturated.
+
+## 2026-06-30 — Issue #104: ModelPrice.cost token guard was sign-only — NaN tokens → invalid JSON in the dashboard aggregate
+**Duration:** ~20 min · **Branch:** `session/2026-06-30-0324-issue-104`
+
+- `ModelPrice.cost` (`telemetry.py:71`) guarded token counts sign-only (`prompt_tokens < 0 or completion_tokens < 0`). A `NaN` slipped through (`NaN < 0` is `False`), and `float`/`bool` slipped through (no type check). The `NaN` then propagated `NaN * rate / 1_000_000` → `prompt_usd` → `CostRecord.total_usd` → `aggregate().total_usd`, and `dump_aggregate_json` serialized it as the bare token `NaN` — invalid JSON that a strict log-tailer rejects whole. The rate fields were already finiteness-tightened (#38) and percentile (#80), but this token-count seam was missed; `CostRecord.build` only finite-checks latency and delegates tokens to `cost()`, so there was no upstream backstop.
+- Fixed by tightening the guard to non-negative `int` (rejecting `NaN/inf/float/bool`), mirroring the module's `dim`/`max_chunks`/`k` int contracts and keeping the `"non-negative"` substring so the existing negative-token test still matches. Guarding in `cost()` covers both direct callers and the `build` path.
+- Parametrized lock test (`nan/inf/-inf/1.0/True` × prompt/completion) plus a valid-int over-rejection guard, confirmed failing pre-fix via `git stash`. Suite 474 → 476, ruff clean (split a compound assert per PT018).
+
+**Why this work, this session:** fourth issue of a NIGHT multi-issue run; a dogfood hunter surfaced this in priority-tier `rag-production-kit`, reproduced firsthand before acting. Extends the #38/#80 finiteness sweep to its last seam.
+
+**Open questions / blockers:** none — ready for review.
+
+**Next session:** continue the loop.
