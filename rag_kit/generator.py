@@ -46,6 +46,61 @@ _DEFAULT_THRESHOLD = 0.02  # tuned against the in-repo retrieval tests; >0 by co
 _CITE_PATTERN = re.compile(r"\[cite:([^\]]+)\]")
 _SENTENCE_SPLIT = re.compile(r"(?<=[.!?])\s+")
 
+# Tokens that end in a period but are NOT sentence boundaries. The `_SENTENCE_SPLIT`
+# regex treats every period-then-whitespace as a boundary, so an ordinary
+# abbreviation ("Dr.", "U.S.", "e.g.") strands a leading claim-less fragment
+# ("Dr.") that survives the alphanumeric filter and then trips
+# `enforce_citations` into a false `unparseable_output` refusal of an otherwise
+# fully-cited answer (#110). Matched case-insensitively against the last
+# whitespace token with its trailing dots removed. Curated on purpose and kept
+# deliberately lenient: a genuine sentence that ends in one of these is
+# vanishingly rare, and the cost of that rare over-merge (one claim riding on a
+# neighbour's citation) is far smaller than refusing every answer that says
+# "Dr." or "U.S.".
+_ABBREVIATIONS = frozenset(
+    {
+        # Titles
+        "dr",
+        "mr",
+        "mrs",
+        "ms",
+        "prof",
+        "sr",
+        "jr",
+        "st",
+        "rev",
+        "gen",
+        "sen",
+        "rep",
+        # Latin / editorial
+        "e.g",
+        "i.e",
+        "etc",
+        "cf",
+        "vs",
+        "al",
+        "viz",
+        # Org / measure
+        "inc",
+        "ltd",
+        "llc",
+        "corp",
+        "co",
+        "no",
+        "vol",
+        "fig",
+        "eq",
+        "pp",
+        # Dotted initialisms (geo / time)
+        "u.s",
+        "u.k",
+        "u.n",
+        "e.u",
+        "a.m",
+        "p.m",
+    }
+)
+
 
 @dataclass(frozen=True)
 class Citation:
@@ -116,6 +171,29 @@ def _top_score(retrieved: Sequence[RetrievalResult]) -> float:
     return max(r.rerank_score if r.rerank_score is not None else r.fused_score for r in retrieved)
 
 
+def _ends_with_abbreviation(fragment: str) -> bool:
+    """True if `fragment`'s last token is a known abbreviation or a single-letter
+    initial — i.e. its trailing period is *not* a sentence boundary.
+
+    See `_ABBREVIATIONS`: the trailing dots are stripped and the token matched
+    case-insensitively (so `"U.S."` -> `"u.s"`, `"e.g."` -> `"e.g"`, `"Dr."` ->
+    `"dr"`). A lone capital initial (the `"J."` in `"Dr. J. Smith"`) also isn't a
+    boundary. Only `.`-terminated tokens can qualify — `!`/`?` are unambiguous
+    sentence ends and never abbreviations.
+    """
+    tokens = fragment.split()
+    if not tokens:
+        return False
+    last = tokens[-1].rstrip(".")
+    if not last:
+        return False
+    if last.lower() in _ABBREVIATIONS:
+        return True
+    # Single capital-letter initial, e.g. the "J." in "Dr. J. Smith". Restricted
+    # to uppercase letters so numeric fragments ("Section 5.") aren't merged.
+    return len(last) == 1 and last.isupper()
+
+
 def split_sentences(text: str) -> list[str]:
     """Split text into claim sentences for citation validation.
 
@@ -127,12 +205,27 @@ def split_sentences(text: str) -> list[str]:
     word/number, and digits are alphanumeric, so a bare-number fragment stays
     under enforcement — dropping word-less fragments can't mask an uncited claim.
 
+    The regex splits on every terminal-punctuation-then-whitespace, which also
+    fires *inside* an abbreviation ("Dr. Smith" -> "Dr.", "Smith"). A merge pass
+    re-joins a fragment with the next when it ends in a known abbreviation or a
+    single-letter initial (`_ends_with_abbreviation`), so an abbreviation-bearing
+    claim stays one sentence and its lone `[cite:...]` marker satisfies
+    enforcement instead of stranding a claim-less "Dr." fragment that falsely
+    refuses the whole answer (#110). The merge is deliberately lenient — see
+    `_ABBREVIATIONS`.
+
     The split is intentionally simple — generators are instructed to produce one
     claim per sentence ending in `.`/`!`/`?`, and we don't need a full NLP
     tokenizer for that contract.
     """
     parts = _SENTENCE_SPLIT.split(text.strip())
-    return [p for p in parts if any(ch.isalnum() for ch in p)]
+    merged: list[str] = []
+    for part in parts:
+        if merged and _ends_with_abbreviation(merged[-1]):
+            merged[-1] = f"{merged[-1]} {part}"
+        else:
+            merged.append(part)
+    return [p for p in merged if any(ch.isalnum() for ch in p)]
 
 
 def enforce_citations(
