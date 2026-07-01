@@ -66,6 +66,48 @@ class TestSplitSentences:
             "Done [cite:A].",
         ]
 
+    @pytest.mark.parametrize(
+        "text",
+        [
+            "Dr. Smith discovered penicillin [cite:A].",  # title
+            "The U.S. economy grew last year [cite:A].",  # dotted initialism
+            "Founded by e.g. Amodei and others [cite:A].",  # Latin editorial
+            "Acme Inc. shipped it on time [cite:A].",  # org abbreviation
+            "It happened at 9 a.m. sharp [cite:A].",  # time abbreviation
+            "Compare vs. the baseline result [cite:A].",  # editorial vs.
+            "Dr. J. Smith wrote the paper [cite:A].",  # title + single-letter initial
+        ],
+    )
+    def test_keeps_abbreviation_sentence_intact(self, text: str) -> None:
+        # An abbreviation's period is not a sentence boundary. Splitting on it
+        # stranded a claim-less fragment ("Dr.", "The U.S.") that survived the
+        # alphanumeric filter and then demanded its own [cite:...] marker,
+        # falsely refusing an otherwise fully-cited answer (#110). Each of these
+        # is one claim carrying one marker and must stay a single sentence.
+        assert split_sentences(text) == [text]
+
+    def test_merges_multiple_abbreviations_in_one_sentence(self) -> None:
+        # The merge pass is iterative: several abbreviations in one claim all
+        # collapse back into the single sentence they belong to.
+        text = "Mr. Poe met Dr. Smith in the U.S. yesterday [cite:A]."
+        assert split_sentences(text) == [text]
+
+    def test_does_not_over_merge_real_sentence_boundaries(self) -> None:
+        # Guard against the fix being too greedy: a period after an ordinary word
+        # (not an abbreviation or a lone capital initial) is still a real
+        # boundary, so genuinely separate claims must each stay their own
+        # sentence and remain individually under citation enforcement. A numeric
+        # section marker ("Section 5.") is likewise not treated as an
+        # abbreviation.
+        assert split_sentences("The cat sat [cite:A]. The dog ran [cite:B].") == [
+            "The cat sat [cite:A].",
+            "The dog ran [cite:B].",
+        ]
+        assert split_sentences("See Section 5. The rest follows [cite:A].") == [
+            "See Section 5.",
+            "The rest follows [cite:A].",
+        ]
+
 
 class TestEnforceCitations:
     def test_accepts_every_sentence_cited(self) -> None:
@@ -304,6 +346,19 @@ class TestAnthropicGenerator:
         result = gen.generate("?", retrieved, threshold=0.05)
         assert isinstance(result, GeneratedAnswer)
         assert result.citations[0].external_id == "A"
+
+    def test_cited_answer_with_abbreviation_is_not_falsely_refused(self) -> None:
+        # End-to-end regression for #110: before the abbreviation-aware merge in
+        # split_sentences, `enforce_citations` split "Dr. Smith discovered
+        # penicillin [cite:A]." into a claim-less "Dr." fragment with no marker
+        # and raised CitationError -> the generator returned a Refusal for a
+        # fully-grounded, correctly-cited answer. It must now validate cleanly.
+        retrieved = [_result("A", "Dr. Smith discovered penicillin", fused=0.4)]
+        client = _FakeClient("Dr. Smith discovered penicillin in the U.S. [cite:A].")
+        gen = AnthropicGenerator(client=client)
+        result = gen.generate("who discovered penicillin?", retrieved, threshold=0.05)
+        assert isinstance(result, GeneratedAnswer)
+        assert [c.external_id for c in result.citations] == ["A"]
 
     def test_refuses_below_threshold_without_calling_client(self) -> None:
         retrieved = [_result("A", "weak", fused=0.001)]
