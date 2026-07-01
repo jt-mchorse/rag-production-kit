@@ -835,3 +835,15 @@ into the savings dashboard" hint; `llm-eval-harness` has a
 **Open questions / blockers:** none — ready for review.
 
 **Next session:** the read-path `since()` silent `JSONDecodeError`→`{}` swallow is now unreachable from clean ingestion but remains a latent read-side gap if a row is corrupted out-of-band — a candidate followup. Continue the loop.
+
+## 2026-07-01 — Issue #110: split_sentences split on abbreviations, falsely refusing fully-cited answers
+**Duration:** ~30 min · **Branch:** `session/2026-07-01-1915-issue-110`
+
+- The citation enforcer's sentence splitter (`split_sentences`) treated every period-then-space as a sentence boundary, so any common abbreviation — `Dr.`, `Mr.`, `U.S.`, `e.g.`, `Inc.`, `vs.` — stranded a claim-less leading fragment (`"Dr."`). That fragment has alphanumeric content, survived the claim-less-fragment filter, and then `enforce_citations` demanded its own `[cite:...]` marker; the marker sits on the *real* sentence, so a fully-grounded, correctly-cited LLM answer was falsely refused as `unparseable_output`. Reproduced firsthand before filing (`"Dr. Smith discovered penicillin [cite:A]."` → `['Dr.', 'Smith discovered penicillin [cite:A].']`).
+- Fixed with an abbreviation-aware merge pass: after the regex split, a fragment is re-joined with the next when it ends in a curated abbreviation or a single-letter initial. Deliberately lenient and documented — a genuine sentence ending in `Dr.`/`U.S.` is vanishingly rare, and the rare over-merge is far cheaper than refusing every answer that mentions an abbreviation. Also cleans up `TemplateGenerator`'s per-chunk rendering. +10 tests (each abbreviation family, single initial, multi-abbreviation, an over-merge/numeric-marker guard, and an end-to-end no-false-refusal regression); suite 502 pass / 7 skip, ruff clean. Inverse safety net confirmed via `git stash`.
+
+**Why this work, this session:** first issue of the DAY run. `rag-production-kit` was the stalest priority-tier repo (20h) and earliest in the build sequence; with zero open issues, two parallel dogfood hunters drove the work. This bug was the higher-impact of two real finds — it defeats the repo's headline citation-enforcement guarantee on ordinary prose.
+
+**Open questions / blockers:** none — PR #112 ready for review.
+
+**Next session:** #111 (priority:low) tracks the second, lower-impact find — non-ASCII sentence terminators (`？！。؟`) leaving a doubled terminator in `TemplateRewriter`'s "and"-split. Continue the loop.
