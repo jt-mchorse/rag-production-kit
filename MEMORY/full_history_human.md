@@ -847,3 +847,15 @@ into the savings dashboard" hint; `llm-eval-harness` has a
 **Open questions / blockers:** none — PR #112 ready for review.
 
 **Next session:** #111 (priority:low) tracks the second, lower-impact find — non-ASCII sentence terminators (`？！。؟`) leaving a doubled terminator in `TemplateRewriter`'s "and"-split. Continue the loop.
+
+## 2026-07-02 — Issue #111: non-ASCII sentence terminators left a doubled terminator
+**Duration:** ~20 min · **Branch:** `session/2026-07-02-0311-issue-111`
+
+- `TemplateRewriter`'s "and"-split re-appends a canonical `?` to each conjunct after stripping the trailing terminator, but the strip set (`rstrip("?.!")`) was ASCII-only. A conjunct ending in a full-width `？`/`！`, ideographic `。`, or Arabic `؟` (common CJK/Arabic IME input) kept its terminator and got a `?` stacked on top — e.g. `"where did they work？?"`. Fixed with a module-level `_TERMINATORS = "?.!？！؟。"` used at both strip sites, extending the #94 well-formed-question contract to non-ASCII enders.
+- Reproduced firsthand before and after (all four enders); +5 tests (4-param non-ASCII well-formedness + an internal-char-untouched guard). Inverse safety net: the 4 parametrized tests fail pre-fix. Suite 502 → 507, ruff + format clean.
+
+**Why this work, this session:** first issue of the NIGHT run. #111 was the only actionable, non-blocked, non-demo open issue across all 12 repos — filed as a followup by the prior session's dogfood hunt. The portfolio is deeply saturated, so a pre-reproduced tracked bug was the highest-value pick.
+
+**Open questions / blockers:** none — PR ready for review.
+
+**Next session:** continue the loop.
