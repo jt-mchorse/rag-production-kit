@@ -859,3 +859,15 @@ into the savings dashboard" hint; `llm-eval-harness` has a
 **Open questions / blockers:** none — PR ready for review.
 
 **Next session:** continue the loop.
+
+## 2026-07-02 — Issue #114: bench_streaming.py had no --k/--n validation (traceback on --k 0, silent empty run on --n 0)
+**Duration:** ~20 min · **Branch:** `session/2026-07-02-2348-bench-streaming-argval`
+
+- `scripts/bench_streaming.py::main` had no CLI input validation, unlike its sibling `scripts/bench_rewriter.py` (which already does `parser.error("--k must be positive")`). So `--k 0` surfaced `StreamingPipeline.run`'s `ValueError` as a **raw traceback** (it raises before the pipeline's own try/except, so it escaped `main()`), and `--n 0`/negative **silently exited 0** with an all-zero four-phase table that reads as a real run. Reproduced both firsthand.
+- **Fix:** added `if args.n <= 0: ap.error("--n must be positive")` and the same for `--k`, right after `parse_args()` — mirroring the sibling. `ap.error(...)` prints usage + message to stderr and exits 2. +5 subprocess regression tests (4 parametrized zero/negative `--k`/`--n` → exit 2, clean message, no traceback, no table; 1 smallest-valid `--n 1 --k 1` still runs); all 4 nonpositive tests fail pre-fix. Suite 507 → 512, ruff + format clean.
+
+**Why this work, this session:** third issue of a DAY run. After shipping llm-cost-optimizer #120 and mcp-server-cookbook #78, the portfolio was comprehensively freshly-hunted (5 clean dogfood hunts this run + prior-run hunts cover all 12 repos). Both earlier bugs this session lived in *peripheral tooling*, so I ran a peripheral-focused hunt on rag-production-kit (prior run hunted its core clean 5h ago); this `--k`/`--n` parity gap was the one reproducible peripheral defect. A consistency/robustness fix, not a wrong-output-on-valid-input bug — shipped because two sibling bench scripts handling the same flag differently (one clean error, one traceback) is a real operator-facing defect with a clear in-repo precedent.
+
+**Open questions / blockers:** none — ready for review.
+
+**Next session:** continue the loop. Portfolio remains saturated; peripheral/tooling surfaces are where the remaining small defects live.
