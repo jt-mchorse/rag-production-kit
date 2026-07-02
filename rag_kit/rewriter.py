@@ -98,6 +98,15 @@ _THEN_PREFIX = re.compile(r"^then\b\W*", re.IGNORECASE)
 # why/how/which/is/are/does/did/can/will/should").
 _AND_SPLIT_RE = re.compile(r"\s*,?\s+and\s+", re.IGNORECASE)
 
+# Sentence terminators stripped before a canonical "?" is re-appended to each
+# conjunct (#94, #111). The set is deliberately NOT ASCII-only: CJK/Arabic IME
+# input commonly ends a question with a full-width `？` (U+FF1F), full-width
+# `！` (U+FF01), ideographic `。` (U+3002), or Arabic `؟` (U+061F). Stripping
+# only ASCII `?.!` left those non-ASCII enders in place, so `+ "?"` stacked a
+# doubled terminator ("... work？?"). Used as an `str.rstrip` argument at both
+# strip sites so the well-formed-question contract holds for non-ASCII locales.
+_TERMINATORS = "?.!？！؟。"
+
 _QUESTION_PREFIXES = (
     "who",
     "what",
@@ -169,7 +178,7 @@ def _split_question_and(query: str) -> list[str] | None:
     otherwise "wine and cheese pairings" would split into two useless
     halves. Returns None if the heuristic doesn't apply.
     """
-    stripped = query.strip().rstrip("?").rstrip()
+    stripped = query.strip().rstrip(_TERMINATORS).rstrip()
     parts = _AND_SPLIT_RE.split(stripped)
     if len(parts) < 2:
         return None
@@ -185,9 +194,10 @@ def _split_question_and(query: str) -> list[str] | None:
         # first: a conjunct that already ends in `.` or `!` (e.g. "What is the
         # price! and ...") would otherwise get a `?` stacked on top, yielding a
         # malformed "What is the price!?" and breaking the well-formed-question
-        # contract. `rstrip("?.!")` is idempotent on a lone trailing `?` and
-        # leaves internal punctuation (a decimal like 3.5) untouched.
-        s = s.rstrip("?.!") + "?"
+        # contract. `rstrip(_TERMINATORS)` is idempotent on a lone trailing `?`,
+        # covers non-ASCII enders (`？！。؟`, #111), and leaves internal
+        # punctuation (a decimal like 3.5) untouched.
+        s = s.rstrip(_TERMINATORS) + "?"
         out.append(s)
     return out if len(out) >= 2 else None
 
