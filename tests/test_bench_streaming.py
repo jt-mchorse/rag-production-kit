@@ -176,6 +176,47 @@ def test_bench_streaming_out_help_text_mentions_dump_summary_json() -> None:
     )
 
 
+def _run_bench_nocheck(*args: str) -> subprocess.CompletedProcess[str]:
+    """Invoke the bench CLI without `check=True` so a non-zero exit (an
+    argparse usage error) is returned rather than raised."""
+    return subprocess.run(
+        [sys.executable, "-m", _SCRIPT_MODULE, *args],
+        cwd=str(_REPO_ROOT),
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+
+@pytest.mark.parametrize(
+    ("flag", "value"),
+    [("--k", "0"), ("--k", "-1"), ("--n", "0"), ("--n", "-5")],
+)
+def test_bench_streaming_rejects_nonpositive_k_and_n(flag: str, value: str) -> None:
+    """Degenerate `--k` / `--n` must fail as a clean argparse usage error
+    (exit 2, message on stderr), not a raw traceback (`--k 0` used to surface
+    `StreamingPipeline.run`'s ValueError) or a silent all-zero table (`--n 0`
+    used to exit 0). Parity with `scripts/bench_rewriter.py`'s `--k` guard (#114).
+    """
+    proc = _run_bench_nocheck(flag, value)
+    assert proc.returncode == 2, (
+        f"{flag} {value} should exit 2 (argparse usage error); "
+        f"got {proc.returncode}. stderr={proc.stderr!r}"
+    )
+    assert f"{flag} must be positive" in proc.stderr, proc.stderr
+    # No uncaught traceback should leak to the operator.
+    assert "Traceback" not in proc.stderr, proc.stderr
+    # And the benchmark must not have run (no results table emitted).
+    assert "Streaming pipeline benchmark" not in proc.stdout, proc.stdout
+
+
+def test_bench_streaming_accepts_valid_small_run() -> None:
+    """The guard must not reject the smallest legitimate invocation —
+    `--n 1 --k 1` still runs and prints the table (exit 0)."""
+    proc = _run_bench("--n", "1", "--k", "1")
+    assert "Streaming pipeline benchmark" in proc.stdout, proc.stdout
+
+
 @pytest.mark.parametrize("phase", _PHASES)
 def test_bench_streaming_out_phase_keys_complete(phase: str, tmp_path: Path) -> None:
     """Parametrized lock: every one of the four canonical phases must

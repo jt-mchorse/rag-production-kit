@@ -191,6 +191,15 @@ def main() -> None:
         ),
     )
     args = ap.parse_args()
+    # Reject degenerate CLI input with a clean `error: ... (exit 2)`, mirroring
+    # the sibling `scripts/bench_rewriter.py`. Without this, `--k 0` surfaces
+    # `StreamingPipeline.run`'s ValueError as a raw traceback (it raises before
+    # the pipeline's own try/except), and `--n 0`/negative silently produces an
+    # all-zero table that reads as a successful run (#114).
+    if args.n <= 0:
+        ap.error("--n must be positive")
+    if args.k <= 0:
+        ap.error("--k must be positive")
 
     t0 = time.perf_counter()
     timings = run(args.n, args.k)
