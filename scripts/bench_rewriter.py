@@ -260,9 +260,18 @@ def _print_md(results: Sequence[_QueryResult], k: int, elapsed_ms: float) -> Non
     for r in results:
         delta = r.rewriter_recall - r.baseline_recall
         sign = "+" if delta >= 0 else ""
+        # `query` is the one free-form cell (every other is a formatted number).
+        # Backticks do NOT protect a literal `|`: GFM splits table cells on
+        # unescaped pipes *before* it parses inline-code spans, so a piped query
+        # injects a spurious column and corrupts the whole table's alignment.
+        # Escape `|` -> `\|` (GitHub renders `\|` as a literal pipe, inside a
+        # code span in a table too) so the cell contributes zero delimiters —
+        # same fix as comment `_row_to_md` (#130), `calibration.render_report`
+        # (llm-eval-harness #134), `aggregate_markdown` (embedding-model-shootout
+        # #79), and `run_matrix._render_summary` (chunking-strategies-lab #100).
+        query = r.query.replace("|", "\\|")
         print(
-            f"| `{r.query}` | {r.baseline_recall:.2f} | {r.rewriter_recall:.2f} | "
-            f"{sign}{delta:.2f} |"
+            f"| `{query}` | {r.baseline_recall:.2f} | {r.rewriter_recall:.2f} | {sign}{delta:.2f} |"
         )
 
 
