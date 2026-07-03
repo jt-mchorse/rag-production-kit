@@ -130,6 +130,38 @@ def _resolves_on_disk(token: str) -> bool:
     return (REPO_ROOT / token).exists()
 
 
+# CamelCase symbols the doc legitimately names that are NOT owned by this
+# package — cross-repo references. `RunResult` is `eval-harness`'s type (the
+# evals-pipeline section: "each writes one `RunResult` JSON via `eval-harness`");
+# rag_kit's own result types are `RetrievalResult` / `RewriteResult`. Excluded
+# from the public-surface check so a correct external reference isn't a false
+# positive. Hard-pinned by `test_external_symbols_hard_pin_set` so this seam
+# can't silently grow into a hole that hides real drift.
+EXTERNAL_SYMBOLS = ("RunResult",)
+
+
+def _extract_camel_symbols(text: str) -> set[str]:
+    """Backtick-quoted multi-word CamelCase identifiers (an internal
+    lowercase->uppercase boundary, e.g. `HashEmbedder`, `UnknownModelError`).
+
+    Single-word capitalized tokens (`Backend`-in-prose) and all-caps tokens
+    (`SCORE`) are excluded so only genuine class-name claims are checked. Bare
+    snake_case is not locked — it collides with field/column names the doc
+    quotes, which are not importable symbols.
+    """
+    found: set[str] = set()
+    for match in re.finditer(r"`([^`\n]+)`", text):
+        token = match.group(1).strip()
+        token = re.sub(r"\(\)$", "", token)
+        while token and token[-1] in ".,;:":
+            token = token[:-1]
+        if re.fullmatch(r"[A-Z][A-Za-z0-9]*[a-z][A-Za-z0-9]*", token) and re.search(
+            r"[a-z][A-Z]", token
+        ):
+            found.add(token)
+    return found
+
+
 def test_doc_exists() -> None:
     assert DOC.exists(), f"missing {DOC}"
 
@@ -159,6 +191,68 @@ def test_operator_supplied_paths_actually_absent() -> None:
         + "\n".join(f"  - `{p}`" for p in landed)
         + "\n(drop them from OPERATOR_SUPPLIED_PATHS so the resolvability "
         "check covers them as literal paths)"
+    )
+
+
+def test_doc_symbol_refs_resolve(doc_text: str) -> None:
+    """Every symbol the doc names resolves to a real package attribute.
+
+    ``test_backtick_paths_resolve_on_disk`` validates slash-path tokens only;
+    a *symbol* reference — a fully-qualified ``rag_kit.<module>.<symbol>`` or a
+    CamelCase public type — was unguarded. That is the drift class portfolio-ops
+    #55 catalogued (a doc naming a nonexistent class stays green in CI).
+    Propagates the embedding-model-shootout #71 / llm-eval-harness #140 lock,
+    adapted to the two citation styles this doc uses, with an
+    ``EXTERNAL_SYMBOLS`` allowlist for cross-repo references (#118).
+    """
+    import importlib
+
+    pkg = importlib.import_module("rag_kit")
+    dotted = set(re.findall(r"rag_kit\.([a-z_]+)\.([A-Za-z_][A-Za-z0-9_]*)", doc_text))
+    camel = _extract_camel_symbols(doc_text) - set(EXTERNAL_SYMBOLS)
+    assert dotted or camel, (
+        "expected at least one symbol reference (`rag_kit.<module>.<symbol>` or "
+        "a CamelCase public type) in docs/architecture.md — the resolver would "
+        "otherwise be vacuously green"
+    )
+
+    unresolved: list[str] = []
+    for module_name, symbol in sorted(dotted):
+        try:
+            module = importlib.import_module(f"rag_kit.{module_name}")
+        except ModuleNotFoundError:
+            unresolved.append(f"rag_kit.{module_name}.{symbol} (module not importable)")
+            continue
+        if not hasattr(module, symbol):
+            unresolved.append(f"rag_kit.{module_name}.{symbol}")
+    for symbol in sorted(camel):
+        if not hasattr(pkg, symbol):
+            unresolved.append(f"{symbol} (not in the rag_kit public surface)")
+
+    assert not unresolved, (
+        "docs/architecture.md names symbols that don't exist in the package:\n"
+        + "\n".join(f"  - {u}" for u in unresolved)
+        + "\n(fix the doc to match the shipped symbol, update the rename that "
+        "orphaned it, or — if it's a legitimate cross-repo reference — add it to "
+        "EXTERNAL_SYMBOLS in tests/test_architecture_doc.py)"
+    )
+
+
+def test_external_symbols_hard_pin_set() -> None:
+    assert EXTERNAL_SYMBOLS == ("RunResult",)
+
+
+def test_external_symbols_absent_from_public_surface() -> None:
+    # An allow-listed external symbol that IS in the rag_kit surface would be a
+    # stale exemption hiding real coverage — drop it from EXTERNAL_SYMBOLS then.
+    import importlib
+
+    pkg = importlib.import_module("rag_kit")
+    shadowed = [s for s in EXTERNAL_SYMBOLS if hasattr(pkg, s)]
+    assert not shadowed, (
+        "these EXTERNAL_SYMBOLS now exist in the rag_kit public surface; drop "
+        "them from the allowlist so the symbol check covers them:\n"
+        + "\n".join(f"  - {s}" for s in shadowed)
     )
 
 
