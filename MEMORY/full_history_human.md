@@ -871,3 +871,15 @@ into the savings dashboard" hint; `llm-eval-harness` has a
 **Open questions / blockers:** none — ready for review.
 
 **Next session:** continue the loop. Portfolio remains saturated; peripheral/tooling surfaces are where the remaining small defects live.
+
+## 2026-07-03 — Issue #116: bench_rewriter._print_md left the query cell's `|` unescaped (GFM table corruption)
+**Duration:** ~20 min · **Branch:** `session/2026-07-03-0329-issue-116`
+
+- `_print_md` (`scripts/bench_rewriter.py`) interpolated the free-form `r.query` into a GFM table cell wrapped in backticks but **without escaping `|`**. Backticks don't protect a literal pipe — GFM splits table cells on unescaped pipes before parsing inline-code spans — so a query with a pipe injected a spurious column (5 cells vs. the 4-column header). Reproduced firsthand (`compare cats | dogs` → 5 cells).
+- **Fix:** `query = r.query.replace("|", "\\|")` before the f-string, mirroring the four sibling emitters already fixed (`comment._row_to_md` #130, `calibration.render_report` #134, `aggregate_markdown` #79, `run_matrix._render_summary` #100). +2 regression tests (piped query → exactly 4 GFM cells; pipe-free output unchanged). Latent today — the 8 shipped queries are pipe-free, so the README snapshot is byte-identical. Suite 512 → 514.
+
+**Why this work, this session:** third issue of a NIGHT run. After five dogfood core-hunts (llm-eval-harness hit → #138; chunking, vector-search, agent-orchestration, python-async all clean), I ran a targeted direct grep for the recurring GFM pipe-escaping class across every table emitter in all 12 repos. Four were already escaped (#130/#134/#79/#100); this `_print_md` emitter was the one miss.
+
+**Open questions / blockers:** none — ready for review.
+
+**Next session:** continue the loop. Portfolio is deeply saturated; remaining open work is JT-blocked decision-revisits and operator-verification demos.
