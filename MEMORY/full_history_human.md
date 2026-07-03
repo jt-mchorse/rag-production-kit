@@ -883,3 +883,13 @@ into the savings dashboard" hint; `llm-eval-harness` has a
 **Open questions / blockers:** none — ready for review.
 
 **Next session:** continue the loop. Portfolio is deeply saturated; remaining open work is JT-blocked decision-revisits and operator-verification demos.
+
+## 2026-07-03 — Issue #118: symbol-resolution doc-lock (propagates portfolio-ops #55) (~20 min)
+
+**What got done.** Second per-repo propagation of the portfolio-ops #55 symbol-resolution lock (after llm-eval-harness #140). Added `test_doc_symbol_refs_resolve` to `tests/test_architecture_doc.py`: fully-qualified `rag_kit.<module>.<symbol>` refs (`io_utils.atomic_write_text`) resolved via importlib+`hasattr` (the #71 shape), and multi-word CamelCase public types (`HashEmbedder`, `CohereReranker`, `UnknownModelError`, …) checked against the `rag_kit` public surface. Firsthand-verified that the doc's `RunResult` token is **eval-harness's** type (evals-pipeline section), not rag_kit drift — rag_kit ships `RetrievalResult`/`RewriteResult`. Added a hard-pinned `EXTERNAL_SYMBOLS = ("RunResult",)` allowlist, a hard-pin test, and a shadow test that fails if an allow-listed name later appears in the rag_kit surface. Inverse-verified both drift styles are flagged and `RunResult` stays exempt. Suite 514 → 517, ruff clean.
+
+**Why this work, this session:** fourth issue of the DAY run. After llm-eval-harness #140 shipped the first propagation, continued the systemic #55 effort to a second priority-tier repo. The key lesson: this propagation is genuinely per-repo — emb-shootout #71 is fully-qualified, llm-eval #140 is bare-submodule + bare-CamelCase, rag #118 is fully-qualified + CamelCase-with-external-allowlist. TS repos will need an exported-name check, not importlib.
+
+**Open questions / blockers:** none — ready for review.
+
+**Next session:** continue #55 propagation (llm-cost-optimizer, chunking, prompt-regression-suite, vector-search-at-scale, agent-orchestration-platform, mcp-server-cookbook; TS: nextjs, ai-app). Remaining non-propagation work stays JT-blocked.
