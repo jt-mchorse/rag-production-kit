@@ -893,3 +893,16 @@ into the savings dashboard" hint; `llm-eval-harness` has a
 **Open questions / blockers:** none — ready for review.
 
 **Next session:** continue #55 propagation (llm-cost-optimizer, chunking, prompt-regression-suite, vector-search-at-scale, agent-orchestration-platform, mcp-server-cookbook; TS: nextjs, ai-app). Remaining non-propagation work stays JT-blocked.
+
+## 2026-07-06 — Issue #120: CI gap for the Next.js demo
+**Duration:** ~20 min · **Branch:** `session/2026-07-06-1515-issue-120`
+
+- The Next.js demo (`demo/nextjs`) ships a Vitest suite (`corpus.test.ts`, `stream-route.test.ts` — 13 tests exercising corpus retrieval and the SSE `/api/stream` protocol), but `ci.yml` defined only Python jobs (ruff + pytest). No `npm`/`node` step ran anywhere, so a demo regression would pass CI silently.
+- Added a `nextjs-demo` job: `setup-node@v4` (node 20, matching `engines.node >=20`), npm cache on the lockfile, `npm ci`, `npm run typecheck`, `npm test`. Excluded `next lint` (no ESLint config → interactive, not CI-safe) and `next build` (out of scope).
+- Verified locally (`typecheck` exit 0, `npm test` 13 passed) before pushing.
+
+**Why this work, this session:** Found via a cross-repo CI-coverage lens sweep after the portfolio's static issue queue was exhausted (all remaining issues JT-gated or headless-demo). Same enforcement-gap class as mcp-server-cookbook#90; both were multi-language repos with a second stack not wired into CI.
+
+**Open questions / blockers:** none.
+
+**Next session:** The CI-coverage lens is now swept across all 12 repos — only these 2 gaps existed (both multi-stack repos); the other 10 single-stack repos are clean. Don't re-sweep. Remaining open issues are JT-gated decision-revisits or headless demo captures.

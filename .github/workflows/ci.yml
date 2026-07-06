@@ -73,6 +73,28 @@ jobs:
       - run: pip install -e '.[dev]'
       - run: pytest -m pg
 
+  nextjs-demo:
+    # The Next.js demo (demo/nextjs) ships a Vitest suite exercising the
+    # corpus-retrieval logic and the SSE /api/stream protocol, but the
+    # jobs above are Python-only (ruff + pytest) — nothing ran the JS
+    # tests, so a regression in the demo would pass CI silently. See #120
+    # (same enforcement-gap class as mcp-server-cookbook#90).
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: demo/nextjs
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: demo/nextjs/package-lock.json
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+
   memory-check:
     runs-on: ubuntu-latest
     timeout-minutes: 15
