@@ -138,7 +138,7 @@ def _render_dashboard_html(records: Sequence[CostRecord]) -> str:
   body {{ font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
          max-width: 800px; margin: 24px auto; padding: 0 16px; color: #222; }}
   h1 {{ font-size: 20px; }}
-  .stats {{ display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin: 12px 0; }}
+  .stats {{ display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin: 12px 0; }}
   .stat {{ background: #f4f4f4; padding: 10px 12px; border-radius: 6px; }}
   .stat-label {{ font-size: 11px; color: #666; text-transform: uppercase; letter-spacing: 0.05em; }}
   .stat-value {{ font-size: 18px; font-weight: 600; margin-top: 2px; }}
@@ -154,6 +154,7 @@ def _render_dashboard_html(records: Sequence[CostRecord]) -> str:
   <div class="stat"><div class="stat-label">total USD</div><div class="stat-value">${agg.total_usd:.4f}</div></div>
   <div class="stat"><div class="stat-label">p50 latency</div><div class="stat-value">{agg.latency_p50_ms:.0f}ms</div></div>
   <div class="stat"><div class="stat-label">p95 latency</div><div class="stat-value">{agg.latency_p95_ms:.0f}ms</div></div>
+  <div class="stat"><div class="stat-label">p99 latency</div><div class="stat-value">{agg.latency_p99_ms:.0f}ms</div></div>
 </div>
 <h2 style="font-size: 14px; color:#555">Per-request latency over time</h2>
 {chart}
