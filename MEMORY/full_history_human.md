@@ -918,3 +918,15 @@ into the savings dashboard" hint; `llm-eval-harness` has a
 **Open questions / blockers:** none. Note: the hunt agent also regenerated `evals/current/*.json`; those were dropped, not committed (benchmark-integrity, no unilateral fixture regen).
 
 **Next session:** bench_streaming / bench_rewriter / capture_demo / run_eval CLI all audited clean; the dashboard p99 omission was the only real non-core finding.
+
+## 2026-07-07 — Issue #124: demo-client AbortController unmount-teardown leak
+**Duration:** ~30 min · **Branch:** `session/2026-07-07-2328-issue-124` · **PR:** #125
+
+- The Next.js demo's `demo-client.tsx` wired an `AbortController` (signal → `fetch`, stored in `abortRef`, nulled in `finally`) but **never called `.abort()`** and imported no `useEffect` — the controller was vestigial and there was no unmount cleanup. Since a browser `fetch` isn't auto-aborted on component unmount, navigating away mid-stream left the `while (true) { reader.read() }` loop doing `setState` on a detached component and held the connection open until the server finished. Fixed by adding `useEffect(() => () => abortRef.current?.abort(), [])`; this also ends server work early (aborting closes the connection → the route's next `enqueue` throws → `finally { controller.close() }`), even though the route has no explicit `cancel()` handler. Added a source-level cleanup lock test (node/vitest idiom, no jsdom) that discovers every AbortController-owning component and asserts unmount teardown. Demo suite 13 → 16, `tsc --noEmit` clean.
+- Same bug class as `nextjs-streaming-ai-patterns#78` shipped earlier this run; found by pattern-matching that hit to rag's demo frontend.
+
+**Why this work, this session:** the static issue queue is globally exhausted, so work came from fresh-lens dogfood hunts. Nine hunts ran this run across nine lens families (percentile, TTL, retry, vsas param/concurrency, python-async TaskGroup, aop HITL/trace, ai-app mock-replay, mcp security, retrieval metrics); eight came back honestly empty — the backend/logic surface is decisively saturated. The single productive axis was **frontend streaming lifecycle**, which yielded both issues this run (#78 and #124). When backend hunts go empty, pivot to React unmount-cleanup/streaming-lifecycle lenses on the two Next.js frontends.
+
+**Open questions / blockers:** none — ready for review.
+
+**Next in this session's loop:** the AbortController-unmount lens is now swept on both frontend surfaces (nextjs 4 clients, rag demo 1 client). Continue only if a genuinely fresh lens surfaces; otherwise stop cleanly within the DAY 2–4 target (2 shipped).
