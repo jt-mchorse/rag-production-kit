@@ -906,3 +906,15 @@ into the savings dashboard" hint; `llm-eval-harness` has a
 **Open questions / blockers:** none.
 
 **Next session:** The CI-coverage lens is now swept across all 12 repos — only these 2 gaps existed (both multi-stack repos); the other 10 single-stack repos are clean. Don't re-sweep. Remaining open issues are JT-gated decision-revisits or headless demo captures.
+
+## 2026-07-07 — Issue #122: Dashboard omits the documented p99 latency tile
+**Duration:** ~20 min · **Branch:** `session/2026-07-07-1522-issue-122`
+
+- The served telemetry dashboard rendered only p50 + p95 tiles, but `README.md:80` and `docs/architecture.md:234` both promise p50/p95/p99. `Aggregate` already computes `latency_p99_ms`; the render just dropped it. Reproduced firsthand on clean main (`p99 in html: False`).
+- Added a p99 tile next to p95 (no fabricated number — p99 is computed) and widened the CSS grid `repeat(4,1fr)` → `repeat(5,1fr)`. New lock test pins p50/p95/p99 + the 5-column grid to the rendered HTML. Full suite 524 passed / 7 skipped; ruff clean.
+
+**Why this work, this session:** Doc-vs-code drift on the *served* dashboard HTML — a sub-lens the earlier run-shipped-example sweep (stdout reproduce) missed. Found by a parallel dogfood hunt on the non-core scripts surface, verified firsthand.
+
+**Open questions / blockers:** none. Note: the hunt agent also regenerated `evals/current/*.json`; those were dropped, not committed (benchmark-integrity, no unilateral fixture regen).
+
+**Next session:** bench_streaming / bench_rewriter / capture_demo / run_eval CLI all audited clean; the dashboard p99 omission was the only real non-core finding.
