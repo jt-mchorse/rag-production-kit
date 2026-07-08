@@ -108,6 +108,32 @@ class TestSplitSentences:
             "The rest follows [cite:A].",
         ]
 
+    @pytest.mark.parametrize(
+        "text",
+        [
+            "It contains vitamin C. It improves immunity [cite:A].",  # common word ending
+            "The patient has hepatitis B. Treatment began [cite:A].",
+            "This is grade A. It ships today [cite:A].",
+            "Vitamin C. It helps [cite:A].",  # capitalized preceding word (sentence-initial)
+        ],
+    )
+    def test_single_capital_letter_word_is_a_real_boundary(self, text: str) -> None:
+        # A claim ending in a lone capital letter ("vitamin C.", "hepatitis B.")
+        # is a genuine sentence boundary, NOT a name initial. Merging it into the
+        # next sentence let the first (potentially fabricated, uncited) claim ride
+        # on the following sentence's [cite:...] marker, bypassing enforcement
+        # (#126). It must split into two sentences so each stays under citation
+        # enforcement in its own right.
+        assert len(split_sentences(text)) == 2
+
+    def test_still_merges_name_initial_after_a_title(self) -> None:
+        # The name-context exception is preserved: a single-letter initial that
+        # follows a title abbreviation ("Dr. J.") or another initial is still not
+        # a boundary, so "Dr. J. Smith ..." stays one cited claim (#110/#126).
+        assert split_sentences("Dr. J. Smith wrote the paper [cite:A].") == [
+            "Dr. J. Smith wrote the paper [cite:A]."
+        ]
+
 
 class TestEnforceCitations:
     def test_accepts_every_sentence_cited(self) -> None:
@@ -359,6 +385,26 @@ class TestAnthropicGenerator:
         result = gen.generate("who discovered penicillin?", retrieved, threshold=0.05)
         assert isinstance(result, GeneratedAnswer)
         assert [c.external_id for c in result.citations] == ["A"]
+
+    def test_uncited_claim_ending_in_single_capital_letter_is_refused(self) -> None:
+        # End-to-end regression for #126: a fabricated, uncited first claim that
+        # ends in a lone capital letter ("... contains vitamin C.") must NOT be
+        # able to merge into the following cited sentence and slip past
+        # enforcement. It is now a real boundary, so the marker-less first claim
+        # raises CitationError and the generator refuses.
+        retrieved = [_result("A", "The product improves immunity", fused=0.4)]
+        client = _FakeClient(
+            "This cures cancer and contains vitamin C. It improves immunity [cite:A]."
+        )
+        gen = AnthropicGenerator(client=client)
+        with pytest.raises(CitationError):
+            enforce_citations(
+                "This cures cancer and contains vitamin C. It improves immunity [cite:A].",
+                retrieved,
+            )
+        # And the same through the generator's public path -> Refusal, not answer.
+        result = gen.generate("does it cure cancer?", retrieved, threshold=0.05)
+        assert isinstance(result, Refusal)
 
     def test_refuses_below_threshold_without_calling_client(self) -> None:
         retrieved = [_result("A", "weak", fused=0.001)]
