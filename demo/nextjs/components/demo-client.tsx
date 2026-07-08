@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 interface Chunk {
   readonly citation_index: number;
@@ -76,6 +76,16 @@ export function DemoClient() {
     },
     [q, running],
   );
+
+  // Abort the in-flight fetch/reader on unmount. A browser fetch is NOT
+  // auto-aborted when its initiating component unmounts, so without this,
+  // navigating away mid-stream leaves the reader.read() loop calling setState
+  // on a detached component and the connection open until the server finishes.
+  // Aborting closes the connection, so the route's next enqueue throws and its
+  // finally { controller.close() } ends server work early.
+  useEffect(() => {
+    return () => abortRef.current?.abort();
+  }, []);
 
   function handleFrame(raw: string): void {
     let evName: string | null = null;
