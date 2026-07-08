@@ -52,6 +52,42 @@ def test_atomic_write_text_overwrites_existing_file(tmp_path: Path) -> None:
     assert out.read_text(encoding="utf-8") == "fresh"
 
 
+def test_atomic_write_text_accepts_name_max_length_basename(tmp_path: Path) -> None:
+    """A basename at the 255-byte NAME_MAX limit that `Path.write_text`
+    accepts must also succeed through `atomic_write_text` (#128).
+
+    The helper prepends the target basename to its temp filename; without
+    capping, a near-NAME_MAX basename overflows the limit and the write
+    fails with `OSError: [Errno 63] File name too long`, even though a
+    plain `Path.write_text` of the same target succeeds. Sibling of the
+    client-reachable mcp-server-cookbook#96.
+    """
+    name = "a" * 250 + ".json"  # 255 bytes == NAME_MAX on ext4/APFS
+    assert len(name.encode("utf-8")) == 255
+    out = tmp_path / name
+
+    # Precondition: the filesystem accepts this basename via a plain write.
+    probe = tmp_path / ("b" * 250 + ".json")
+    probe.write_text("probe", encoding="utf-8")
+    probe.unlink()
+
+    atomic_write_text(out, '{"ok": true}')
+    assert out.read_text(encoding="utf-8") == '{"ok": true}'
+
+
+def test_atomic_write_text_caps_multibyte_basename_on_char_boundary(
+    tmp_path: Path,
+) -> None:
+    """The temp-base cap is byte-budgeted but trims on a char boundary,
+    so a multibyte basename is never split mid-codepoint (#128)."""
+    # 100 × 3-byte char + ".json" == 305 bytes, well over the 200-byte cap.
+    name = "é" * 100 + ".json"
+    assert len(name.encode("utf-8")) > 200
+    out = tmp_path / name
+    atomic_write_text(out, "multibyte")
+    assert out.read_text(encoding="utf-8") == "multibyte"
+
+
 def test_atomic_write_text_replace_failure_leaves_destination_absent(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
