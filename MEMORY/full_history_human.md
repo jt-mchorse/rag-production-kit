@@ -930,3 +930,16 @@ into the savings dashboard" hint; `llm-eval-harness` has a
 **Open questions / blockers:** none — ready for review.
 
 **Next in this session's loop:** the AbortController-unmount lens is now swept on both frontend surfaces (nextjs 4 clients, rag demo 1 client). Continue only if a genuinely fresh lens surfaces; otherwise stop cleanly within the DAY 2–4 target (2 shipped).
+
+## 2026-07-08 — Issue #126: citation-enforcement bypass via lone-capital-letter claim endings
+**Duration:** ~30 min · **Branch:** `session/2026-07-08-0336-issue-126`
+
+- `_ends_with_abbreviation` returned `True` for **any** sentence ending in a single uppercase letter. The docstring scopes that to name initials ("Dr. J. Smith"), but it also fires on common claim endings — "vitamin C.", "hepatitis B.", "grade A.", "type O." `split_sentences` then merges such a claim into the next sentence, so the first (potentially fabricated, **uncited**) claim rides on the following sentence's `[cite:...]` marker and slips past `enforce_citations`'s "every claim sentence cites a chunk" guarantee. Reproduced firsthand: `enforce_citations("This cures cancer and contains vitamin C. It improves immunity [cite:doc1].", ...)` was ACCEPTED.
+- Fixed by treating a lone capital initial as a non-boundary **only in a name context** — preceded by a title abbreviation ("Dr. J.") or another single-letter initial ("J. K."). This keeps "Dr. J. Smith" merging while making "vitamin C." and the sentence-initial "Vitamin C." real boundaries, so an uncited such claim is refused. I chose this name-context discriminator over the hunter's simpler "preceding word capitalized" suggestion because the simpler one still false-merges a capitalized preceding word ("Vitamin C.", "Product C."); the name-context rule closes that too. False-refusing an ambiguous name is the safe direction; false-accepting an uncited claim (the bug) is not.
+- Added split-boundary tests for the common-word endings, an end-to-end `enforce_citations` refusal test, and a name-initial preservation test. Full suite 524 → 530 passed (7 Postgres skipped), ruff clean.
+
+**Why this work, this session:** static queue exhausted; this NIGHT run's wave-2 fresh-lens hunts (5 parallel, priority-tier-weighted) surfaced it — the citation-enforcement lens, one hit out of five (the other four — chunking recall/NDCG, leh judge calibration, lco model routing, rag reranker over-fetch — came back honestly empty).
+
+**Open questions / blockers:** none — ready for review.
+
+**Next session:** the "citation-enforcement sentence-boundary merge leniency" lens is swept on rag (the only repo with this citation-split construct). The #110 abbreviation-merge that prevents false-refusal of claim-less fragments is exactly what opened this false-accept when over-lenient — watch for that dual in similar guards.
