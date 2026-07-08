@@ -178,8 +178,8 @@ def _ends_with_abbreviation(fragment: str) -> bool:
     See `_ABBREVIATIONS`: the trailing dots are stripped and the token matched
     case-insensitively (so `"U.S."` -> `"u.s"`, `"e.g."` -> `"e.g"`, `"Dr."` ->
     `"dr"`). A lone capital initial (the `"J."` in `"Dr. J. Smith"`) also isn't a
-    boundary. Only `.`-terminated tokens can qualify — `!`/`?` are unambiguous
-    sentence ends and never abbreviations.
+    boundary, but ONLY in a name context (see below). Only `.`-terminated tokens
+    can qualify — `!`/`?` are unambiguous sentence ends and never abbreviations.
     """
     tokens = fragment.split()
     if not tokens:
@@ -189,9 +189,19 @@ def _ends_with_abbreviation(fragment: str) -> bool:
         return False
     if last.lower() in _ABBREVIATIONS:
         return True
-    # Single capital-letter initial, e.g. the "J." in "Dr. J. Smith". Restricted
-    # to uppercase letters so numeric fragments ("Section 5.") aren't merged.
-    return len(last) == 1 and last.isupper()
+    # A lone capital-letter token, e.g. the "J." in "Dr. J. Smith". A bare
+    # `len==1 and isupper()` test also fires on ordinary claim endings —
+    # "vitamin C.", "hepatitis B.", "grade A.", "type O." — and merging those
+    # into the next sentence lets an *uncited* claim ride on the following
+    # sentence's [cite:...] marker, bypassing enforcement (#126). Only treat it
+    # as a non-boundary in a NAME context: preceded by a title abbreviation
+    # ("Dr. J.") or another single-letter initial ("J. K."). False-refusing an
+    # ambiguous name is the safe direction; false-accepting an uncited claim
+    # (the bug) is not.
+    if len(last) == 1 and last.isupper():
+        prev = tokens[-2].rstrip(".") if len(tokens) >= 2 else ""
+        return prev.lower() in _ABBREVIATIONS or (len(prev) == 1 and prev.isupper())
+    return False
 
 
 def split_sentences(text: str) -> list[str]:
