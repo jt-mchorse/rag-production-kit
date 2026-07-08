@@ -943,3 +943,15 @@ into the savings dashboard" hint; `llm-eval-harness` has a
 **Open questions / blockers:** none — ready for review.
 
 **Next session:** the "citation-enforcement sentence-boundary merge leniency" lens is swept on rag (the only repo with this citation-split construct). The #110 abbreviation-merge that prevents false-refusal of claim-less fragments is exactly what opened this false-accept when over-lenient — watch for that dual in similar guards.
+
+## 2026-07-08 (day) — Issue #128: atomic_write_text overflow on NAME_MAX basename
+**Duration:** ~20 min · **Branch:** `session/2026-07-08-1908-issue-128`
+
+- `atomic_write_text` built its temp file with `NamedTemporaryFile(prefix=f".{target.name}.", ...)`, prepending the **full** target basename. For a basename at/near the 255-byte `NAME_MAX` limit — a name the filesystem accepts and `Path.write_text` writes fine — the derived temp name overflowed and raised `OSError: [Errno 63] File name too long`. Reproduced firsthand on clean `main` before touching code.
+- Fixed with a `_cap_base_for_temp` helper that caps the basename's byte contribution to the temp prefix at 200 bytes, trimming on a char boundary so multibyte names are never split mid-codepoint. This mirrors the `mcp-server-cookbook#96` TS fix exactly (byte-budgeted, not the char-slice `name[:200]` the issue sketched). Uniqueness still comes from `NamedTemporaryFile`'s random component; the truncated base is cosmetic. Added a 255-byte NAME_MAX test (with a plain-write precondition probe) and a 305-byte multibyte test. Full suite 530 → 532 passed, 7 Postgres skipped, ruff clean.
+
+**Why this work, this session:** for once the work came off the static queue — #128 is a real `priority:low` bug I filed last night as a deferred sibling of the client-reachable mcp#96 (which was fixed). The `priority:high` queue is still globally exhausted across all 13 repos, but a real filed bug in a priority-tier repo with a proven fix shape beats manufacturing a fresh dogfood hunt.
+
+**Open questions / blockers:** none — ready for review. The leh/lco/prs sibling helpers share the shape but take operator-controlled paths and are tracked as a class; no churn PRs there.
+
+**Next in this session's loop:** continue the DAY 2–4 target with a fresh-lens dogfood hunt or another static item if one surfaces.
