@@ -168,7 +168,16 @@ def _split_compare(query: str) -> list[str] | None:
         return None
     # Synthesize independent sub-queries about each entity. We don't try
     # to invent an attribute axis — that's the rewriter's caller's job.
-    return [f"What is {a}?", f"What is {b}?"]
+    #
+    # Strip a trailing sentence terminator from each entity before appending the
+    # canonical "?", else "Compare X with Java." yields the malformed
+    # doubled-terminator "What is Java.?" (and "…Java!" / "…Y。" likewise). The
+    # `_COMPARE_RE` `b` group only strips a lone trailing "?", not "." / "!" /
+    # the non-ASCII enders. This mirrors the `rstrip(_TERMINATORS)` the `and`-split
+    # seam already applies (#94/#113); the compare seam predates that fix and was
+    # never given the same treatment. Only a *trailing* terminator is stripped, so
+    # internal punctuation (a decimal like "3.5") is preserved.
+    return [f"What is {a.rstrip(_TERMINATORS)}?", f"What is {b.rstrip(_TERMINATORS)}?"]
 
 
 def _split_question_and(query: str) -> list[str] | None:

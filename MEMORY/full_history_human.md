@@ -970,3 +970,15 @@ into the savings dashboard" hint; `llm-eval-harness` has a
 **Open questions / blockers:** none.
 
 **Next session:** citation-merge word-sense-collision lens — check other repos' sentence splitters for the same ambiguous-token class (an abbreviation that is also a common claim-ending word).
+
+## 2026-07-09 — Issue #132: compare-split doubled-terminator sub-queries
+**Duration:** ~20 min · **Branch:** `session/2026-07-09-1552-issue-132` · **PR:** #133
+
+- `TemplateRewriter`'s `compare X with Y` decomposition synthesized sub-queries without stripping a trailing sentence terminator, so `"Compare Python with Java."` produced the malformed `"What is Java.?"` (and `!` / non-ASCII enders likewise). #94/#113 fixed this for the sibling `and`-split seam but never touched the compare seam.
+- Applied `rstrip(_TERMINATORS)` to both entities in `_split_compare`, mirroring the `and`-split fix; internal decimals preserved. 6 regression tests mirroring the `and`-split terminator tests, all failing pre-fix. Full suite 544 pass, ruff clean.
+
+**Why this work, this session:** found via the sibling-branch-incomplete-fix meta-lens — the fourth hit of this run via that lens (after aop#99, nextjs#80, leh#156); reproduced firsthand via the public rewriter API before fixing.
+
+**Open questions / blockers:** none — ready for review.
+
+**Next session:** the terminator-stripping class is now swept on both rewriter seams (and-split #94/#113 + compare-split #132). The then-split and looks-like-question paths don't re-append a canonical `?`, so they don't carry this class.
