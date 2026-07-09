@@ -360,3 +360,52 @@ def test_anthropic_rewriter_rejects_empty_query():
     rw = AnthropicRewriter(client=_FakeClient("{}"))
     with pytest.raises(ValueError, match="non-empty"):
         rw.rewrite("   ")
+
+
+def test_template_rewriter_compare_conjunct_with_dot_or_bang_is_well_formed():
+    """#132: a compare entity ending in `.` or `!` must not get a `?` stacked on
+    top (the malformed "What is Java.?" double terminator). Sibling of the
+    #94 `and`-split fix, on the compare seam that predated it."""
+    for q in [
+        "Compare Python with Java.",
+        "Compare Python with Java!",
+        "Compare apples to oranges.",
+    ]:
+        out = TemplateRewriter().rewrite(q)
+        assert out.reasoning == "compare_pattern", q
+        for sub in out.sub_queries:
+            assert sub.endswith("?"), sub
+            assert not sub.endswith((".?", "!?", "??")), sub
+    assert TemplateRewriter().rewrite("Compare Python with Java.").sub_queries == (
+        "What is Python?",
+        "What is Java?",
+    )
+
+
+@pytest.mark.parametrize(
+    "ender",
+    [
+        "？",  # U+FF1F full-width question mark (CJK IME)
+        "！",  # U+FF01 full-width exclamation mark
+        "。",  # U+3002 ideographic full stop
+        "؟",  # U+061F Arabic question mark
+    ],
+)
+def test_template_rewriter_compare_non_ascii_terminator_is_well_formed(ender):
+    """#132: a compare entity ending in a non-ASCII terminator must not get a
+    `?` stacked on top (e.g. "What is Y。?"). Sibling of the #113 `and`-split
+    non-ASCII fix, on the compare seam."""
+    out = TemplateRewriter().rewrite(f"Compare X with Y{ender}")
+    assert out.reasoning == "compare_pattern"
+    assert out.sub_queries == ("What is X?", "What is Y?")
+    for sub in out.sub_queries:
+        assert sub.endswith("?"), sub
+        assert sub[-2] not in "?.!？！؟。", sub
+
+
+def test_template_rewriter_compare_does_not_mangle_internal_decimal():
+    """The trailing-terminator strip must not touch internal punctuation: a
+    decimal like `3.5` is only stripped if the `.` is trailing."""
+    out = TemplateRewriter().rewrite("Compare 3.5 with 4.0")
+    assert out.reasoning == "compare_pattern"
+    assert out.sub_queries == ("What is 3.5?", "What is 4.0?")
