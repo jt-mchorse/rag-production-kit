@@ -101,6 +101,22 @@ _ABBREVIATIONS = frozenset(
     }
 )
 
+# The subset of `_ABBREVIATIONS` whose legitimate sense is a *numeric reference*
+# — they abbreviate a label that is followed by a number ("No. 5", "Vol. 3",
+# "Fig. 2", "Eq. 4", "pp. 12"). At least one ("no") is ALSO a common English
+# word that naturally ends a claim ("The answer is no."). Treating these as
+# unconditional non-boundaries let an uncited claim ending in the word merge
+# into the next sentence and ride on ITS `[cite:...]` marker, bypassing
+# enforcement — the same false-accept #126 fixed for the lone capital initial
+# ("vitamin C."). So they count as a non-boundary only when a digit follows
+# (the numeric sense); the word sense stays a real boundary. False-refusing the
+# rare non-numeric use ("See No. IV") is the safe direction (#126); false-
+# accepting an uncited claim is the bug. Name/proper-noun-context abbreviations
+# ("co"→"Acme Co.", "st"→"Main St.", "al"→"et al.") are deliberately NOT gated:
+# they are followed by proper nouns, not digits, and are not common standalone
+# claim-endings, so gating them would false-refuse legitimate cited text.
+_NUMERIC_REFERENCE_ABBREVIATIONS = frozenset({"no", "vol", "fig", "eq", "pp"})
+
 
 @dataclass(frozen=True)
 class Citation:
@@ -171,7 +187,7 @@ def _top_score(retrieved: Sequence[RetrievalResult]) -> float:
     return max(r.rerank_score if r.rerank_score is not None else r.fused_score for r in retrieved)
 
 
-def _ends_with_abbreviation(fragment: str) -> bool:
+def _ends_with_abbreviation(fragment: str, following: str = "") -> bool:
     """True if `fragment`'s last token is a known abbreviation or a single-letter
     initial — i.e. its trailing period is *not* a sentence boundary.
 
@@ -180,6 +196,13 @@ def _ends_with_abbreviation(fragment: str) -> bool:
     `"dr"`). A lone capital initial (the `"J."` in `"Dr. J. Smith"`) also isn't a
     boundary, but ONLY in a name context (see below). Only `.`-terminated tokens
     can qualify — `!`/`?` are unambiguous sentence ends and never abbreviations.
+
+    `following` is the next candidate fragment (the one that would be merged in).
+    It gates the numeric-reference abbreviations in
+    `_NUMERIC_REFERENCE_ABBREVIATIONS` ("No.", "Vol.", ...): those are a
+    non-boundary only when a number follows, so an uncited claim ending in the
+    word "no" ("The answer is no.") stays a real boundary and can't ride on the
+    next sentence's citation (#130, sibling of #126).
     """
     tokens = fragment.split()
     if not tokens:
@@ -188,6 +211,10 @@ def _ends_with_abbreviation(fragment: str) -> bool:
     if not last:
         return False
     if last.lower() in _ABBREVIATIONS:
+        if last.lower() in _NUMERIC_REFERENCE_ABBREVIATIONS:
+            # Non-boundary only in the numeric sense: a digit must follow.
+            stripped = following.lstrip()
+            return bool(stripped) and stripped[0].isdigit()
         return True
     # A lone capital-letter token, e.g. the "J." in "Dr. J. Smith". A bare
     # `len==1 and isupper()` test also fires on ordinary claim endings —
@@ -231,7 +258,7 @@ def split_sentences(text: str) -> list[str]:
     parts = _SENTENCE_SPLIT.split(text.strip())
     merged: list[str] = []
     for part in parts:
-        if merged and _ends_with_abbreviation(merged[-1]):
+        if merged and _ends_with_abbreviation(merged[-1], following=part):
             merged[-1] = f"{merged[-1]} {part}"
         else:
             merged.append(part)

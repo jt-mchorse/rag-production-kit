@@ -134,6 +134,46 @@ class TestSplitSentences:
             "Dr. J. Smith wrote the paper [cite:A]."
         ]
 
+    @pytest.mark.parametrize(
+        "text",
+        [
+            "The answer is no. The sky is blue [cite:A].",  # "no" as the English word
+            "The result is a clear no. It ships today [cite:A].",
+        ],
+    )
+    def test_numeric_reference_abbreviation_word_sense_is_a_real_boundary(self, text: str) -> None:
+        # #130 (sibling of #126): "no" is a numeric-reference abbreviation ("No. 5")
+        # but ALSO a common English word that ends a claim. Treating the word sense
+        # as a non-boundary merged an uncited claim into the next sentence, letting
+        # it ride on that sentence's [cite:...] marker and bypass enforcement. The
+        # word sense (no digit following) must stay a real boundary so each claim
+        # remains individually under citation enforcement.
+        assert len(split_sentences(text)) == 2
+
+    @pytest.mark.parametrize(
+        "text",
+        [
+            "See No. 5 for the details [cite:A].",  # "No." + number = numeric reference
+            "It is described in Vol. 3 of the series [cite:A].",
+            "The proof is in pp. 12 of the appendix [cite:A].",
+        ],
+    )
+    def test_numeric_reference_abbreviation_numeric_sense_still_merges(self, text: str) -> None:
+        # The legitimate numeric sense — the abbreviation immediately followed by a
+        # number — is still a non-boundary, so "No. 5" / "Vol. 3" / "pp. 12" stays
+        # one sentence carrying its single marker rather than stranding a claim-less
+        # "No." fragment that would falsely refuse the answer (#110 posture).
+        assert split_sentences(text) == [text]
+
+    def test_no_word_bypass_is_refused_end_to_end(self) -> None:
+        # End-to-end #130: an uncited claim ending in "no" followed by a cited
+        # sentence must be REFUSED, not silently accepted by riding on the cited
+        # sentence's marker. Mirrors the #126 capital-letter end-to-end guard.
+        retrieved = [_result("doc1", "The sky is blue.")]
+        with pytest.raises(CitationError) as excinfo:
+            enforce_citations("The answer is no. The sky is blue [cite:doc1].", retrieved)
+        assert excinfo.value.reason == "unparseable_output"
+
 
 class TestEnforceCitations:
     def test_accepts_every_sentence_cited(self) -> None:
