@@ -955,3 +955,18 @@ into the savings dashboard" hint; `llm-eval-harness` has a
 **Open questions / blockers:** none — ready for review. The leh/lco/prs sibling helpers share the shape but take operator-controlled paths and are tracked as a class; no churn PRs there.
 
 **Next in this session's loop:** continue the DAY 2–4 target with a fresh-lens dogfood hunt or another static item if one surfaces.
+
+---
+
+## 2026-07-09 — Issue #130: citation-enforcement bypass via the "no" abbreviation
+**Duration:** ~35 min · **Branch:** `session/2026-07-09-0345-issue-130` · **PR:** #131
+
+- `split_sentences` merged a claim sentence ending in a listed abbreviation into the next sentence. For the numeric-reference abbreviations — chiefly `no`, which is also a common English word that ends a claim — an uncited claim ("The answer is no.") merged into the following cited sentence and rode on its `[cite:...]` marker, so `enforce_citations` never demanded a citation for it. Same false-accept class #126 fixed for the lone-capital-letter path ("vitamin C."); the capital path was made safe but the word-abbreviation path still false-accepted.
+- Fix: `_ends_with_abbreviation` now takes the following fragment; `no`/`vol`/`fig`/`eq`/`pp` are non-boundaries only when a digit follows (the "No. 5" numeric sense). The word sense stays a real boundary — the safe false-refuse direction per #126. Left `co`/`st`/`al` under the existing leniency (proper-noun context; gating would false-refuse "Acme Co."/"et al.").
+- Reproduced firsthand on clean main; 3 regression tests added. Full suite 538 passed / 7 PG-skipped; ruff clean.
+
+**Why this work, this session:** Static queue globally exhausted; rag-production-kit is priority-tier. Found by my own inline read of the citation-enforcement code (the rag#126 citation-merge lens stays productive here) while three parallel dogfood agents swept python-async / aop / mcp-cookbook.
+
+**Open questions / blockers:** none.
+
+**Next session:** citation-merge word-sense-collision lens — check other repos' sentence splitters for the same ambiguous-token class (an abbreviation that is also a common claim-ending word).
