@@ -992,3 +992,13 @@ Extracted a testable `_json_response_body(records)` helper that routes the paylo
 **Why prioritized.** Static priority:high queue globally exhausted; a moderate-confidence second-wave hunt candidate, verified firsthand and supported by the #80 direct-construction precedent. The rag non-finite-at-JSON-egress sweep now covers both SSE (#106) and dashboard `/json` (#134).
 
 **Open questions / blockers.** None — PR ready for review.
+
+## 2026-07-10 — Issue #136: fail-loud on non-finite total_usd at the metric boundary (~25 min, night)
+
+**What got done.** `TelemetryStore.dump_aggregate_json` (a documented operator observability sink) emitted invalid JSON for a non-finite `total_usd`: `aggregate()` summed the costs unguarded and `json.dumps` (`allow_nan=True` default) serialized the result as the bare token `Infinity`/`-Infinity`/`NaN`, which a strict log-tailer rejects wholesale. #135 guarded the dashboard `/json` route via `_json_safe` and asserted `total_usd` was "incidentally protected by SQLite NOT NULL" — but that's true only for NaN. SQLite's `NOT NULL` rejects NaN (stored NULL) yet round-trips ±Infinity, and a directly-constructed `CostRecord` (no `__post_init__`) bypasses `build`'s ingestion guard, so a ±Inf cost sails through to the egress. #80 already made `aggregate()` fail loud on a non-finite `total_latency_ms` (via `percentile`); `total_usd` was the unguarded sibling at the same call site.
+
+Added a `total_usd` finiteness guard in `aggregate()` that raises a clean `ValueError`, for parity with the latency percentile guard — failing loud at the metric boundary rather than emitting an unparseable artifact. (This file has two consistent postures: the *metric boundary* fails loud; the *presentation boundary* — dashboard `/json`, SSE — sanitizes via `_json_safe` per #106/#135. `total_usd` joins latency at the fail-loud metric boundary.) Six test cases; full suite (555) + ruff green. Verified the repro firsthand before/after.
+
+**Why prioritized.** Static priority:high queue globally exhausted; found via the sibling-incomplete-fix / non-finite-at-JSON-egress lens on the just-merged #135. The rag non-finite-at-egress class is now swept across the SSE wire, the dashboard `/json` route, and the `aggregate()` metric boundary.
+
+**Open questions / blockers.** None — PR ready for review.
