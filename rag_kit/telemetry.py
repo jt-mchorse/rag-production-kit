@@ -448,11 +448,26 @@ def aggregate(records: Iterable[CostRecord]) -> Aggregate:
             latency_p99_ms=0.0,
         )
     latencies = [r.total_latency_ms for r in rs]
+    costs = [r.total_usd for r in rs]
+    # `total_usd` fails loud at the metric boundary, the cost sibling of the
+    # `total_latency_ms` percentile guard below (#80). `CostRecord.build` guards
+    # cost finiteness at ingestion (#38/#58), but a record constructed directly
+    # (the dataclass has no `__post_init__`) bypasses it, and a ±Infinity survives
+    # the store round-trip — SQLite's `total_usd REAL NOT NULL` only rejects NaN
+    # (stored as NULL), it passes ±Infinity through `record()`/`since()` to here.
+    # Unguarded, `dump_aggregate_json` then serializes the non-finite sum as the
+    # bare token `Infinity` / `NaN` (json.dumps defaults to allow_nan=True) —
+    # invalid JSON that breaks the "one log-parsing config consumes all portfolio
+    # observability artifacts" contract. Reject it here rather than emit an
+    # unparseable artifact, the same posture as the latency guard (#80); #135's
+    # dashboard `/json` egress sibling sanitizes at the presentation boundary.
+    if any(not math.isfinite(c) for c in costs):
+        raise ValueError(f"total_usd values must all be finite numbers; got {costs!r}")
     return Aggregate(
         n=len(rs),
         total_prompt_tokens=sum(r.prompt_tokens for r in rs),
         total_completion_tokens=sum(r.completion_tokens for r in rs),
-        total_usd=round(sum(r.total_usd for r in rs), 6),
+        total_usd=round(sum(costs), 6),
         latency_p50_ms=percentile(latencies, 0.5),
         latency_p95_ms=percentile(latencies, 0.95),
         latency_p99_ms=percentile(latencies, 0.99),
