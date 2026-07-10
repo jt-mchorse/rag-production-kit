@@ -982,3 +982,13 @@ into the savings dashboard" hint; `llm-eval-harness` has a
 **Open questions / blockers:** none — ready for review.
 
 **Next session:** the terminator-stripping class is now swept on both rewriter seams (and-split #94/#113 + compare-split #132). The then-split and looks-like-question paths don't re-append a canonical `?`, so they don't carry this class.
+
+## 2026-07-10 — Issue #134: dashboard /json non-finite egress guard (~25 min, night)
+
+**What got done.** The telemetry dashboard's `/json` endpoint serialized `per_phase_ms` with `json.dumps` (default `allow_nan=True`), so a non-finite phase value emitted the bare tokens `NaN` / `Infinity` — invalid JSON that a browser's `fetch().then(r => r.json())` rejects wholesale, blanking the dashboard. `CostRecord` has no `__post_init__` (only `ModelPrice` does), so a record constructed directly (a documented public API) bypasses `build`'s #108 finiteness guard; `total_usd`/`total_latency_ms` are incidentally protected by SQLite `NOT NULL`, but `per_phase_ms` is a JSON text blob and sails through to the `/json` egress. Verified firsthand. This is the egress seam missed in the repo-wide non-finite-at-the-seam sweep (#81 percentile, #82 to_pgvector, #87 reranker, #106 to_sse, #108 build).
+
+Extracted a testable `_json_response_body(records)` helper that routes the payload through the existing `_json_safe` chokepoint (#106) — non-finite floats map to `null`, matching JavaScript's own `JSON.stringify(NaN)` — so every `/json` response parses regardless of DB contents. Reused the #106 helper rather than duplicating. Added tests locking strict-valid `/json` for a non-finite `per_phase_ms` (value renders `null`, finite siblings preserved) plus an over-sanitization guard. Full suite (549) + ruff green.
+
+**Why prioritized.** Static priority:high queue globally exhausted; a moderate-confidence second-wave hunt candidate, verified firsthand and supported by the #80 direct-construction precedent. The rag non-finite-at-JSON-egress sweep now covers both SSE (#106) and dashboard `/json` (#134).
+
+**Open questions / blockers.** None — PR ready for review.

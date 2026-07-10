@@ -38,6 +38,7 @@ _REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
+from rag_kit.streaming import _json_safe  # noqa: E402
 from rag_kit.telemetry import (  # noqa: E402
     CostRecord,
     ModelPrice,
@@ -45,6 +46,38 @@ from rag_kit.telemetry import (  # noqa: E402
     TelemetryStore,
     aggregate,
 )
+
+
+def _json_response_body(records: Sequence[CostRecord]) -> bytes:
+    """Serialize the ``/json`` records payload as strict-valid UTF-8 JSON.
+
+    ``per_phase_ms`` is a free-form phase→ms mapping. A record constructed
+    directly (``CostRecord`` has no ``__post_init__``, so ``build``'s finiteness
+    guard is bypassed) can carry a non-finite phase value, which ``json.dumps``
+    (``allow_nan=True`` by default) emits as the bare tokens ``NaN`` /
+    ``Infinity`` — invalid JSON that a browser's ``fetch().then(r => r.json())``
+    rejects wholesale, blanking the dashboard. Route the payload through the
+    same ``_json_safe`` chokepoint the SSE wire seam uses (#106): non-finite
+    floats map to ``null``, matching JavaScript's own ``JSON.stringify(NaN)``,
+    so every ``/json`` response parses. The egress sibling of the #81/#82/#87/
+    #106/#108 non-finite-at-the-seam sweep.
+    """
+    payload = {
+        "records": [
+            {
+                "ts": r.ts,
+                "query": r.query,
+                "model": r.model,
+                "prompt_tokens": r.prompt_tokens,
+                "completion_tokens": r.completion_tokens,
+                "total_usd": r.total_usd,
+                "total_latency_ms": r.total_latency_ms,
+                "per_phase_ms": dict(r.per_phase_ms),
+            }
+            for r in records
+        ],
+    }
+    return json.dumps(_json_safe(payload), indent=2).encode("utf-8")
 
 
 def _seed(store: TelemetryStore, n: int = 60, now: float | None = None) -> None:
@@ -204,22 +237,7 @@ class _Handler(http.server.BaseHTTPRequestHandler):
     def _handle_json(self) -> None:
         with TelemetryStore(self.db_path) as store:
             records = store.last_24h()
-        payload = {
-            "records": [
-                {
-                    "ts": r.ts,
-                    "query": r.query,
-                    "model": r.model,
-                    "prompt_tokens": r.prompt_tokens,
-                    "completion_tokens": r.completion_tokens,
-                    "total_usd": r.total_usd,
-                    "total_latency_ms": r.total_latency_ms,
-                    "per_phase_ms": dict(r.per_phase_ms),
-                }
-                for r in records
-            ],
-        }
-        body = json.dumps(payload, indent=2).encode("utf-8")
+        body = _json_response_body(records)
         self.send_response(200)
         self.send_header("Content-Type", "application/json")
         self.send_header("Content-Length", str(len(body)))
