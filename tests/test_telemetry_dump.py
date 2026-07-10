@@ -255,3 +255,55 @@ def test_module_still_exports_aggregate_function() -> None:
     # And the price table API is still present (sanity check that
     # the import surface wasn't accidentally shuffled).
     assert isinstance(PriceTable({"foo": ModelPrice(1.0, 1.0)}), PriceTable)
+
+
+# --- Issue #136: non-finite total_usd must fail loud at the metric boundary --
+#
+# SQLite's `total_usd REAL NOT NULL` rejects NaN (stored as NULL) but round-trips
+# ±Infinity, and CostRecord (no __post_init__) lets a directly-constructed record
+# bypass build's #38/#58 ingestion guard. #80 made aggregate() fail loud on a
+# non-finite total_latency_ms (via percentile); total_usd was the unguarded
+# sibling, so a non-finite cost reached json.dumps(allow_nan=True) in
+# dump_aggregate_json and emitted the bare token Infinity/NaN — invalid JSON.
+import math  # noqa: E402
+
+import pytest  # noqa: E402
+
+from rag_kit.telemetry import aggregate  # noqa: E402
+
+
+def _reject_non_finite(token: str) -> float:
+    raise AssertionError(f"strict JSON parser hit a bare non-finite token: {token!r}")
+
+
+@pytest.mark.parametrize("bad", [math.inf, -math.inf, math.nan])
+def test_aggregate_rejects_non_finite_total_usd(bad: float) -> None:
+    rec = _make_record(ts=1.0, total_usd=bad)
+    with pytest.raises(ValueError, match=r"total_usd values must all be finite numbers"):
+        aggregate([rec])
+
+
+@pytest.mark.parametrize("bad", [math.inf, -math.inf])
+def test_dump_aggregate_json_never_emits_bare_non_finite_cost(tmp_path: Path, bad: float) -> None:
+    # +/-Infinity round-trips SQLite NOT NULL; the egress must not produce an
+    # unparseable artifact. aggregate() now fails loud before serialization, so
+    # dump_aggregate_json raises rather than writing a bare Infinity token.
+    out = tmp_path / "agg.json"
+    with TelemetryStore(tmp_path / "t.db") as store:
+        store.record(_make_record(ts=1.0, total_usd=bad))
+        with pytest.raises(ValueError, match=r"total_usd values must all be finite numbers"):
+            store.dump_aggregate_json(out, since_ts=0.0)
+    assert not out.exists(), "no partial/invalid artifact should be written"
+
+
+def test_dump_aggregate_json_strict_valid_for_finite_costs(tmp_path: Path) -> None:
+    # The valid path is unchanged: finite costs aggregate and serialize to
+    # strict-valid JSON (no bare non-finite tokens survive a strict parser).
+    out = tmp_path / "agg.json"
+    with TelemetryStore(tmp_path / "t.db") as store:
+        store.record(_make_record(ts=1.0, total_usd=0.001))
+        store.record(_make_record(ts=2.0, total_usd=0.002))
+        store.dump_aggregate_json(out, since_ts=0.0)
+    payload = json.loads(out.read_text(encoding="utf-8"), parse_constant=_reject_non_finite)
+    assert payload["n"] == 2
+    assert payload["total_usd"] == pytest.approx(0.003)
