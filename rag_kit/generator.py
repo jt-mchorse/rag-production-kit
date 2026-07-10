@@ -117,6 +117,30 @@ _ABBREVIATIONS = frozenset(
 # claim-endings, so gating them would false-refuse legitimate cited text.
 _NUMERIC_REFERENCE_ABBREVIATIONS = frozenset({"no", "vol", "fig", "eq", "pp"})
 
+# The subset of `_ABBREVIATIONS` that also spells a common *unit* which naturally
+# ends a measurement claim. "ms" is the courtesy title "Ms." (followed by a
+# proper name) but ALSO the milliseconds unit ("5 ms") — and a latency/telemetry
+# RAG kit ends claims in "... N ms." constantly. Treating "ms" as an
+# unconditional non-boundary let an uncited measurement claim ("The p50 was 5
+# ms.") merge into the next (cited) sentence and ride on ITS `[cite:...]` marker,
+# bypassing enforcement — the same false-accept #126/#130 fixed for "vitamin C."
+# and the word "no". Unlike the numeric-reference set (gated on a digit that
+# *follows*), the unit sense is distinguished by a number that *precedes*: "5
+# ms." is the unit (a real boundary), while "Ms." at the head of a name has no
+# preceding number (the title sense, a non-boundary). False-refusing a rare
+# "5 Ms." is the safe direction; false-accepting an uncited claim is the bug.
+_UNIT_COLLISION_ABBREVIATIONS = frozenset({"ms"})
+
+_HAS_DIGIT_RE = re.compile(r"\d")
+
+
+def _looks_numeric(token: str) -> bool:
+    """True if `token` carries a digit — a measurement like "5", "1.5", "500"
+    (the unit sense of "ms"), as opposed to a name or ordinary word (the title
+    sense). A digit anywhere is enough: decimals and unit-suffixed forms all
+    qualify while proper names never do."""
+    return bool(_HAS_DIGIT_RE.search(token))
+
 
 @dataclass(frozen=True)
 class Citation:
@@ -215,6 +239,13 @@ def _ends_with_abbreviation(fragment: str, following: str = "") -> bool:
             # Non-boundary only in the numeric sense: a digit must follow.
             stripped = following.lstrip()
             return bool(stripped) and stripped[0].isdigit()
+        if last.lower() in _UNIT_COLLISION_ABBREVIATIONS:
+            # Non-boundary only in the title sense ("Ms." + a name): a numeric
+            # token immediately before is the unit sense ("5 ms.") and stays a
+            # real boundary so the measurement claim can't ride on the next
+            # sentence's citation (see `_UNIT_COLLISION_ABBREVIATIONS`).
+            prev = tokens[-2] if len(tokens) >= 2 else ""
+            return not _looks_numeric(prev)
         return True
     # A lone capital-letter token, e.g. the "J." in "Dr. J. Smith". A bare
     # `len==1 and isupper()` test also fires on ordinary claim endings —

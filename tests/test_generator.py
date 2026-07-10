@@ -174,6 +174,56 @@ class TestSplitSentences:
             enforce_citations("The answer is no. The sky is blue [cite:doc1].", retrieved)
         assert excinfo.value.reason == "unparseable_output"
 
+    @pytest.mark.parametrize(
+        "text",
+        [
+            "The p50 latency was 5 ms. Requests were rare [cite:A].",  # integer unit
+            "The mean was 1.5 ms. It held steady [cite:A].",  # decimal unit
+            "It took 500 ms. Done [cite:A].",  # large integer unit
+        ],
+    )
+    def test_unit_collision_abbreviation_unit_sense_is_a_real_boundary(self, text: str) -> None:
+        # #138 (sibling of #126/#130): "ms" is the title "Ms." but ALSO the
+        # milliseconds unit — the dominant claim-ending in a latency/telemetry
+        # kit. Treating "N ms." as a non-boundary merged an uncited measurement
+        # claim into the next sentence, letting it ride on that sentence's
+        # [cite:...] marker and bypass enforcement. The unit sense (a number
+        # precedes) must stay a real boundary so each claim is individually
+        # under citation enforcement.
+        assert len(split_sentences(text)) == 2
+
+    @pytest.mark.parametrize(
+        "text",
+        [
+            "Ms. Smith reported the outage [cite:A].",  # title + name
+            "Ms. J. Smith signed off on it [cite:A].",  # title + initial + name
+        ],
+    )
+    def test_unit_collision_abbreviation_title_sense_still_merges(self, text: str) -> None:
+        # The legitimate title sense — "Ms." with no preceding number, followed
+        # by a name — is still a non-boundary, so "Ms. Smith ..." stays one
+        # sentence carrying its single marker rather than stranding a claim-less
+        # "Ms." fragment that would falsely refuse the answer (#110 posture).
+        assert split_sentences(text) == [text]
+
+    def test_ms_unit_bypass_is_refused_end_to_end(self) -> None:
+        # End-to-end #138: an uncited measurement claim ending in "N ms."
+        # followed by a cited sentence must be REFUSED, not silently accepted by
+        # riding on the cited sentence's marker. Mirrors the #130 "no" guard.
+        retrieved = [_result("doc1", "Requests slower than that were rare.")]
+        with pytest.raises(CitationError) as excinfo:
+            enforce_citations(
+                "The p50 latency was 5 ms. Requests were rare [cite:doc1].", retrieved
+            )
+        assert excinfo.value.reason == "unparseable_output"
+
+    def test_ms_title_answer_is_not_falsely_refused_end_to_end(self) -> None:
+        # The title sense must not regress into a false refusal: a fully-cited
+        # "Ms. Smith ..." answer stays one enforced claim and is accepted.
+        retrieved = [_result("doc1", "Ms. Smith reported the outage.")]
+        citations = enforce_citations("Ms. Smith reported the outage [cite:doc1].", retrieved)
+        assert [c.external_id for c in citations] == ["doc1"]
+
 
 class TestEnforceCitations:
     def test_accepts_every_sentence_cited(self) -> None:
