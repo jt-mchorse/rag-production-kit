@@ -1002,3 +1002,15 @@ Added a `total_usd` finiteness guard in `aggregate()` that raises a clean `Value
 **Why prioritized.** Static priority:high queue globally exhausted; found via the sibling-incomplete-fix / non-finite-at-JSON-egress lens on the just-merged #135. The rag non-finite-at-egress class is now swept across the SSE wire, the dashboard `/json` route, and the `aggregate()` metric boundary.
 
 **Open questions / blockers.** None — PR ready for review.
+
+## 2026-07-10 — Issue #138: "ms" milliseconds unit bypassed citation enforcement (~20 min, night)
+
+**What got done.** `_ABBREVIATIONS` in `generator.py` carried `"ms"` for the courtesy title "Ms." and `_ends_with_abbreviation` treated it as an **unconditional** non-boundary. But `ms` also spells the milliseconds unit — the dominant claim-ending in this latency/telemetry-centric RAG kit. An uncited measurement claim ("The p50 latency was 5 ms.") merged into the next cited sentence and rode on its `[cite:...]` marker, bypassing citation enforcement — the exact #126/#130 false-accept class.
+
+This is the exposed sibling of the #130 word-sense-collision fix, but with a **different discriminator**: the numeric-reference set (`no/vol/fig/eq/pp`) gates on a *following* digit ("No. 5"), whereas the unit sense is distinguished by a *preceding* number — "5 ms." is the unit (a real boundary), while "Ms." at the head of a name has no preceding number (the title sense, a non-boundary). Added a `_UNIT_COLLISION_ABBREVIATIONS = {"ms"}` set gated on `_looks_numeric(preceding_token)` (a digit-anywhere regex, so decimals like "1.5 ms" and large ints like "500 ms" all resolve to the unit sense).
+
+Five tests: unit-sense "N ms." splits into two sentences (parametrized 5/1.5/500 ms), title-sense "Ms. Smith"/"Ms. J. Smith" stays one, plus end-to-end that an uncited "5 ms." claim before a cited sentence is refused (`unparseable_output`) and a cited "Ms. Smith ..." answer is not falsely refused. Full suite green (562 passed, 7 pg-skipped); ruff clean. Reproduced firsthand before/after.
+
+**Why prioritized.** Static priority:high queue globally exhausted; found via the sibling-incomplete-fix meta-lens (the citation word-sense-collision class). `ms` is the only unit spelling currently in `_ABBREVIATIONS`, so the lens is exhausted here — but the heuristic transfers to any future unit-word abbreviation added to the set.
+
+**Open questions / blockers.** None — PR ready for review.
