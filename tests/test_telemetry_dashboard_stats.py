@@ -15,6 +15,7 @@ apart again.
 
 from __future__ import annotations
 
+import re
 import sys
 from pathlib import Path
 
@@ -40,3 +41,22 @@ def test_dashboard_stat_grid_width_matches_tile_count() -> None:
     # wide enough or the last tile wraps to a second row.
     html = _render_dashboard_html([])
     assert "repeat(5, 1fr)" in html
+
+
+def test_readme_stat_card_count_matches_rendered_tiles() -> None:
+    # README's Endpoints section hardcodes "<N> stat cards". #122 added the p99
+    # tile (4 -> 5) and updated the p50/p95/p99 prose + the CSS-grid lock, but
+    # left this count at the stale "4". Pin the prose count to the actual number
+    # of `class="stat"` tiles the dashboard renders so it can't drift again.
+    html = _render_dashboard_html([])
+    rendered_tiles = html.count('class="stat"')
+    assert rendered_tiles == 5  # sanity: keep this in step with the tile set
+
+    readme = (_REPO_ROOT / "README.md").read_text(encoding="utf-8")
+    m = re.search(r"(\d+)\s+stat cards", readme)
+    assert m is not None, "README no longer states an 'N stat cards' count"
+    claimed = int(m.group(1))
+    assert claimed == rendered_tiles, (
+        f"README claims {claimed} stat cards but the dashboard renders "
+        f'{rendered_tiles} `class="stat"` tiles'
+    )

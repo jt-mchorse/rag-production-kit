@@ -282,7 +282,7 @@ python -m scripts.telemetry_dashboard --db ./telemetry.db --seed 60 --port 8766
 
 Endpoints:
 
-- `GET /` → HTML dashboard (24-hour window, 4 stat cards, latency chart,
+- `GET /` → HTML dashboard (24-hour window, 5 stat cards, latency chart,
   most recent 20 records).
 - `GET /api/last_24h` → JSON snapshot of the same window for scripts /
   downstream tooling.
