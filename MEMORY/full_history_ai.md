@@ -1557,3 +1557,24 @@ context_for_next_session:
 decisions_made: []
 followups: []
 ---
+
+---
+session: 2026-07-12T09:41Z
+issue: 140
+duration_min: 14
+focus: telemetry_dashboard_readme_4_stat_cards_stale_pre_122_count_dashboard_renders_5_served_html_doc_drift_sibling_of_122
+phase: night_session_phase_b_issue_4
+delta:
+  files_changed: 2   # README.md (4->5 stat cards) + tests/test_telemetry_dashboard_stats.py (1 lock test + re import)
+  tests_added: 1     # readme "N stat cards" count == rendered class="stat" tile count (==5)
+context_for_next_session:
+  - shipped_140_pr_ready_rag_readme_285_endpoints_bullet_said_4_stat_cards_but_dashboard_renders_5_requests_total_usd_p50_p95_p99_scripts_telemetry_dashboard_py_5x_class_stat_css_grid_repeat_5_1fr
+  - STALE_PRE_122_COUNT_rag_122_added_the_p99_tile_4_to_5_updated_p50_p95_p99_prose_readme_80_architecture_234_and_added_lock_test_test_telemetry_dashboard_stats_py_but_that_test_pinned_percentile_tiles_and_css_grid_width_NOT_the_readme_hardcoded_N_stat_cards_count_so_this_one_prose_site_drifted_untested_direct_sibling_incomplete_fix_of_122
+  - found_by_wave5_rag_served_html_doc_drift_agent_HIGH_confidence_VERIFIED_FIRSTHAND_grep_c_class_stat_5_grep_repeat_5_1fr_present_grep_stat_cards_readme_285_says_4
+  - fix_readme_4_to_5_plus_ADDED_lock_test_parses_readme_N_stat_cards_regex_asserts_equals_rendered_class_stat_count_5_defense_in_depth_alongside_existing_css_grid_lock_so_prose_cant_drift_from_code_again
+  - full_suite_green_pg_tests_skipped_no_db_ruff_check_format_clean
+  - SERVED_HTML_DOC_DRIFT_lens_beat_saturation_again_after_leh_lco_chunking_rag_python_static_hunts_all_empty_this_run_the_rendered_output_vs_readme_claim_diff_is_a_distinct_productive_vein
+  - lco_architecture_md_router_panel_doc_drift_ALSO_found_wave5_follow_on_issue_prose_but_panel_shipped_66_separate_repo_next_issue
+decisions_made: []
+followups: []
+---

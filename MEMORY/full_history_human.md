@@ -1014,3 +1014,15 @@ Five tests: unit-sense "N ms." splits into two sentences (parametrized 5/1.5/500
 **Why prioritized.** Static priority:high queue globally exhausted; found via the sibling-incomplete-fix meta-lens (the citation word-sense-collision class). `ms` is the only unit spelling currently in `_ABBREVIATIONS`, so the lens is exhausted here — but the heuristic transfers to any future unit-word abbreviation added to the set.
 
 **Open questions / blockers.** None — PR ready for review.
+
+## 2026-07-12 — Issue #140: README says "4 stat cards" but dashboard renders 5
+**Duration:** ~14 min · **Branch:** `session/2026-07-12-0940-issue-140`
+
+- The telemetry dashboard renders 5 stat tiles (requests, total USD, p50, p95, p99 — `5× class="stat"`, CSS grid `repeat(5, 1fr)`), but `README.md:285` still said "4 stat cards" — the stale pre-#122 count. rag#122 added the p99 tile and updated the p50/p95/p99 prose + a CSS-grid lock test, but that test never pinned the README's hardcoded card count, so this prose site drifted untested. Direct sibling-incomplete-fix of #122.
+- Fixed the count 4→5 and added a lock test that parses the README's "N stat cards" claim and asserts it equals the rendered `class="stat"` tile count, closing the gap the CSS-grid lock left open. Verified firsthand; full suite green, ruff clean.
+
+**Why this work, this session:** Fourth hit of the run — the served-HTML doc-drift lens (which yielded #122) beating saturation again after the Python static hunts went empty.
+
+**Open questions / blockers:** none — ready for review.
+
+**Next session:** Phase A merge PR for #140.
