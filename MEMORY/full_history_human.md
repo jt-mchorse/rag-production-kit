@@ -1040,3 +1040,14 @@ Reproduced all four behaviors firsthand (bypass splits, mid-sentence merges, bot
 **Open questions / blockers:** none — PR #143 ready for review.
 
 **Next session:** Phase A merge PR for #142.
+
+## 2026-07-13 (night) — Issue #144: unicode sentence terminators bypass enforce_citations
+**Duration:** ~20 min · **Branch:** `session/2026-07-13-1115-issue-144` · **PR:** #145
+
+`_SENTENCE_SPLIT` in `generator.py` recognized only the ASCII terminators `.`, `!`, `?`. It missed the unicode terminators `…` (ellipsis), `。` (ideographic full stop), and `！`/`？` (fullwidth). A claim ending in one of these was not split off, so it merged into the following sentence and rode on that sentence's `[cite:...]` marker — bypassing `enforce_citations` exactly the way the #143 (a.m/p.m), #139 (ms unit), and #133 (compare-split) fixes each closed one ASCII case. Added the unicode terminators to the split character class (they are never abbreviations, so the dot-only abbreviation-merge pass is untouched — no ASCII regression) and to the citation-template `rstrip` for symmetry. Six lock tests: end-to-end refusal of an uncited `…`-terminated bypass (the realistic English case, an LLM autocorrect of `...`), boundary assertions for all four terminators, and an ASCII/abbreviation no-regression check.
+
+**Why this work, this session:** First hit of the night run, surfaced by the sibling-incomplete-fix dogfood hunt on rag-production-kit's citation terminator-handling lineage and verified firsthand before filing.
+
+**Open questions / blockers:** none — PR #145 ready for review.
+
+**Next session:** Phase A merge PR for #144.
