@@ -131,6 +131,24 @@ _NUMERIC_REFERENCE_ABBREVIATIONS = frozenset({"no", "vol", "fig", "eq", "pp"})
 # "5 Ms." is the safe direction; false-accepting an uncited claim is the bug.
 _UNIT_COLLISION_ABBREVIATIONS = frozenset({"ms"})
 
+# The subset of `_ABBREVIATIONS` that spells a *time-of-day* marker which very
+# commonly ENDS a claim ("The outage started at 5 p.m."). Unlike "ms" (which
+# also has a title sense "Ms." with no preceding number), "a.m"/"p.m" are
+# essentially always the time sense, so the `_UNIT_COLLISION` preceding-number
+# gate can't distinguish a boundary from a mid-sentence use — a number precedes
+# in BOTH "...at 5 p.m. The root cause..." (boundary) and "...at 9 a.m. sharp"
+# (mid-sentence). Treating them as unconditional non-boundaries let an uncited
+# claim ending in a time ("The outage started at 5 p.m.") merge into the next
+# (cited) sentence and ride on ITS `[cite:...]` marker, bypassing enforcement —
+# the same false-accept #126/#130/#139 fixed for "vitamin C.", "no", and "5 ms.".
+# A latency/telemetry RAG kit ends claims in "... at N a.m./p.m." as often as it
+# does in units (#139's rationale). The distinguishing signal is what FOLLOWS: a
+# lowercase continuation ("9 a.m. sharp") is mid-sentence (non-boundary), while a
+# capitalized/digit/empty follow-on ("5 p.m. The root...") is a real boundary.
+# False-refusing the rare "9 a.m. Monday ..." is the safe direction (#126);
+# false-accepting an uncited claim is the bug.
+_TIME_ABBREVIATIONS = frozenset({"a.m", "p.m"})
+
 _HAS_DIGIT_RE = re.compile(r"\d")
 
 
@@ -246,6 +264,14 @@ def _ends_with_abbreviation(fragment: str, following: str = "") -> bool:
             # sentence's citation (see `_UNIT_COLLISION_ABBREVIATIONS`).
             prev = tokens[-2] if len(tokens) >= 2 else ""
             return not _looks_numeric(prev)
+        if last.lower() in _TIME_ABBREVIATIONS:
+            # Non-boundary only when the continuation is unambiguously
+            # mid-clause: a lowercase-letter follow-on ("9 a.m. sharp"). A
+            # capitalized/digit/bracket/empty follow-on ("5 p.m. The root...")
+            # is a real boundary so an uncited time-of-day claim can't ride on
+            # the next sentence's citation (see `_TIME_ABBREVIATIONS`).
+            stripped = following.lstrip()
+            return bool(stripped) and stripped[0].islower()
         return True
     # A lone capital-letter token, e.g. the "J." in "Dr. J. Smith". A bare
     # `len==1 and isupper()` test also fires on ordinary claim endings —
