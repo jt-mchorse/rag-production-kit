@@ -224,6 +224,55 @@ class TestSplitSentences:
         citations = enforce_citations("Ms. Smith reported the outage [cite:doc1].", retrieved)
         assert [c.external_id for c in citations] == ["doc1"]
 
+    @pytest.mark.parametrize(
+        "text",
+        [
+            "The outage started at 5 p.m. The root cause was a config error [cite:A].",
+            "The alert fired at 3 a.m. Engineers were paged [cite:A].",
+        ],
+    )
+    def test_time_abbreviation_boundary_sense_is_a_real_boundary(self, text: str) -> None:
+        # #142 (sibling of #126/#130/#139): "a.m"/"p.m" very commonly END a claim
+        # in a telemetry kit ("... at 5 p.m."). Treating them as unconditional
+        # non-boundaries merged an uncited time-of-day claim into the next
+        # sentence, letting it ride on that sentence's [cite:...] marker and
+        # bypass enforcement. A capitalized follow-on is a real boundary so each
+        # claim is individually under citation enforcement.
+        assert len(split_sentences(text)) == 2
+
+    @pytest.mark.parametrize(
+        "text",
+        [
+            "It happened at 9 a.m. sharp [cite:A].",  # lowercase continuation
+            "The batch ran at 2 p.m. and finished quickly [cite:A].",
+        ],
+    )
+    def test_time_abbreviation_mid_sentence_sense_still_merges(self, text: str) -> None:
+        # The legitimate mid-sentence sense — a.m./p.m. followed by a lowercase
+        # continuation ("sharp", "and ...") — stays a non-boundary, so it stays
+        # one sentence carrying its single marker rather than stranding a
+        # claim-less "... a.m." fragment that would falsely refuse (#110 posture).
+        assert split_sentences(text) == [text]
+
+    def test_time_abbreviation_bypass_is_refused_end_to_end(self) -> None:
+        # End-to-end #142: an uncited time-of-day claim ending in "N p.m."
+        # followed by a cited sentence must be REFUSED, not silently accepted by
+        # riding on the cited sentence's marker. Mirrors the #138/#130 guards.
+        retrieved = [_result("doc1", "The root cause was a config error.")]
+        with pytest.raises(CitationError) as excinfo:
+            enforce_citations(
+                "The outage started at 5 p.m. The root cause was a config error [cite:doc1].",
+                retrieved,
+            )
+        assert excinfo.value.reason == "unparseable_output"
+
+    def test_time_abbreviation_mid_sentence_answer_is_not_falsely_refused_end_to_end(self) -> None:
+        # The mid-sentence sense must not regress into a false refusal: a
+        # fully-cited "... 9 a.m. sharp" answer stays one enforced claim.
+        retrieved = [_result("doc1", "It happened at 9 a.m. sharp.")]
+        citations = enforce_citations("It happened at 9 a.m. sharp [cite:doc1].", retrieved)
+        assert [c.external_id for c in citations] == ["doc1"]
+
 
 class TestEnforceCitations:
     def test_accepts_every_sentence_cited(self) -> None:

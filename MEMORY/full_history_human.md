@@ -1026,3 +1026,17 @@ Five tests: unit-sense "N ms." splits into two sentences (parametrized 5/1.5/500
 **Open questions / blockers:** none — ready for review.
 
 **Next session:** Phase A merge PR for #140.
+
+## Session 2026-07-13 (night) — issue #142: gate a.m/p.m to close an enforce_citations bypass
+
+`a.m` and `p.m` were listed in `_ABBREVIATIONS` as unconditional non-boundaries, so the sentence splitter never broke after a time-of-day. That let an *uncited* claim ending in a time ("The outage started at 5 p.m.") merge into the following, cited sentence and ride on that sentence's `[cite:...]` marker — bypassing `enforce_citations` entirely and serving an uncited factual claim as if cited. It's the fourth member of the word-sense-collision class the maintainer has been closing (#126 "vitamin C.", #130 "no", #139 "5 ms.").
+
+The `ms` fix gates on a *preceding* number, but that discriminator can't be reused here: a number precedes in both the bypass case ("5 p.m. The root...") and the legitimate mid-sentence case ("9 a.m. sharp"), and an existing test pins the latter as a single sentence. The fix instead gates on the *following* fragment — a lowercase continuation ("sharp", "and ...") is mid-clause (non-boundary), while a capitalized/digit/empty follow-on is a real boundary. This accepts a rare false refusal on phrasings like "9 a.m. Monday" in exchange for eliminating the false accept, which is the maintainer's stated safe direction.
+
+Reproduced all four behaviors firsthand (bypass splits, mid-sentence merges, both-cited splits cleanly, end-of-text stands alone) before and after. Added four lock tests mirroring the `ms` unit-collision suite. Full suite green, ruff clean.
+
+**Why this work, this session:** Second hit of the night run, surfaced by the sibling-incomplete-fix dogfood hunt on rag-production-kit and verified firsthand — including catching that the hunt agent's proposed fix would have broken an existing test.
+
+**Open questions / blockers:** none — PR #143 ready for review.
+
+**Next session:** Phase A merge PR for #142.
