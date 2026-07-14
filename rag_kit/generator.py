@@ -134,10 +134,15 @@ _NUMERIC_REFERENCE_ABBREVIATIONS = frozenset({"no", "vol", "fig", "eq", "pp"})
 # ms.") merge into the next (cited) sentence and ride on ITS `[cite:...]` marker,
 # bypassing enforcement — the same false-accept #126/#130 fixed for "vitamin C."
 # and the word "no". Unlike the numeric-reference set (gated on a digit that
-# *follows*), the unit sense is distinguished by a number that *precedes*: "5
-# ms." is the unit (a real boundary), while "Ms." at the head of a name has no
-# preceding number (the title sense, a non-boundary). False-refusing a rare
-# "5 Ms." is the safe direction; false-accepting an uncited claim is the bug.
+# *follows*), the two senses are told apart by the token's own CASE: the courtesy
+# title is always capitalized "Ms." while the SI-style unit is lowercase "ms".
+# So a lowercase "ms" is always a real boundary — "5 ms." AND "reported in ms."
+# (no preceding number) alike — and only a capitalized "Ms." with no preceding
+# number is the title (a non-boundary). A number-precedes check alone (the
+# original #138 shape) missed the unit forms where no number immediately precedes
+# ("in ms.", "measured in ms."), mis-reading them as the title. False-refusing a
+# rare capitalized "5 Ms." is the safe direction; false-accepting an uncited
+# claim is the bug.
 _UNIT_COLLISION_ABBREVIATIONS = frozenset({"ms"})
 
 # The subset of `_ABBREVIATIONS` that spells a *time-of-day* marker which very
@@ -267,12 +272,19 @@ def _ends_with_abbreviation(fragment: str, following: str = "") -> bool:
             stripped = following.lstrip()
             return bool(stripped) and stripped[0].isdigit()
         if last.lower() in _UNIT_COLLISION_ABBREVIATIONS:
-            # Non-boundary only in the title sense ("Ms." + a name): a numeric
-            # token immediately before is the unit sense ("5 ms.") and stays a
-            # real boundary so the measurement claim can't ride on the next
-            # sentence's citation (see `_UNIT_COLLISION_ABBREVIATIONS`).
+            # Non-boundary only in the *capitalized title* sense ("Ms." + a
+            # name). The reliable discriminator is the token's own case: the
+            # courtesy title is always written "Ms." while the SI-style
+            # millisecond unit is lowercase "ms". A number immediately before is
+            # ALSO the unit sense ("5 ms."), but a number doesn't always precede
+            # the unit ("latency reported in ms.", "measured in ms.") — so the
+            # numeric-prev check alone (the #138 shape) mis-read those as the
+            # title and merged the uncited measurement claim into the next
+            # sentence, letting it ride on that sentence's citation. Requiring
+            # capitalization keeps a lowercase "ms" a real boundary regardless of
+            # what precedes (see `_UNIT_COLLISION_ABBREVIATIONS`).
             prev = tokens[-2] if len(tokens) >= 2 else ""
-            return not _looks_numeric(prev)
+            return last[:1].isupper() and not _looks_numeric(prev)
         if last.lower() in _TIME_ABBREVIATIONS:
             # Non-boundary only when the continuation is unambiguously
             # mid-clause: a lowercase-letter follow-on ("9 a.m. sharp"). A
