@@ -91,6 +91,38 @@ def test_split_then_does_not_false_split_on_thence_content_word():
     assert _split_then("Go home. Thence to the river.") is None
 
 
+def test_split_then_handles_unicode_terminators():
+    # #146: _THEN_SPLIT's lookbehind was ASCII-only (`[.!?]`), so a first step
+    # ending in a full-width `！。？`, an ellipsis `…`, or an Arabic `؟` — the
+    # same enders generator._SENTENCE_SPLIT (#144) and _TERMINATORS (#94/#111)
+    # already recognize — failed to decompose, degrading retrieval for non-ASCII
+    # locales. Each unicode terminator before "Then" must now split.
+    assert _split_then("Summarize the doc！ Then list the risks.") == [
+        "Summarize the doc！",
+        "list the risks.",
+    ]
+    assert _split_then("Summarize the doc。 Then list the risks.") == [
+        "Summarize the doc。",
+        "list the risks.",
+    ]
+    assert _split_then("Is the doc ready？ Then list the risks.") == [
+        "Is the doc ready？",
+        "list the risks.",
+    ]
+    assert _split_then("Summarize the doc… Then list the risks.") == [
+        "Summarize the doc…",
+        "list the risks.",
+    ]
+    assert _split_then("هل المستند جاهز؟ Then list the risks.") == [
+        "هل المستند جاهز؟",
+        "list the risks.",
+    ]
+    # ASCII no-regression: unchanged behavior.
+    assert _split_then("Do A. Then do B.") == ["Do A.", "do B."]
+    # A unicode terminator with NO following "then" still doesn't false-split.
+    assert _split_then("Summarize the doc！ List the risks.") is None
+
+
 def test_template_rewriter_then_pattern_is_case_insensitive():
     # #96: _THEN_SPLIT enumerated `Then|then` literally without re.IGNORECASE,
     # so an emphatic all-caps / mixed-case connective silently failed to

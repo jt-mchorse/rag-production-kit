@@ -82,7 +82,15 @@ _COMPARE_RE = re.compile(
 # patterns (_THEN_PREFIX, _COMPARE_RE, _AND_SPLIT_RE); the downstream strip is
 # already case-insensitive so any casing is cleaned. `then\b` still requires a
 # word boundary, so a content word like "thence" does not false-split.
-_THEN_SPLIT = re.compile(r"(?<=[.!?])\s+(?=then\b)", re.IGNORECASE)
+#
+# The terminator class is NOT ASCII-only. Besides ASCII `.!?` it includes `…`
+# (U+2026 ellipsis), `。` (ideographic full stop), `！`/`？` (fullwidth), and `؟`
+# (Arabic question mark) — the same enders `generator._SENTENCE_SPLIT` (#144) and
+# `_TERMINATORS` (#94/#111) already recognize. A first step ending in one of
+# these (common from a CJK/Arabic IME) previously failed the `[.!?]` lookbehind,
+# so the multi-step query never decomposed and retrieval degraded for non-ASCII
+# locales (#146, sibling of #144).
+_THEN_SPLIT = re.compile(r"(?<=[.!?…。！？؟])\s+(?=then\b)", re.IGNORECASE)
 # Strip the leading "Then" connective from each split part. The split above
 # fires on `then\b` (a word boundary), so the connective can be followed by
 # punctuation — "Then, ...", "Then; ...", "Then- ..." — not just a space.
