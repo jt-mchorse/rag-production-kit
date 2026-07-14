@@ -213,19 +213,21 @@ def test_template_rewriter_three_part_and_questions():
         "！",  # U+FF01 full-width exclamation mark
         "。",  # U+3002 ideographic full stop
         "؟",  # U+061F Arabic question mark
+        "…",  # U+2026 ellipsis (LLM/IME autocorrect of "..."); #150
     ],
 )
 def test_template_rewriter_and_split_non_ascii_terminator_is_well_formed(ender):
-    """#111: a conjunct ending in a non-ASCII sentence terminator must not get a
-    `?` stacked on top. The pre-fix ASCII-only strip left `？`/`！`/`。`/`؟` in
-    place, yielding a doubled terminator like "where did they work？?"."""
+    """#111/#150: a conjunct ending in a non-ASCII sentence terminator must not
+    get a `?` stacked on top. The pre-fix ASCII-only strip left `？`/`！`/`。`/`؟`/`…`
+    in place, yielding a doubled terminator like "where did they work？?" or
+    "... Java…?"."""
     out = TemplateRewriter().rewrite(f"Who founded X and where did they work{ender}")
     assert out.reasoning == "multi_question_and_pattern"
     assert out.sub_queries == ("Who founded X?", "where did they work?")
     for sub in out.sub_queries:
         assert sub.endswith("?"), sub
         # No terminator (ASCII or non-ASCII) may precede the canonical "?".
-        assert sub[-2:] not in {f"{t}?" for t in "?.!？！؟。"}, sub
+        assert sub[-2:] not in {f"{t}?" for t in "?.!？！؟。…"}, sub
 
 
 def test_template_rewriter_and_split_non_ascii_does_not_mangle_internal_char():
