@@ -1051,3 +1051,14 @@ Reproduced all four behaviors firsthand (bypass splits, mid-sentence merges, bot
 **Open questions / blockers:** none — PR #145 ready for review.
 
 **Next session:** Phase A merge PR for #144.
+
+## 2026-07-14 (night) — Issue #146: _THEN_SPLIT sequential decomposition is ASCII-terminator-only
+**Duration:** ~20 min · **Branch:** `session/2026-07-14-0519-issue-146` · **PR:** #147
+
+`_THEN_SPLIT` (`rewriter.py:85`) splits "X. Then Y" sequential-step queries, but its lookbehind was ASCII-only (`[.!?]`). A first step ending in a full-width `！`/`。`/`？` (common from a CJK IME), an ellipsis `…`, or an Arabic `؟` failed the lookbehind, so the multi-step query never decomposed and retrieval degraded for non-ASCII locales. The same file already recognizes these unicode terminators elsewhere — `_TERMINATORS = "?.!？！؟。"` (#94/#111) — and `generator._SENTENCE_SPLIT` was made unicode-aware in #144; `_THEN_SPLIT` was simply missed. Fixed by widening the class to `[.!?…。！？؟]` for parity across the pipeline. Verified firsthand in the local venv: pre-fix the full-width/ellipsis/Arabic cases all returned `None`, post-fix all decompose, ASCII behavior unchanged, and a unicode terminator with no following "Then" still doesn't false-split. One lock test; full suite (576 passed, 7 PG-skipped) green, ruff clean.
+
+**Why this work, this session:** Second hit of the night run — surfaced by the rag terminator sibling hunt on the #144 fix and verified firsthand. (Consciously skipped the agent's reranker `[A-Za-z0-9]+` tokenization flag — that's a by-design dep-free lexical-overlap fallback, a different class, not a terminator sibling.)
+
+**Open questions / blockers:** none — PR #147 ready for review.
+
+**Next session:** Phase A merge PR for #146.
