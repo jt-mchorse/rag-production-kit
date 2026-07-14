@@ -1075,3 +1075,16 @@ This was a genuine missed sibling, not churn: the rewriter's `_TERMINATORS` and 
 **Open questions / blockers:** none — PR #149 ready for review.
 
 **Next session:** Phase A merge PR for #148.
+
+## 2026-07-14 (night) — Issue #150: rewriter _TERMINATORS omitted the ellipsis …
+**Duration:** ~15 min · **Branch:** `session/2026-07-14-0738-issue-150` · **PR:** #151
+
+`_TERMINATORS` (`rewriter.py:116`), the `str.rstrip` set applied to each conjunct before re-appending a canonical `?`, covered ASCII `?.!`, fullwidth `？！`, ideographic `。`, and Arabic `؟`, but omitted the ellipsis `…` (U+2026) — even though `_THEN_SPLIT` and `generator._SENTENCE_SPLIT` both treat `…` as a terminator. A conjunct ending in `…` was therefore not stripped, and appending `?` stacked a doubled terminator (`…?`), the exact malformation `_TERMINATORS` exists to prevent. Verified firsthand: `_split_compare("Compare Python with Java…")` → `['What is Python?', 'What is Java…?']`.
+
+Fixed by adding `…` to `_TERMINATORS`, reaching parity with the `…`-aware split sites. One parametrized regression test; full suite green (PG-skipped), ruff clean.
+
+**Why this work, this session:** Sixth hit of the night run, surfaced by a **second-order sibling hunt on this run's own #148 fix** (the #148 generator hunt was scoped to `generator.py`; this is the rewriter's `_TERMINATORS` string-vs-split-regex asymmetry, a distinct literal). Lesson: a terminator added to the split *regexes* must also be added to the rstrip *string* used to de-double them — they are separate literals that drift.
+
+**Open questions / blockers:** none — PR #151 ready for review.
+
+**Next session:** Phase A merge PR for #150 (and #148 — same-repo sibling, rebase the later one).

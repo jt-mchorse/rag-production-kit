@@ -109,11 +109,14 @@ _AND_SPLIT_RE = re.compile(r"\s*,?\s+and\s+", re.IGNORECASE)
 # Sentence terminators stripped before a canonical "?" is re-appended to each
 # conjunct (#94, #111). The set is deliberately NOT ASCII-only: CJK/Arabic IME
 # input commonly ends a question with a full-width `？` (U+FF1F), full-width
-# `！` (U+FF01), ideographic `。` (U+3002), or Arabic `؟` (U+061F). Stripping
-# only ASCII `?.!` left those non-ASCII enders in place, so `+ "?"` stacked a
-# doubled terminator ("... work？?"). Used as an `str.rstrip` argument at both
-# strip sites so the well-formed-question contract holds for non-ASCII locales.
-_TERMINATORS = "?.!？！؟。"
+# `！` (U+FF01), ideographic `。` (U+3002), Arabic `؟` (U+061F), or an ellipsis
+# `…` (U+2026, common LLM/IME autocorrect of "..."). Stripping only ASCII `?.!`
+# left those non-ASCII enders in place, so `+ "?"` stacked a doubled terminator
+# ("... work？?", "... Java…?"). Used as an `str.rstrip` argument at both strip
+# sites so the well-formed-question contract holds for non-ASCII locales, and
+# kept in parity with the `…`-aware `_THEN_SPLIT` and `generator._SENTENCE_SPLIT`
+# (#150, sibling of #144/#146).
+_TERMINATORS = "?.!？！؟。…"
 
 _QUESTION_PREFIXES = (
     "who",
