@@ -273,6 +273,43 @@ class TestSplitSentences:
         citations = enforce_citations("It happened at 9 a.m. sharp [cite:doc1].", retrieved)
         assert [c.external_id for c in citations] == ["doc1"]
 
+    @pytest.mark.parametrize(
+        "text",
+        [
+            "The p50 latency was catastrophic… The cause was GC [cite:doc1].",  # ellipsis
+            "The p50 latency was catastrophic。 The cause was GC [cite:doc1].",  # ideographic stop
+            "The p50 latency was catastrophic！ The cause was GC [cite:doc1].",  # fullwidth !
+            "The p50 latency was catastrophic？ The cause was GC [cite:doc1].",  # fullwidth ?
+        ],
+    )
+    def test_unicode_terminator_is_a_real_boundary(self, text: str) -> None:
+        # #144 (sibling of #143/#139/#133): the unicode terminators `…。！？` end a
+        # claim just like ASCII `.!?`. Treating them as non-boundaries merged an
+        # uncited claim into the next sentence, letting it ride on that sentence's
+        # [cite:...] marker and bypass enforcement. Each must split into 2.
+        assert len(split_sentences(text)) == 2
+
+    def test_unicode_terminator_bypass_is_refused_end_to_end(self) -> None:
+        # End-to-end #144: an uncited claim ending in the ellipsis terminator `…`
+        # (the realistic English case — LLM autocorrect of "...") followed by a
+        # cited sentence must be REFUSED, not silently accepted by riding on the
+        # cited sentence's marker. Mirrors the #138/#142 guards.
+        retrieved = [_result("doc1", "The cause was GC.")]
+        with pytest.raises(CitationError) as excinfo:
+            enforce_citations(
+                "The p50 latency was catastrophic… The cause was GC [cite:doc1].", retrieved
+            )
+        assert excinfo.value.reason == "unparseable_output"
+
+    def test_ascii_terminators_still_split_and_abbreviations_still_merge(self) -> None:
+        # No regression: ASCII `.!?` still split, and a dot-abbreviation ("Dr.")
+        # still merges into one sentence (the unicode-terminator addition touches
+        # only the split class, never the dot-only abbreviation merge pass).
+        assert len(split_sentences("Alpha is first. Beta is second!")) == 2
+        assert split_sentences("Dr. Smith reported it [cite:A].") == [
+            "Dr. Smith reported it [cite:A]."
+        ]
+
 
 class TestEnforceCitations:
     def test_accepts_every_sentence_cited(self) -> None:

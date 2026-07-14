@@ -44,7 +44,14 @@ from .retriever import RetrievalResult
 
 _DEFAULT_THRESHOLD = 0.02  # tuned against the in-repo retrieval tests; >0 by construction
 _CITE_PATTERN = re.compile(r"\[cite:([^\]]+)\]")
-_SENTENCE_SPLIT = re.compile(r"(?<=[.!?])\s+")
+# Sentence terminators. Besides ASCII `.!?`, this includes the unicode
+# terminators `…` (U+2026 ellipsis), `。` (ideographic full stop), and `！`/`？`
+# (fullwidth), so a claim ending in one is split off and individually citation-
+# enforced instead of merging onto the next sentence's [cite:...] marker and
+# bypassing enforcement (#144, sibling of #143/#139/#133). Like `!`/`?`, these
+# are unambiguous ends and never abbreviations, so the `_ends_with_abbreviation`
+# merge pass (dot-only) leaves them untouched — no regression on ASCII behavior.
+_SENTENCE_SPLIT = re.compile(r"(?<=[.!?…。！？])\s+")
 
 # Tokens that end in a period but are NOT sentence boundaries. The `_SENTENCE_SPLIT`
 # regex treats every period-then-whitespace as a boundary, so an ordinary
@@ -443,7 +450,7 @@ class TemplateGenerator:
         # uncited — a false "unparseable_output" refusal. Each chunk still
         # yields exactly one deduped Citation.
         sentences = [
-            f"Per the retrieved context, {s.strip().rstrip('.!?')} [cite:{c.external_id}]."
+            f"Per the retrieved context, {s.strip().rstrip('.!?…。！？')} [cite:{c.external_id}]."
             for c in chosen
             for s in split_sentences(c.text)
         ]
