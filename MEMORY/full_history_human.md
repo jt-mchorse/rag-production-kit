@@ -1062,3 +1062,16 @@ Reproduced all four behaviors firsthand (bypass splits, mid-sentence merges, bot
 **Open questions / blockers:** none — PR #147 ready for review.
 
 **Next session:** Phase A merge PR for #146.
+
+## 2026-07-14 (night) — Issue #148: citation-enforcement splitter missed the Arabic question mark ؟
+**Duration:** ~20 min · **Branch:** `session/2026-07-14-0713-issue-148` · **PR:** #149
+
+`enforce_citations` splits model output with `_SENTENCE_SPLIT` (`generator.py:54`) and refuses any sentence lacking a `[cite:...]` marker. The class recognized ASCII `.!?` plus the unicode terminators `…。！？` (#144/#145) but **omitted the Arabic question mark `؟` (U+061F)**. A claim ending in the native Arabic `؟` was not split off — it merged onto the next sentence's citation and bypassed enforcement, the exact grounding-integrity failure #144/#145 exist to prevent. Verified firsthand: `؟` was ACCEPTED (bypass) while the semantically-identical fullwidth `？` and ASCII `?` were correctly REFUSED.
+
+This was a genuine missed sibling, not churn: the rewriter's `_TERMINATORS` and `_THEN_SPLIT` already include `؟`, and the just-merged #147 comment even asserted (falsely) that `generator._SENTENCE_SPLIT` recognized it. Notably the #144 memory entry claimed the unicode-terminator axis was "exhausted, only exotic terminators left" — but the Arabic question mark is common, not exotic, and was already handled on the rewriter side. Fixed by adding `؟` to the split class (line 54) and the citation-template `rstrip` (line 453), reaching pipeline parity. Two regression tests (parametrized boundary + dedicated e2e bypass refusal); full suite green (PG-skipped), ruff clean.
+
+**Why this work, this session:** First hit of the night run — surfaced by the rag terminator sibling hunt on the #147 fix and verified firsthand. The genuinely-exotic terminators (Arabic full stop U+066B, Devanagari danda U+0964) remain out of scope — vanishingly rare in this English-corpus kit.
+
+**Open questions / blockers:** none — PR #149 ready for review.
+
+**Next session:** Phase A merge PR for #148.

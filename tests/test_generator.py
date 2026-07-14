@@ -280,6 +280,7 @@ class TestSplitSentences:
             "The p50 latency was catastrophic。 The cause was GC [cite:doc1].",  # ideographic stop
             "The p50 latency was catastrophic！ The cause was GC [cite:doc1].",  # fullwidth !
             "The p50 latency was catastrophic？ The cause was GC [cite:doc1].",  # fullwidth ?
+            "The p50 latency was catastrophic؟ The cause was GC [cite:doc1].",  # Arabic ؟ (U+061F)
         ],
     )
     def test_unicode_terminator_is_a_real_boundary(self, text: str) -> None:
@@ -298,6 +299,19 @@ class TestSplitSentences:
         with pytest.raises(CitationError) as excinfo:
             enforce_citations(
                 "The p50 latency was catastrophic… The cause was GC [cite:doc1].", retrieved
+            )
+        assert excinfo.value.reason == "unparseable_output"
+
+    def test_arabic_question_mark_bypass_is_refused_end_to_end(self) -> None:
+        # #148 (sibling of #144/#147): the Arabic question mark `؟` (U+061F) is a
+        # sentence terminator the rewriter's `_TERMINATORS` already recognized, but
+        # `generator._SENTENCE_SPLIT` omitted it — so an uncited Arabic-locale claim
+        # ending in the native `؟` merged onto the next cited sentence and bypassed
+        # enforcement (the `？`/`。`/`…` cases were already refused; `؟` was not).
+        retrieved = [_result("doc1", "The cause was GC.")]
+        with pytest.raises(CitationError) as excinfo:
+            enforce_citations(
+                "The p50 latency was catastrophic؟ The cause was GC [cite:doc1].", retrieved
             )
         assert excinfo.value.reason == "unparseable_output"
 
