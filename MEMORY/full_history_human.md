@@ -1088,3 +1088,11 @@ Fixed by adding `…` to `_TERMINATORS`, reaching parity with the `…`-aware sp
 **Open questions / blockers:** none — PR #151 ready for review.
 
 **Next session:** Phase A merge PR for #150 (and #148 — same-repo sibling, rebase the later one).
+
+## 2026-07-14 (night, issue #152) — "in ms." unit bypasses citation enforcement (sibling of #138)
+
+#138 kept the milliseconds unit ("5 ms.") a real sentence boundary in `_ends_with_abbreviation` by gating `_UNIT_COLLISION_ABBREVIATIONS` on a number immediately preceding the "ms" token. But the unit doesn't always carry a preceding number — "latency reported in ms.", "measured in ms.", "the unit is ms." — and in those the preceding token is non-numeric, so the gate mis-read them as the courtesy title "Ms.", merged the fragment into the next sentence, and let an uncited measurement claim ride on that sentence's `[cite:...]` marker, bypassing `enforce_citations`.
+
+The reliable discriminator is the token's own **case**: the title is always capitalized "Ms." while the SI-style unit is lowercase "ms". The fix gates the non-boundary on `last[:1].isupper()`, so a lowercase "ms" stays a real boundary regardless of what precedes ("5 ms." and "in ms." both), while the capitalized "Ms. Smith" title merge is preserved. This narrows the non-boundary — the module's documented safe direction (false-refusing is safe; false-accepting an uncited claim is the bug). The deeper lesson: a token's case is a stronger word-sense signal than neighboring numeric context; #138's numeric-prev heuristic was a partial proxy for the real signal.
+
+Verified firsthand: pre-fix "The latency is reported in ms. [cite:doc1] ..." was ACCEPTED; post-fix it's refused, while "5 ms." stays a boundary and "Ms. Smith"/"Ms. J. Smith" still merge/accept. All-caps "MS." (multiple sclerosis) is unchanged (rare, genuinely ambiguous, out of scope — not a regression). Full suite 583 passed / 7 Postgres-skipped; ruff clean. Shipped as PR #153.

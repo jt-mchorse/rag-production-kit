@@ -195,6 +195,36 @@ class TestSplitSentences:
     @pytest.mark.parametrize(
         "text",
         [
+            "The latency is reported in ms. It held steady [cite:A].",  # unit, no number precedes
+            "Latency was measured in ms. Throughput held [cite:A].",  # unit, verb precedes
+            "The unit is ms. Values follow [cite:A].",  # unit, noun precedes
+        ],
+    )
+    def test_unit_collision_abbreviation_unit_without_preceding_number_is_a_boundary(
+        self, text: str
+    ) -> None:
+        # Sibling of #138: the milliseconds unit does NOT always have a number
+        # immediately before it ("reported in ms.", "measured in ms."). The
+        # number-precedes gate alone mis-read these as the title "Ms." and merged
+        # the uncited measurement claim into the next (cited) sentence, bypassing
+        # enforcement. A lowercase "ms" is the unit and must stay a real boundary
+        # regardless of what precedes; only a capitalized "Ms." is the title.
+        assert len(split_sentences(text)) == 2
+
+    def test_ms_unit_without_number_bypass_is_refused_end_to_end(self) -> None:
+        # End-to-end sibling of #138: an uncited "... in ms." claim (no preceding
+        # number) followed by a cited sentence must be REFUSED, not silently
+        # accepted by riding on the cited sentence's marker.
+        retrieved = [_result("doc1", "The system stayed responsive.")]
+        with pytest.raises(CitationError) as excinfo:
+            enforce_citations(
+                "The latency is reported in ms. The system is fast [cite:doc1].", retrieved
+            )
+        assert excinfo.value.reason == "unparseable_output"
+
+    @pytest.mark.parametrize(
+        "text",
+        [
             "Ms. Smith reported the outage [cite:A].",  # title + name
             "Ms. J. Smith signed off on it [cite:A].",  # title + initial + name
         ],
