@@ -163,6 +163,22 @@ _UNIT_COLLISION_ABBREVIATIONS = frozenset({"ms"})
 # false-accepting an uncited claim is the bug.
 _TIME_ABBREVIATIONS = frozenset({"a.m", "p.m"})
 
+# The subset of `_ABBREVIATIONS` that spells an *enumeration* marker which very
+# commonly ENDS a claim ("We support JSON, CSV, etc."). Unlike "Dr."/"U.S." — the
+# "vanishingly rare" claim-enders the general `_ABBREVIATIONS` leniency assumes —
+# "etc." is one of the MOST common sentence-ending abbreviations in English, so
+# treating it as an unconditional non-boundary let an uncited claim ending in it
+# ("We support JSON, CSV, etc.") merge into the next (cited) sentence and ride on
+# ITS `[cite:...]` marker, bypassing enforcement — the same false-accept
+# #126/#130/#139/#152 fixed for "vitamin C.", "no", "5 ms.", and "in ms.". Like
+# the time markers (and unlike the unit's own-case signal), the two senses are
+# told apart by what FOLLOWS: a lowercase continuation ("…, etc. are fruits") is
+# a genuine mid-clause list (non-boundary), while a capitalized/digit/empty
+# follow-on ("…, etc. The system…") is a real boundary. False-refusing the rare
+# mid-sentence "etc. Foo" is the safe direction (#126); false-accepting an
+# uncited claim is the bug.
+_ENUMERATION_ABBREVIATIONS = frozenset({"etc"})
+
 _HAS_DIGIT_RE = re.compile(r"\d")
 
 
@@ -291,6 +307,15 @@ def _ends_with_abbreviation(fragment: str, following: str = "") -> bool:
             # capitalized/digit/bracket/empty follow-on ("5 p.m. The root...")
             # is a real boundary so an uncited time-of-day claim can't ride on
             # the next sentence's citation (see `_TIME_ABBREVIATIONS`).
+            stripped = following.lstrip()
+            return bool(stripped) and stripped[0].islower()
+        if last.lower() in _ENUMERATION_ABBREVIATIONS:
+            # Non-boundary only when the continuation is unambiguously
+            # mid-clause: a lowercase-letter follow-on ("..., etc. are fruits").
+            # A capitalized/digit/bracket/empty follow-on ("..., etc. The
+            # system...") is a real boundary so an uncited enumeration claim
+            # ("We support JSON, CSV, etc.") can't ride on the next sentence's
+            # citation (see `_ENUMERATION_ABBREVIATIONS`).
             stripped = following.lstrip()
             return bool(stripped) and stripped[0].islower()
         return True

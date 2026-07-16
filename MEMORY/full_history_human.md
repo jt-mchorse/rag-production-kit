@@ -1096,3 +1096,24 @@ Fixed by adding `…` to `_TERMINATORS`, reaching parity with the `…`-aware sp
 The reliable discriminator is the token's own **case**: the title is always capitalized "Ms." while the SI-style unit is lowercase "ms". The fix gates the non-boundary on `last[:1].isupper()`, so a lowercase "ms" stays a real boundary regardless of what precedes ("5 ms." and "in ms." both), while the capitalized "Ms. Smith" title merge is preserved. This narrows the non-boundary — the module's documented safe direction (false-refusing is safe; false-accepting an uncited claim is the bug). The deeper lesson: a token's case is a stronger word-sense signal than neighboring numeric context; #138's numeric-prev heuristic was a partial proxy for the real signal.
 
 Verified firsthand: pre-fix "The latency is reported in ms. [cite:doc1] ..." was ACCEPTED; post-fix it's refused, while "5 ms." stays a boundary and "Ms. Smith"/"Ms. J. Smith" still merge/accept. All-caps "MS." (multiple sclerosis) is unchanged (rare, genuinely ambiguous, out of scope — not a regression). Full suite 583 passed / 7 Postgres-skipped; ruff clean. Shipped as PR #153.
+
+## 2026-07-15 — Issue #154: "etc." citation bypass (sibling of #152)
+
+The sentence-boundary detector in `generator.py` had been hardened across a
+long wave (#126/#130/#138/#139/#152) that gated the unit, numeric-reference,
+and time-of-day abbreviations so that uncited claims ending in them couldn't
+merge into the next cited sentence and ride on its citation marker. But `etc.`
+was still sitting in the general `_ABBREVIATIONS` set as an unconditional
+non-boundary — and `etc.` is one of the most common sentence-*ending*
+abbreviations in English, not the "vanishingly rare" claim-ender that leniency
+assumes. So `"We support JSON, CSV, etc. The system is fast [cite:doc1]."`
+merged into one sentence and the uncited enumeration claim bypassed citation
+enforcement.
+
+Fixed by adding `_ENUMERATION_ABBREVIATIONS = {"etc"}` gated on the follow-on
+case exactly like the time markers: a non-boundary only when a lowercase
+continuation follows (genuine mid-clause list), a real boundary otherwise.
+Six regression tests, verified firsthand pre/post fix. Full suite green.
+
+Why prioritized: static priority:high queue is globally empty; this came from
+the sibling-incomplete-fix meta-lens applied to this run's Phase-A-merged #152.

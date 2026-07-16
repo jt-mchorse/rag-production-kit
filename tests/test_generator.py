@@ -306,6 +306,60 @@ class TestSplitSentences:
     @pytest.mark.parametrize(
         "text",
         [
+            "We support JSON, CSV, etc. The system is fast [cite:A].",  # capital follow-on
+            "The formats are listed, etc. It held steady [cite:A].",
+        ],
+    )
+    def test_enumeration_abbreviation_boundary_sense_is_a_real_boundary(self, text: str) -> None:
+        # Sibling of #152/#142 (same wave, same file): "etc." is one of the MOST
+        # common sentence-ENDING abbreviations, not the "vanishingly rare"
+        # claim-ender the general `_ABBREVIATIONS` leniency assumes. Treating it
+        # as an unconditional non-boundary merged an uncited enumeration claim
+        # ("We support JSON, CSV, etc.") into the next sentence, letting it ride
+        # on that sentence's [cite:...] marker and bypass enforcement. A
+        # capitalized follow-on is a real boundary so each claim is individually
+        # under citation enforcement.
+        assert len(split_sentences(text)) == 2
+
+    @pytest.mark.parametrize(
+        "text",
+        [
+            "apples, oranges, etc. are fruits [cite:A].",  # lowercase continuation
+            "It supports X, Y, etc. and more besides [cite:A].",
+        ],
+    )
+    def test_enumeration_abbreviation_mid_sentence_sense_still_merges(self, text: str) -> None:
+        # The legitimate mid-clause sense — "etc." followed by a lowercase
+        # continuation ("are fruits", "and ...") — stays a non-boundary, so it
+        # stays one sentence carrying its single marker rather than stranding a
+        # claim-less "..., etc." fragment that would falsely refuse (#110 posture).
+        assert split_sentences(text) == [text]
+
+    def test_enumeration_abbreviation_bypass_is_refused_end_to_end(self) -> None:
+        # End-to-end sibling of #152/#142: an uncited enumeration claim ending in
+        # "..., etc." followed by a cited sentence must be REFUSED, not silently
+        # accepted by riding on the cited sentence's marker.
+        retrieved = [_result("doc1", "The system stayed responsive.")]
+        with pytest.raises(CitationError) as excinfo:
+            enforce_citations(
+                "We support JSON, CSV, etc. The system is fast [cite:doc1].", retrieved
+            )
+        assert excinfo.value.reason == "unparseable_output"
+
+    def test_enumeration_abbreviation_mid_sentence_answer_is_not_falsely_refused_end_to_end(
+        self,
+    ) -> None:
+        # The mid-clause sense must not regress into a false refusal: a
+        # fully-cited "..., etc. and more" answer stays one enforced claim.
+        retrieved = [_result("doc1", "It supports X, Y, etc. and more besides.")]
+        citations = enforce_citations(
+            "It supports X, Y, etc. and more besides [cite:doc1].", retrieved
+        )
+        assert [c.external_id for c in citations] == ["doc1"]
+
+    @pytest.mark.parametrize(
+        "text",
+        [
             "The p50 latency was catastrophic… The cause was GC [cite:doc1].",  # ellipsis
             "The p50 latency was catastrophic。 The cause was GC [cite:doc1].",  # ideographic stop
             "The p50 latency was catastrophic！ The cause was GC [cite:doc1].",  # fullwidth !
