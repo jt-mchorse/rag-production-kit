@@ -360,6 +360,60 @@ class TestSplitSentences:
     @pytest.mark.parametrize(
         "text",
         [
+            "The method was introduced by Vaswani et al. It uses attention [cite:A].",  # capital
+            "The result was reproduced by Chen et al. Scaling held [cite:A].",  # capital
+        ],
+    )
+    def test_attribution_abbreviation_boundary_sense_is_a_real_boundary(self, text: str) -> None:
+        # Sibling of #154 ("etc."): "et al." is a routine LLM attribution phrasing
+        # that commonly ENDS a claim in paper/research RAG, and the next sentence
+        # is very often the cited one. Treating "al" as an unconditional
+        # non-boundary merged an uncited attribution ("… by Vaswani et al.") into
+        # the next sentence, letting it ride on that sentence's [cite:...] marker
+        # and bypass enforcement. A capitalized follow-on is a real boundary so
+        # each claim is individually under citation enforcement.
+        assert len(split_sentences(text)) == 2
+
+    @pytest.mark.parametrize(
+        "text",
+        [
+            "Smith et al. found that recall improved [cite:A].",  # lowercase continuation
+            "As shown by Chen et al. and others, it scales [cite:A].",  # lowercase "and"
+        ],
+    )
+    def test_attribution_abbreviation_mid_sentence_sense_still_merges(self, text: str) -> None:
+        # The legitimate mid-clause sense — "et al." followed by a lowercase
+        # continuation ("found that", "and others") — stays a non-boundary, so it
+        # stays one sentence carrying its single marker rather than stranding a
+        # claim-less "… et al." fragment that would falsely refuse.
+        assert split_sentences(text) == [text]
+
+    def test_attribution_abbreviation_bypass_is_refused_end_to_end(self) -> None:
+        # End-to-end sibling of #154: an uncited attribution claim ending in
+        # "… et al." followed by a cited sentence must be REFUSED, not silently
+        # accepted by riding on the cited sentence's marker.
+        retrieved = [_result("doc1", "The architecture uses attention.")]
+        with pytest.raises(CitationError) as excinfo:
+            enforce_citations(
+                "The method was introduced by Vaswani et al. It uses attention [cite:doc1].",
+                retrieved,
+            )
+        assert excinfo.value.reason == "unparseable_output"
+
+    def test_attribution_abbreviation_mid_sentence_answer_is_not_falsely_refused_end_to_end(
+        self,
+    ) -> None:
+        # The mid-clause sense must not regress into a false refusal: a fully-cited
+        # "Smith et al. found …" answer stays one enforced claim.
+        retrieved = [_result("doc1", "Smith et al. found that recall improved.")]
+        citations = enforce_citations(
+            "Smith et al. found that recall improved [cite:doc1].", retrieved
+        )
+        assert [c.external_id for c in citations] == ["doc1"]
+
+    @pytest.mark.parametrize(
+        "text",
+        [
             "The p50 latency was catastrophic… The cause was GC [cite:doc1].",  # ellipsis
             "The p50 latency was catastrophic。 The cause was GC [cite:doc1].",  # ideographic stop
             "The p50 latency was catastrophic！ The cause was GC [cite:doc1].",  # fullwidth !
