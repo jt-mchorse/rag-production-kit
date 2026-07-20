@@ -462,6 +462,53 @@ class TestSplitSentences:
             "Dr. Smith reported it [cite:A]."
         ]
 
+    @pytest.mark.parametrize(
+        "text",
+        [
+            'The log read "degraded." The fix landed [cite:doc1].',  # straight double quote
+            "The log read 'degraded.' The fix landed [cite:doc1].",  # straight single quote
+            "The log read “degraded.” The fix landed [cite:doc1].",  # smart double quote
+            "The log read ‘degraded.’ The fix landed [cite:doc1].",  # smart single quote
+            "The first step failed (badly.) The fix landed [cite:doc1].",  # closing paren
+            "See the note [1.] The fix landed [cite:doc1].",  # closing bracket
+        ],
+    )
+    def test_closing_quote_or_bracket_after_terminator_is_a_real_boundary(self, text: str) -> None:
+        # A closing quote/bracket between the terminator and the whitespace (`."`,
+        # `.'`, `.”`, `.’`, `.)`, `.]`) hid the sentence boundary from the bare
+        # `(?<=[.!?…])\s+` split, merging an uncited first claim onto the next
+        # sentence so it rode on that sentence's [cite:...] marker and bypassed
+        # enforcement — the same false-accept as the abbreviation vein, reached
+        # through punctuation. Each must split into 2.
+        assert len(split_sentences(text)) == 2
+
+    def test_closing_quote_bypass_is_refused_end_to_end(self) -> None:
+        # End-to-end: an uncited claim ending in a closing quote (`degraded."`)
+        # followed by a cited sentence must be REFUSED, not silently accepted by
+        # riding on the cited sentence's marker. Mirrors the #144/#148 guards.
+        retrieved = [_result("doc1", "The fix landed.")]
+        with pytest.raises(CitationError) as excinfo:
+            enforce_citations('The log read "degraded." The fix landed [cite:doc1].', retrieved)
+        assert excinfo.value.reason == "unparseable_output"
+
+    def test_closing_quote_retained_on_preceding_sentence(self) -> None:
+        # The fix keeps the closing quote attached to the preceding sentence
+        # (non-lossy) rather than consuming it into the split delimiter.
+        assert split_sentences('He said "done." Next is cited [cite:A].') == [
+            'He said "done."',
+            "Next is cited [cite:A].",
+        ]
+
+    def test_mid_sentence_quote_and_decimal_do_not_over_split(self) -> None:
+        # No regression: a quote that is NOT preceded by a terminator, and a
+        # decimal number, must not introduce a spurious boundary.
+        assert split_sentences('He called it "fast" and moved on [cite:A].') == [
+            'He called it "fast" and moved on [cite:A].'
+        ]
+        assert split_sentences("The value was 3.5 and stable [cite:A].") == [
+            "The value was 3.5 and stable [cite:A]."
+        ]
+
 
 class TestEnforceCitations:
     def test_accepts_every_sentence_cited(self) -> None:
