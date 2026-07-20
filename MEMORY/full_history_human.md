@@ -1141,3 +1141,15 @@ the existing pipe escape — the same backtick-in-code-span fix already shipped 
 llm-eval-harness (#183) and chunking-strategies-lab (#135). Found by running the
 sibling-incomplete-fix lens on those just-merged fixes; the leh MEMORY had already
 flagged this exact site as the next candidate. Two tests added. PR #159.
+## 2026-07-20 (night) — issue #160: closing quote/bracket hid a sentence boundary
+
+`split_sentences` split on a terminator only when whitespace followed it
+immediately. A closing quote or bracket between the period and the space
+(`."`, `.)`, `.]`, smart-quote variants) hid the boundary, so two sentences
+merged and an uncited first claim rode on the next sentence's `[cite:...]`
+marker — a citation bypass distinct from the abbreviation vein, reached through
+punctuation. Confirmed firsthand end-to-end (accepted pre-fix, refused post-fix).
+Fixed with a second fixed-width lookbehind matching an optional closing
+quote/bracket while keeping it attached to the preceding sentence (non-lossy).
+Four tests added; mid-sentence quotes, decimals, and abbreviation merges
+unaffected. PR #161.
