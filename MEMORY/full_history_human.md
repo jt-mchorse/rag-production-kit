@@ -1130,3 +1130,14 @@ hunt agent originally proposed gating e.g./i.e. too, but those introduce a claus
 mid-sentence and take *capitalized* examples ("e.g. JSON"), so the
 lowercase-follow-on gate would wrongly split them — only "al" genuinely ends
 claims and fits the discriminator. Shipped as PR #157 (595 tests green).
+
+## 2026-07-20 (night) — issue #158: backtick in the rewriter benchmark query cell
+
+`bench_rewriter._print_md` wraps each query in an inline-code span inside a GFM
+table cell and escaped only the pipe. A backtick in a natural-language query
+("what does `git rebase` do?") closes the code span early, splitting the cell and
+leaking text out as prose. Neutralized the backtick to a straight quote alongside
+the existing pipe escape — the same backtick-in-code-span fix already shipped in
+llm-eval-harness (#183) and chunking-strategies-lab (#135). Found by running the
+sibling-incomplete-fix lens on those just-merged fixes; the leh MEMORY had already
+flagged this exact site as the next candidate. Two tests added. PR #159.
