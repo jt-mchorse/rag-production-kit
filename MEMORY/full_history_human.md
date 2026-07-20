@@ -1117,3 +1117,16 @@ Six regression tests, verified firsthand pre/post fix. Full suite green.
 
 Why prioritized: static priority:high queue is globally empty; this came from
 the sibling-incomplete-fix meta-lens applied to this run's Phase-A-merged #152.
+
+## 2026-07-17 — Issue #156: "et al." citation-bypass non-boundary
+
+The citation-boundary detector treated "et al." as an unconditional
+non-boundary, so an uncited attribution ("The method was introduced by Vaswani
+et al.") merged into the next sentence and rode on its citation — the same
+bypass #154 fixed for "etc." I verified the bypass firsthand end-to-end
+(`enforce_citations` accepted it) before fixing. Added `_ATTRIBUTION_ABBREVIATIONS
+= {"al"}` gated on a lowercase follow-on, mirroring the enumeration gate. The
+hunt agent originally proposed gating e.g./i.e. too, but those introduce a clause
+mid-sentence and take *capitalized* examples ("e.g. JSON"), so the
+lowercase-follow-on gate would wrongly split them — only "al" genuinely ends
+claims and fits the discriminator. Shipped as PR #157 (595 tests green).

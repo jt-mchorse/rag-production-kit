@@ -179,6 +179,23 @@ _TIME_ABBREVIATIONS = frozenset({"a.m", "p.m"})
 # uncited claim is the bug.
 _ENUMERATION_ABBREVIATIONS = frozenset({"etc"})
 
+# The subset of `_ABBREVIATIONS` that spells an *attribution* marker which very
+# commonly ENDS a claim ("The method was introduced by Vaswani et al."). In a
+# paper/research RAG "X et al." is a routine LLM attribution phrasing and the
+# NEXT sentence is very often the cited one, so treating "al" as an unconditional
+# non-boundary let an uncited attribution ("… by Vaswani et al.") merge into the
+# next (cited) sentence and ride on ITS `[cite:...]` marker, bypassing
+# enforcement — the same false-accept #154 fixed for "etc.". Told apart, like the
+# enumeration/time markers, by what FOLLOWS: a lowercase continuation ("Smith et
+# al. found that …") is a genuine mid-clause use (non-boundary), while a
+# capitalized/digit/bracket/empty follow-on ("… et al. It uses …") is a real
+# boundary. False-refusing a rare mid-sentence "et al. Foo" is the safe direction;
+# false-accepting an uncited claim is the bug. (The other ungated Latin markers —
+# "e.g."/"i.e."/"cf."/"viz." — stay unconditional non-boundaries: they INTRODUCE
+# a clause and are commonly followed by a *capitalized* example, so this
+# lowercase-follow-on gate would wrongly split them.)
+_ATTRIBUTION_ABBREVIATIONS = frozenset({"al"})
+
 _HAS_DIGIT_RE = re.compile(r"\d")
 
 
@@ -316,6 +333,15 @@ def _ends_with_abbreviation(fragment: str, following: str = "") -> bool:
             # system...") is a real boundary so an uncited enumeration claim
             # ("We support JSON, CSV, etc.") can't ride on the next sentence's
             # citation (see `_ENUMERATION_ABBREVIATIONS`).
+            stripped = following.lstrip()
+            return bool(stripped) and stripped[0].islower()
+        if last.lower() in _ATTRIBUTION_ABBREVIATIONS:
+            # Non-boundary only when the continuation is unambiguously mid-clause:
+            # a lowercase-letter follow-on ("Smith et al. found that ..."). A
+            # capitalized/digit/bracket/empty follow-on ("... et al. It uses ...")
+            # is a real boundary so an uncited attribution claim ("The method was
+            # introduced by Vaswani et al.") can't ride on the next sentence's
+            # citation (see `_ATTRIBUTION_ABBREVIATIONS`).
             stripped = following.lstrip()
             return bool(stripped) and stripped[0].islower()
         return True
