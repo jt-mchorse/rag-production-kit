@@ -269,7 +269,18 @@ def _print_md(results: Sequence[_QueryResult], k: int, elapsed_ms: float) -> Non
         # same fix as comment `_row_to_md` (#130), `calibration.render_report`
         # (llm-eval-harness #134), `aggregate_markdown` (embedding-model-shootout
         # #79), and `run_matrix._render_summary` (chunking-strategies-lab #100).
-        query = r.query.replace("|", "\\|")
+        #
+        # The pipe is not the only delimiter this cell carries: `query` is
+        # wrapped in an inline-code span (`` `{query}` ``), and a backtick in a
+        # natural-language query ("what does `git rebase` do?") closes that span
+        # early — GFM tokenizes the first pair as a span, leaks the middle out as
+        # prose, and reopens a second span, corrupting the row. A backtick can't
+        # be backslash-escaped inside a code span, so neutralize it to a straight
+        # quote — the same backtick-in-code-span fix as `md_code_span`/
+        # `md_code_cell` (llm-eval-harness #180/#183) and `run_matrix`
+        # (chunking-strategies-lab #135). Newline is not reachable here: `query`
+        # is a single-line user prompt with no external multi-line loader.
+        query = r.query.replace("|", "\\|").replace("`", "'")
         print(
             f"| `{query}` | {r.baseline_recall:.2f} | {r.rewriter_recall:.2f} | {sign}{delta:.2f} |"
         )

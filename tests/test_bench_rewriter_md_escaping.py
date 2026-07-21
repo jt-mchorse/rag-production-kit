@@ -57,3 +57,24 @@ def test_pipe_free_query_is_unchanged(capsys) -> None:
     row = _data_row(capsys.readouterr().out)
     assert "\\|" not in row
     assert row == "| `what is a vector database` | 0.50 | 0.80 | +0.30 |"
+
+
+def test_backtick_query_does_not_split_the_code_span(capsys) -> None:
+    # The query cell is wrapped in an inline-code span (`` `{query}` ``). A
+    # backtick inside the value closes that span early — GFM tokenizes the first
+    # pair as a span, leaks the middle out as prose, and reopens a second span.
+    # The cell must carry exactly the two span-delimiting backticks; any interior
+    # backtick is neutralized to a straight quote (backticks can't be
+    # backslash-escaped inside a code span). Same class as leh#183 / chunking#135.
+    _print_md([_result("what does the `git rebase` command do?")], k=5, elapsed_ms=1.0)
+    row = _data_row(capsys.readouterr().out)
+    assert row.count("`") == 2, f"exactly two span backticks expected, got {row!r}"
+    assert "`git rebase`" not in row
+    assert "'git rebase'" in row
+
+
+def test_backtick_free_query_is_unchanged(capsys) -> None:
+    _print_md([_result("what is a vector database")], k=5, elapsed_ms=1.0)
+    row = _data_row(capsys.readouterr().out)
+    assert "'" not in row
+    assert row == "| `what is a vector database` | 0.50 | 0.80 | +0.30 |"
