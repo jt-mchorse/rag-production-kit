@@ -53,7 +53,20 @@ _CITE_PATTERN = re.compile(r"\[cite:([^\]]+)\]")
 # `_TERMINATORS` (#147), which already recognized it here. Like `!`/`?`, these
 # are unambiguous ends and never abbreviations, so the `_ends_with_abbreviation`
 # merge pass (dot-only) leaves them untouched — no regression on ASCII behavior.
-_SENTENCE_SPLIT = re.compile(r"(?<=[.!?…。！？؟])\s+")
+# A closing quote or bracket may sit between the terminator and the whitespace:
+# `."`, `.'`, `.)`, `.]`, and the smart-quote variants `.”` / `.’`. A bare
+# `(?<=[.!?…])\s+` requires whitespace *immediately* after the terminator, so
+# that intervening quote/bracket hides the boundary — the two sentences merge
+# and an uncited first claim rides on the next sentence's [cite:...] marker,
+# bypassing enforcement (the same false-accept as the abbreviation vein #144/
+# #148, reached through punctuation rather than an abbreviation). Match an
+# optional closing quote/bracket via a SECOND fixed-width lookbehind alternated
+# with the bare one (Python `re` forbids a variable-width lookbehind, and this
+# keeps the quote *attached* to the preceding sentence rather than consuming it,
+# unlike a `["'…]?` inside the split delimiter). Quoting source text and ending
+# the sentence at the closing quote is standard English punctuation, so this is
+# reachable in ordinary generated answers, not a synthetic input.
+_SENTENCE_SPLIT = re.compile(r"(?:(?<=[.!?…。！？؟])|(?<=[.!?…。！？؟][\"”’')\]]))\s+")
 
 # Tokens that end in a period but are NOT sentence boundaries. The `_SENTENCE_SPLIT`
 # regex treats every period-then-whitespace as a boundary, so an ordinary
