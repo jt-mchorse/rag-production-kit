@@ -84,6 +84,38 @@ def test_split_then_strips_punctuated_connective_directly():
     assert _split_then("Do A. Then do B.") == ["Do A.", "do B."]
 
 
+def test_template_rewriter_then_splits_after_closing_quote_or_bracket():
+    # #161 sibling: a closing quote/bracket between the terminator and the
+    # whitespace ("...rose." Then ...", "(...it.) Then ...") hid the boundary from
+    # the bare-terminator lookbehind, so the multi-step query silently failed to
+    # decompose. The closing punct stays attached to the preceding step (non-lossy).
+    for query, first, second in [
+        (
+            'The report says revenue rose." Then what caused it?',
+            'The report says revenue rose."',
+            "what caused it?",
+        ),
+        (
+            "Check the value (compute it.) Then log the result.",
+            "Check the value (compute it.)",
+            "log the result.",
+        ),
+        ("It said 'done.' Then archive it.", "It said 'done.'", "archive it."),
+        ("See [ref.] Then summarize.", "See [ref.]", "summarize."),
+    ]:
+        out = TemplateRewriter().rewrite(query)
+        assert out.reasoning == "sequential_then_pattern", query
+        assert out.sub_queries == (first, second), query
+
+
+def test_split_then_handles_closing_punct_before_connective_directly():
+    # Unit-level guard on the helper for the #161-sibling closing-punct seam.
+    assert _split_then('Do A." Then do B.') == ['Do A."', "do B."]
+    assert _split_then("Do A.) Then do B.") == ["Do A.)", "do B."]
+    # The bare-terminator case (no intervening punct) still works.
+    assert _split_then("Do A. Then do B.") == ["Do A.", "do B."]
+
+
 def test_split_then_does_not_false_split_on_thence_content_word():
     # `then\b` requires a word boundary, so a content word that merely *starts*
     # with "then" (e.g. "thence") is not the connective: no split fires and the

@@ -1153,3 +1153,17 @@ Fixed with a second fixed-width lookbehind matching an optional closing
 quote/bracket while keeping it attached to the preceding sentence (non-lossy).
 Four tests added; mid-sentence quotes, decimals, and abbreviation merges
 unaffected. PR #161.
+
+## 2026-07-21 — rewriter _THEN_SPLIT closing-punct boundary (#162, PR #163)
+
+The query rewriter's multi-step decomposition (`_THEN_SPLIT`) required the
+sentence terminator to sit immediately before the whitespace before "Then", so a
+closing quote/bracket between them (`."`, `.)`, `.'`, `.]`) hid the boundary and
+the query silently failed to decompose — the exact terminator-adjacency assumption
+`generator._SENTENCE_SPLIT` carried until #161. Verified firsthand: four quoted /
+bracketed multi-step queries returned 1 sub-query before, 2 after, with the closing
+punctuation kept attached to the first step. Fix mirrors #161 exactly — a second
+fixed-width lookbehind with the identical closing-punct class. Guillemets/CJK
+brackets deliberately left out of scope to stay consistent with #161. Two tests.
+Found via the sibling-incomplete-fix lens on #161, whose memory flagged the rewriter
+as the next candidate.

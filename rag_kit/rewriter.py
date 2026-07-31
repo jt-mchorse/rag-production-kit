@@ -90,7 +90,19 @@ _COMPARE_RE = re.compile(
 # these (common from a CJK/Arabic IME) previously failed the `[.!?]` lookbehind,
 # so the multi-step query never decomposed and retrieval degraded for non-ASCII
 # locales (#146, sibling of #144).
-_THEN_SPLIT = re.compile(r"(?<=[.!?…。！？؟])\s+(?=then\b)", re.IGNORECASE)
+# A closing quote/bracket may sit between the terminator and the whitespace
+# ("...revenue rose." Then ...", "(...compute it.) Then ..."). With only the bare
+# terminator lookbehind, that intervening punctuation hid the boundary and the
+# multi-step query silently failed to decompose — the exact adjacency assumption
+# `generator._SENTENCE_SPLIT` carried until #161 added an optional-closing-punct
+# second lookbehind. Mirror that fix here with the identical closing-punct class
+# (`[\"”’')\]]`) so the two split sites stay in parity (#161 sibling). Python's
+# `re` forbids a variable-width lookbehind, so the two fixed-width alternatives
+# are alternated; the closing punct stays attached to the preceding step.
+_THEN_SPLIT = re.compile(
+    r"(?:(?<=[.!?…。！？؟])|(?<=[.!?…。！？؟][\"”’')\]]))\s+(?=then\b)",
+    re.IGNORECASE,
+)
 # Strip the leading "Then" connective from each split part. The split above
 # fires on `then\b` (a word boundary), so the connective can be followed by
 # punctuation — "Then, ...", "Then; ...", "Then- ..." — not just a space.
