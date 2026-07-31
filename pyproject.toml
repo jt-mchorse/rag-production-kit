@@ -72,6 +72,13 @@ markers = [
 ]
 
 [tool.ruff]
+# ruff 0.16.1 extended `ruff format` to Python code blocks inside Markdown.
+# CI installs ruff unpinned (`pip install -e '.[dev]'`), so the tool's scope
+# widened overnight and `ruff format --check .` started failing on committed
+# Markdown that had never been in scope — with nothing here changed (#164).
+# This repo's lint contract has always been "format Python source"; prose is
+# not Python source. Re-state the scope the config always meant.
+extend-exclude = ["*.md"]
 line-length = 100
 target-version = "py311"
 
