@@ -14,8 +14,12 @@ Run:
     python -m demo.streaming.server          # listens on :8765
     open http://localhost:8765/
 
-The page wires `EventSource('/stream?q=postgres+tuning')` and renders
-each phase event as a card with the wall-clock elapsed time.
+The page fetches `/stream?q=postgres+tuning` and renders each phase event
+as a card with the wall-clock elapsed time. It reads the SSE frames with
+`fetch()` + a `TextDecoder` rather than `EventSource` (see the comment at
+the top of `app.js`), which is why a failure has to reach it either as a
+non-2xx status or as an `error` frame — a 200 with no body renders
+nothing at all.
 """
 
 from __future__ import annotations
@@ -152,10 +156,29 @@ class Handler(BaseHTTPRequestHandler):
         if not query:
             self.send_error(400, "missing q")
             return
+        # Validate `k` fully *before* the response starts, like `missing q`
+        # above. `StreamingPipeline.run` enforces the repo's positive-int
+        # contract (#41) and is a generator, so its `ValueError` lands on the
+        # first `next()` — inside the `for` below, after `send_response(200)`
+        # and the SSE headers have already gone out. That left the client with
+        # a 200 and a zero-byte body: `resp.ok` is true, the reader reports
+        # `done` immediately, and `app.js` renders nothing at all, while its
+        # `HTTP <status>` error card sat unreachable. The `error` SSE event
+        # can't cover it either — `run` wraps its body in `except Exception`,
+        # but the `k` check sits above that `try` (#166).
+        #
+        # An unparseable `k` used to fall back to 3 silently. It 400s now: a
+        # typo and an out-of-range value are the same class of client mistake,
+        # and defaulting one while rejecting the other would be arbitrary.
+        raw_k = (qs.get("k") or ["3"])[0]
         try:
-            k = int((qs.get("k") or ["3"])[0])
+            k = int(raw_k)
         except ValueError:
-            k = 3
+            self.send_error(400, f"k must be a positive integer, got {raw_k!r}")
+            return
+        if k <= 0:
+            self.send_error(400, f"k must be a positive integer, got {k!r}")
+            return
 
         self.send_response(200)
         self.send_header("Content-Type", "text/event-stream; charset=utf-8")
