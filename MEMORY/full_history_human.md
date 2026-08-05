@@ -1203,3 +1203,69 @@ just formatter scope.
 Pinning a ruff range in `.[dev]` is the deeper fix, but that is a dependency
 policy call across six repos rather than a bug fix, so it is flagged for JT
 rather than made unilaterally.
+
+## 2026-08-04 — Issue #166: a crash that showed the user nothing at all
+
+`demo/streaming/server.py`'s `_serve_stream` gets `q` right and `k` half-right,
+and the missing half crashes the handler after the response has already
+started.
+
+`StreamingPipeline.run` enforces the repo's positive-int contract for `k` (#41),
+and it is a generator — so the `ValueError` for `k <= 0` doesn't fire when
+`run(...)` is called. It fires on the first `next()`, which happens inside the
+`for` loop, three statements after `send_response(200)` and all the SSE headers
+have gone out.
+
+The symptom is the part I'd want a reader to take away. It isn't a 500 and it
+isn't an error message: it's a **200 with a zero-byte body**. `app.js` reads the
+stream with `fetch()` and a `TextDecoder`, so `resp.ok` is true, the reader
+reports `done` on the first read, no frames are ever handled, and the page shows
+no phases, no answer, and no error. The client has a branch written for exactly
+this case — `if (!resp.ok) appendCard("error", ...)` — and it was unreachable
+for the one input that needed it.
+
+The `error` SSE event can't cover it either. `run` wraps its whole body in
+`except Exception` and yields a clean `error` frame for anything that fails
+mid-stream. But the `k` check sits *above* that `try`, so a bad-input failure is
+the single failure mode the error-event contract cannot express.
+
+The fix is to validate `k` completely before `send_response(200)` and
+`send_error(400, ...)` — which is exactly what the `missing q` branch three
+lines above already does. That's what makes this a sibling-incomplete fix inside
+one function rather than a design gap: the correct pattern was already sitting
+there.
+
+One behaviour change worth flagging: `?k=abc` now 400s rather than silently
+falling back to 3. Nothing pinned the old fallback, and rejecting an
+out-of-range `k` while defaulting a typo'd one would be arbitrary — the silent
+default is part of why `?k=0` looked survivable in the first place. I offered
+JT a one-line revert in the PR.
+
+I deliberately did *not* move `run`'s validation inside its own `try`. It would
+have made the crash disappear, but a caller's bad argument should raise at the
+call site; mid-stream failures are a different category. The library is right
+and the demo caller was wrong. There's a test pinning that pairing so a future
+change to either side has to confront the other.
+
+Two things found in passing. The module docstring said the page "wires
+`EventSource('/stream?q=...')`" — `app.js` has used `fetch()` throughout, and
+its own comment explains why. That difference decides how a failure reaches the
+user, so it's corrected and pinned rather than just fixed. And the handler had
+**no tests at all**, despite `open http://127.0.0.1:8765/` being in the README.
+That is how a crash on a one-character query-string edit stayed invisible.
+
+The tests drive the real `ThreadingHTTPServer` over a real socket, because the
+defect is in *when* the response was committed relative to the validation, and
+no test of a pure function can see that. Two mechanical notes for next time:
+`urlopen(...).read(n)` blocks forever on an SSE body with no `Content-Length`
+and `keep-alive` — use `read1` and stop at the terminal frame — and `parse_qs`
+drops blank values, so `?k=` arrives as *absent*, not as unusable.
+
+The generalisable lens: a generator that validates its arguments defers the
+raise to the first `next()`. Any caller that commits something first — starts an
+HTTP response, opens a file, takes a lock — has already committed by the time
+the `ValueError` arrives. Worth grepping for a `send_response`/`write`
+immediately preceding a `for x in <generator>`.
+
+630 passed, 7 skipped (Postgres, which run in `integration-pg`). Shipped as
+PR #167.
