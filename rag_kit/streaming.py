@@ -142,7 +142,27 @@ class PhaseTimings:
         # matches numpy's default) — see `test_phase_timings_percentile_clamps_edges`.
         if not isinstance(p, (int, float)) or isinstance(p, bool) or math.isnan(p):
             raise ValueError(f"p must be a finite number; got {p!r}")
-        values = sorted(getattr(self, phase))
+        # Validate the *values* too, not just `p` (#168). `record` guards
+        # finiteness at ingestion (#63), but this is a dataclass whose four
+        # phase lists are public init fields, so `PhaseTimings(total=[...])`
+        # — rebuilding timings from a persisted summary, merging across runs
+        # via `combined.total.extend(other.total)` — never touches `record`,
+        # and a later `pt.total.append(x)` bypasses it as well. That is the
+        # same argument `telemetry.percentile` used to add its own guard in
+        # #80 *despite* `CostRecord.build` already guarding at ingestion, and
+        # that docstring names this method as the thing it must "agree on the
+        # number" with. It didn't: `sorted()` leaves a NaN in an
+        # implementation-defined slot (every NaN comparison is False), so the
+        # same multiset in a different order returned a different percentile
+        # (p50 of 20.0 / 40.0 / 20.0 for three orderings of one sample), and
+        # a +Inf silently became the maximum and egressed through
+        # `summary()` -> `to_dict()` -> `dump_summary_json` as the bare token
+        # `Infinity` — invalid JSON a strict log-tailer rejects whole.
+        # Read-boundary, not `__post_init__`: only this side sees an append.
+        raw = getattr(self, phase)
+        if any(not math.isfinite(v) for v in raw):
+            raise ValueError(f"values must all be finite numbers; got {list(raw)!r}")
+        values = sorted(raw)
         if not values:
             return None
         if p <= 0:
