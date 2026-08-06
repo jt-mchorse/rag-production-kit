@@ -1269,3 +1269,111 @@ immediately preceding a `for x in <generator>`.
 
 630 passed, 7 skipped (Postgres, which run in `integration-pg`). Shipped as
 PR #167.
+
+## Session 2026-08-06 — a docstring said the two percentiles agree; nothing checked (#168)
+
+`rag_kit.telemetry.percentile` opens with a promise:
+
+> Matches `rag_kit.streaming.PhaseTimings.percentile` so a 24-hour
+> aggregate window and a streaming-pipeline snapshot **agree on the
+> number when given the same sample.**
+
+Nothing enforced it. On a sample containing a NaN, one raises and the
+other returns a number:
+
+```python
+sample = [10.0, 20.0, float("nan"), 40.0, 50.0]
+PhaseTimings(total=sample).percentile("total", 50)   # -> nan
+PhaseTimings(total=sample).percentile("total", 95)   # -> 48.0
+telemetry.percentile(sample, 0.5)                    # -> ValueError
+```
+
+And the number the streaming side returns depends on where in the input
+list the NaN happened to sit. Same multiset, three orderings:
+
+```
+p50=20.0  p95=48.0   from [nan, 10.0, 20.0, 40.0, 50.0]
+p50=40.0  p95=nan    from [10.0, 20.0, 40.0, 50.0, nan]
+p50=20.0  p95=48.0   from [10.0, nan, 20.0, 40.0, 50.0]
+```
+
+`sorted()` puts a NaN wherever the comparisons happen to leave it,
+because every comparison against it is False. A `+Inf` fares no better:
+it silently becomes the maximum and rides out through `summary()` →
+`to_dict()` → `dump_summary_json` as the bare token `Infinity` — invalid
+JSON that `jq`, browser `JSON.parse`, and Go and Rust decoders reject
+whole.
+
+### All three harms were already written down
+
+Every one of them is quoted from the docstring of the guard that **#80
+added to the telemetry copy**:
+
+> Unguarded, `sorted()` leaves the NaN in an implementation-defined slot
+> (all NaN comparisons are False), so the returned percentile is
+> silently wrong and position-dependent, and `dump_aggregate_json` then
+> serializes the `nan` as the bare token `NaN` — invalid JSON a strict
+> log-tailer rejects whole.
+
+#80 fixed the copy it was looking at. The copy its own docstring names
+as the thing it must agree with never got the guard.
+
+### Why the ingestion guard didn't cover it
+
+`PhaseTimings.record` does reject non-finite `ms` (#63). #80 added the
+telemetry guard anyway and explained why: `CostRecord.build` already
+guarded at ingestion, "but a record constructed directly (the dataclass
+has no `__post_init__`) bypasses it, and this function is exported on
+its own."
+
+Both halves apply here, and the first one harder. `PhaseTimings` is a
+dataclass whose four phase lists are *public init fields*, so
+`PhaseTimings(total=[...])` is a supported public path — the natural way
+to rebuild timings from a persisted summary, or to merge across runs
+with `combined.total.extend(other.total)`. And `pt.total.append(x)`
+bypasses `record` too, which is precisely why the guard belongs at the
+**read** boundary and not in a `__post_init__`: only the read side can
+see an append. There's a test for that case specifically.
+
+Values only. The out-of-range-`p` clamping contract is deliberate
+("matches numpy's default"), and it, `record()`'s ingestion guard, and
+the `p` NaN/bool validation are all untouched — their tests pass
+unmodified. Negatives stay unrejected here as well, because
+`telemetry.percentile` rejects only non-finiteness and exact parity with
+the sibling is the whole point of the change.
+
+### Two tests worth the space
+
+The **parity test** asserts the two implementations directly against
+each other across p ∈ {0, 25, 50, 75, 95, 100}, and against each other
+again on rejecting the same bad sample — rather than two independent
+tests that could drift apart again the way these two did. That's the
+contract the prose was standing in for.
+
+The **JSON-egress test** uses `parse_constant`. Python's `json.loads`
+accepts bare `NaN` and `Infinity` by default, so a naive round-trip
+assertion would have passed on the broken output: the artifact was
+invalid for every strict consumer and green in CI.
+
+The position-dependence test pins the corruption rather than the
+exception type — all three orderings must now fail identically.
+
+Anti-vacuous check: reverting only the guard fails all seven, the parity
+test included; its finite half agrees either way, so it fails
+specifically on the divergence.
+
+### The transferable lens
+
+A docstring asserting that two implementations agree is an unenforced
+contract and a good hunt seed. Grep the portfolio for "Matches X",
+"Parity with X", "Mirrors X", "Same shape as X" — then diff the two
+line by line and write the parity test the prose has been standing in
+for.
+
+### Noted, not filed
+
+`scripts/telemetry_dashboard.py --seed N` puts N records in the database
+but the dashboard shows N−1. `_seed` places the oldest at exactly
+`now − 86400`, and `last_24h()` recomputes its cutoff at *request* time,
+so that record is always just outside the window. Deterministic, not a
+race — but a thin demo path; left for a future run.
