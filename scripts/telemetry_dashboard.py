@@ -81,12 +81,31 @@ def _json_response_body(records: Sequence[CostRecord]) -> bytes:
 
 
 def _seed(store: TelemetryStore, n: int = 60, now: float | None = None) -> None:
-    """Insert N deterministic synthetic records spanning the last 24 hours."""
+    """Insert N deterministic synthetic records *strictly inside* the last 24 hours.
+
+    The interval is half-open — ``(now - 24h, now]`` — and that matters (#170).
+    Distributing as ``i / (n - 1)`` puts the oldest record on ``now - span_s``
+    exactly, i.e. on the boundary. ``last_24h()`` recomputes its cutoff at
+    *request* time, which is necessarily later than seed time, and ``since()``
+    filters ``ts >= cutoff``; so the boundary record had always expired by the
+    time anything read it. ``--seed 60`` served 59, and ``--seed 1`` served 0 —
+    the dashboard rendered its "no records in window" empty state for a store
+    that had just been told to seed a record.
+
+    ``(i + 1) / n`` instead puts the oldest one interval in and the newest on
+    ``now``. Landing on ``now`` is safe: ``since()`` is a lower bound only, so
+    there is no symmetric boundary to fall off at the top.
+
+    The margin against elapsed wall-clock time is ``span_s / n`` — 24 minutes
+    at the documented ``--seed 60``. It shrinks as N grows, so a pathological
+    seed of ~86k records could still race the clock; that is out of proportion
+    to a demo path and deliberately not defended against.
+    """
     now = now if now is not None else time.time()
     pt = PriceTable({"synthetic-model": ModelPrice(2.0, 8.0)})
     span_s = 24 * 3600
     for i in range(n):
-        ts = now - span_s + (span_s * i / max(n - 1, 1))
+        ts = now - span_s + span_s * (i + 1) / n
         # Deterministic-but-varied latency curve so the chart shows shape.
         latency_ms = 80.0 + 40.0 * ((i * 7) % 13) / 12 + 20.0 * ((i * 11) % 7) / 6
         rec = CostRecord.build(
