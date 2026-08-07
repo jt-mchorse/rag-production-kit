@@ -555,3 +555,114 @@ class TestStreamingPipelineRunKValidation:
         events = list(pipe.run("q", k=1))
         # First event is retrieving, last is done (or error if something throws).
         assert events[0].type == "retrieving"
+
+
+# ---------------------------------------------------------------------------
+# #168: PhaseTimings.percentile guards its *values*, not just `p`.
+#
+# `telemetry.percentile`'s docstring says it "matches
+# `rag_kit.streaming.PhaseTimings.percentile` so a 24-hour aggregate window
+# and a streaming-pipeline snapshot agree on the number when given the same
+# sample." #80 added a finiteness guard to the telemetry copy; the copy that
+# docstring names never got one, so on a sample containing NaN the two
+# disagreed — one raising, the other returning a position-dependent number.
+# ---------------------------------------------------------------------------
+
+_NAN = float("nan")
+_INF = float("inf")
+
+
+@pytest.mark.parametrize("bad", [_NAN, _INF, -_INF])
+def test_phase_timings_percentile_rejects_non_finite_values(bad: float) -> None:
+    """A non-finite value reaches the list only by bypassing `record`
+    (#63) — which `PhaseTimings(total=[...])` does, since the phase lists
+    are public dataclass init fields, as does a later `.append`. Guard at
+    the read boundary, mirroring `telemetry.percentile` (#80)."""
+    t = PhaseTimings(total=[10.0, 20.0, bad, 40.0])
+    with pytest.raises(ValueError, match="must all be finite"):
+        t.percentile("total", 50)
+
+
+def test_phase_timings_percentile_rejects_a_value_appended_after_construction() -> None:
+    """The read boundary is the *complete* place for this guard: a
+    `__post_init__` would catch construction but never see an append."""
+    t = PhaseTimings()
+    t.record("retrieving", 5.0)
+    t.retrieving.append(_NAN)  # bypasses record()'s ingestion guard
+    with pytest.raises(ValueError, match="must all be finite"):
+        t.percentile("retrieving", 95)
+
+
+def test_phase_timings_percentile_was_position_dependent_on_nan() -> None:
+    """The concrete corruption, not just the exception type.
+
+    `sorted()` leaves a NaN in an implementation-defined slot because every
+    NaN comparison is False, so the *same multiset* in different orders
+    returned different percentiles — p50 of 20.0 / 40.0 / 20.0 for these
+    three orderings. Every ordering must now fail identically.
+    """
+    orderings = (
+        [_NAN, 10.0, 20.0, 40.0, 50.0],
+        [10.0, 20.0, 40.0, 50.0, _NAN],
+        [10.0, _NAN, 20.0, 40.0, 50.0],
+    )
+    for order in orderings:
+        t = PhaseTimings(total=list(order))
+        with pytest.raises(ValueError, match="must all be finite"):
+            t.percentile("total", 50)
+
+
+def test_phase_timings_percentile_matches_the_telemetry_sibling() -> None:
+    """The contract `telemetry.percentile`'s docstring states, asserted
+    directly rather than as two independent tests that could drift apart
+    again. Note the scale difference is deliberate and documented: this
+    method takes `p` in [0, 100], the telemetry one takes `q` in [0, 1].
+    """
+    from rag_kit.telemetry import percentile as telemetry_percentile
+
+    finite = [10.0, 20.0, 40.0, 50.0, 90.0]
+    t = PhaseTimings(total=list(finite))
+    for p in (0, 25, 50, 75, 95, 100):
+        assert t.percentile("total", p) == pytest.approx(telemetry_percentile(finite, p / 100.0)), (
+            f"the two implementations disagree at p={p}"
+        )
+
+    # ...and they now agree on rejecting the same bad sample, which is
+    # where they diverged before #168.
+    # Both messages say "must all be finite" — the guard was deliberately
+    # worded to match the sibling's, so one `match` pins both.
+    bad = [10.0, 20.0, _NAN, 40.0]
+    with pytest.raises(ValueError, match="must all be finite"):
+        PhaseTimings(total=list(bad)).percentile("total", 50)
+    with pytest.raises(ValueError, match="must all be finite"):
+        telemetry_percentile(bad, 0.5)
+
+
+def test_non_finite_never_egresses_as_an_invalid_json_token(tmp_path: Path) -> None:
+    """`summary()` / `to_dict()` / `dump_summary_json` all route through
+    `percentile`, so the guard reaches the on-disk artifact too.
+
+    Asserted with `parse_constant`: Python's `json.loads` accepts bare
+    `NaN` / `Infinity` by default, so a naive round-trip test would have
+    passed on the broken output — the file was invalid for every strict
+    consumer (`jq`, browser `JSON.parse`, Go/Rust decoders) and green here.
+    """
+    t = PhaseTimings(total=[10.0, 20.0, 30.0, _INF])
+    for call in (lambda: t.summary(), lambda: t.to_dict()):
+        with pytest.raises(ValueError, match="must all be finite"):
+            call()
+    out = tmp_path / "summary.json"
+    with pytest.raises(ValueError, match="must all be finite"):
+        t.dump_summary_json(out)
+    assert not out.exists(), "a rejected summary must not leave an artifact behind"
+
+    # The healthy path still writes strictly-valid JSON.
+    ok = PhaseTimings()
+    for ms in (10.0, 20.0, 30.0):
+        ok.record("total", ms)
+    ok.dump_summary_json(out)
+
+    def _reject(token: str) -> float:
+        raise ValueError(f"bare {token} token")
+
+    json.loads(out.read_text(encoding="utf-8"), parse_constant=_reject)
