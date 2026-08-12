@@ -1377,3 +1377,34 @@ but the dashboard shows N−1. `_seed` places the oldest at exactly
 `now − 86400`, and `last_24h()` recomputes its cutoff at *request* time,
 so that record is always just outside the window. Deterministic, not a
 race — but a thin demo path; left for a future run.
+
+## 2026-08-07 — the dashboard seeder wrote a record that was already too old (#170)
+
+`--seed 60` printed "seeded 60 synthetic records" and the dashboard then
+showed 59. The seeder spread its timestamps across the window as
+`i / (n - 1)`, which lands the first one on `now - 24h` exactly. The reader
+recomputes its own cutoff when the request arrives, and that is always later
+than the moment the seed was written, so the oldest record was outside the
+window before anything could read it. Not a race — guaranteed.
+
+Reproducing across the whole range rather than just the documented `--seed
+60` turned up something the report had missed: `--seed 1` serves *zero*. With
+one record, `max(n - 1, 1)` is still 1, `i=0` still lands on the boundary,
+and the entire store falls outside the window, so the dashboard shows its
+"no records in window" empty state for a database it has just been told to
+populate. That case is now the one the regression test leads with, because
+it's what separates a real fix from one that merely shifts the boundary by
+an interval.
+
+The fix distributes as `(i + 1) / n` instead. The oldest record sits one
+interval inside; the newest lands exactly on `now`, which is fine because the
+query is a lower bound only — there's no symmetric boundary at the top to
+fall off. At the documented sixty records that leaves a 24-minute margin
+against elapsed time and still covers 23h36m of the window, so the chart
+keeps its shape.
+
+The general shape is worth remembering: a producer that anchors to `now` when
+it *writes* and a reader that recomputes the same window when it *reads* are
+always racing the clock between them. Any record placed exactly on the
+boundary is dead on arrival. The tell here was cheap and visible from the
+outside — a printed count and a served count that disagreed.
