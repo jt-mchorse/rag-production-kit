@@ -1408,3 +1408,41 @@ it *writes* and a reader that recomputes the same window when it *reads* are
 always racing the clock between them. Any record placed exactly on the
 boundary is dead on arrival. The tell here was cheap and visible from the
 outside — a printed count and a served count that disagreed.
+
+## 2026-08-12 — the fix that would have been a no-op (#172)
+
+`scripts/bench_streaming.py` had a bare `--out` write seam: an unwritable
+target — a file in the parent chain, a directory target, a read-only parent —
+escaped as a raw traceback at exit 1. And it escaped *after* the bench had run
+every query and printed its complete table, so the operator saw a full,
+successful-looking benchmark followed by a stack.
+
+The obvious fix is to wrap the write and return 2. That would have done
+nothing. The module guard was a bare `main()` call rather than
+`raise SystemExit(main())`, so `main`'s return value was discarded and the
+process exited 0 no matter what it reported. The result would have read
+correctly at the call site, passed a quick review, and still exited 0 on every
+I/O failure.
+
+That's the lens worth keeping: **before fixing an exit-code seam, check that
+the module guard can carry a code at all.** It's cheap to verify and easy to
+miss, because the broken version looks identical to the working one everywhere
+except one line at the bottom of the file.
+
+Three of this repo's four entry points — `bench_rewriter`,
+`telemetry_dashboard`, `evals/run_eval` — are `main(argv) -> int` under a guard
+that propagates. `bench_streaming` was the outlier on all three axes at once:
+no `argv`, no `int`, no propagating guard. The missing `argv` is also why the
+seam had no coverage; the script couldn't be driven in-process, so all six
+existing `--out` tests shell out, and all six test happy paths.
+
+What pointed at it was the file's own comment: "Reject degenerate CLI input
+with a clean `error: ... (exit 2)`, mirroring the sibling
+`scripts/bench_rewriter.py`". It does mirror `bench_rewriter` — on the
+`ap.error` half. It diverged on everything that carries a code out of the
+process. Prose asserting that two implementations agree stays an unenforced
+claim until something diffs them.
+
+So the new lock diffs them, from the AST of all four entry points, rather than
+adding another comment asking the next author to remember. A comment asking
+the next author to remember is what made this gap.
