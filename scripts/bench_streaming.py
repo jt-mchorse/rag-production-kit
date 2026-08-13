@@ -174,7 +174,19 @@ def print_table(t: PhaseTimings) -> None:
         print(f"{phase:<12} {s['n']:>5} {_fmt(s['p50_ms']):>10} {_fmt(s['p95_ms']):>10}")
 
 
-def main() -> None:
+def main(argv: Sequence[str] | None = None) -> int:
+    """Run the bench and return the process exit code.
+
+    Signature and module guard match the repo's three other entry points —
+    `scripts/bench_rewriter.py`, `scripts/telemetry_dashboard.py` and
+    `evals/run_eval.py` — all of which are `main(argv) -> int`. This one was
+    `main() -> None` under a bare `main()` call, which meant two things
+    (#172): the `--out` write seam could not report an I/O failure with an
+    exit code, and any code returned from here would have been *discarded* by
+    the module guard, so fixing the seam without fixing the plumbing would
+    have been a no-op. `parse_args(argv)` also makes the failure paths
+    driveable in-process, which is why they had no coverage.
+    """
     ap = argparse.ArgumentParser(description="Benchmark StreamingPipeline phases")
     ap.add_argument("--n", type=int, default=200, help="number of queries to run")
     ap.add_argument("--k", type=int, default=3, help="final top-k after rerank")
@@ -190,7 +202,7 @@ def main() -> None:
             "indent=2, trailing newline). Stdout table prints regardless."
         ),
     )
-    args = ap.parse_args()
+    args = ap.parse_args(argv)
     # Reject degenerate CLI input with a clean `error: ... (exit 2)`, mirroring
     # the sibling `scripts/bench_rewriter.py`. Without this, `--k 0` surfaces
     # `StreamingPipeline.run`'s ValueError as a raw traceback (it raises before
@@ -216,8 +228,27 @@ def main() -> None:
     print_table(timings)
 
     if args.out is not None:
-        timings.dump_summary_json(args.out)
+        # `dump_summary_json` delegates to `atomic_write_text`, which raises
+        # OSError on an unwritable target — a file parent (FileExistsError), a
+        # directory target (IsADirectoryError), a read-only parent
+        # (PermissionError). Bare, each escaped as a raw traceback at exit 1
+        # *after* the full stdout table had already printed, so the operator saw
+        # a complete, successful-looking benchmark followed by a stack (#172).
+        # Same translation `evals/run_eval.py` already does around the same
+        # helper, and the write-seam exit-2 sweep this file was missed by
+        # (lco#162, aop#113, pyasync#84, vsas#97, chunking#126).
+        try:
+            timings.dump_summary_json(args.out)
+        except OSError as e:
+            print(f"::error::failed to write {args.out}: {e}", file=sys.stderr)
+            return 2
+
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    # `raise SystemExit(main())`, not a bare `main()`. Under the bare call the
+    # return value was discarded, so the process exited 0 no matter what `main`
+    # reported — the reason the seam above could not have been fixed by
+    # returning 2 alone (#172).
+    raise SystemExit(main())
