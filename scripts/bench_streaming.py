@@ -234,9 +234,12 @@ def main(argv: Sequence[str] | None = None) -> int:
         # (PermissionError). Bare, each escaped as a raw traceback at exit 1
         # *after* the full stdout table had already printed, so the operator saw
         # a complete, successful-looking benchmark followed by a stack (#172).
-        # Same translation `evals/run_eval.py` already does around the same
-        # helper, and the write-seam exit-2 sweep this file was missed by
-        # (lco#162, aop#113, pyasync#84, vsas#97, chunking#126).
+        # Same translation the write-seam exit-2 sweep this file was missed by
+        # applied elsewhere (lco#162, aop#113, pyasync#84, vsas#97,
+        # chunking#126). This comment used to claim `evals/run_eval.py` already
+        # did it around the same helper — it did not, and that unchecked claim
+        # is how #172 closed one branch of the class while leaving the sibling
+        # it named exposed. Both are guarded as of #174.
         try:
             timings.dump_summary_json(args.out)
         except OSError as e:

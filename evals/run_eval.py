@@ -35,6 +35,7 @@ import argparse
 import hashlib
 import json
 import re
+import shutil
 import subprocess
 import sys
 import urllib.error
@@ -57,6 +58,13 @@ DATASET_PATH = REPO_ROOT / "evals" / "dataset" / "rag_qa_v1.jsonl"
 CORPUS_PATH = REPO_ROOT / "evals" / "dataset" / "corpus_v1.jsonl"
 BASELINES_DIR = REPO_ROOT / "evals" / "baselines"
 CURRENT_DIR = REPO_ROOT / "evals" / "current"
+
+# `--post-comment` renders each suite delta by shelling out to `eval-harness
+# diff-json`, which ships in the `[eval]` extra rather than the base install
+# (see pyproject). Both the pre-check in `main` and the guard in
+# `_diff_markdown` name the extra so the operator gets a fix, not a stack.
+_EVAL_HARNESS_HINT = "eval-harness not found on PATH; install it with: pip install -e '.[eval]'"
+_EVAL_HARNESS_MISSING = f"_({_EVAL_HARNESS_HINT})_"
 
 SUITES = ("faithfulness", "recall_at_5", "correctness")
 
@@ -304,13 +312,18 @@ def write_runs(runs: list[_SuiteRun], out_dir: Path, *, dataset_version: str) ->
     return paths
 
 
-def _post_composite_comment(repo: str, pr: int, deltas: dict[str, str], token: str | None) -> None:
+def _post_composite_comment(repo: str, pr: int, deltas: dict[str, str], token: str | None) -> bool:
     """Composite sticky comment with all three suite deltas.
 
     Avoids ``eval-harness comment`` (it uses a single hardcoded marker)
     so the three suites share one comment instead of overwriting each
     other. Marker below is repo-private to keep this comment from
     colliding with the harness's own demo marker.
+
+    Returns True when the comment was posted (or when there is no token and
+    the body was printed as a dry run), False when the API call failed. The
+    caller turns a False into a non-zero exit so a fork-PR 403 is visible to
+    CI instead of being swallowed (#174).
     """
     marker = "<!-- rag-production-kit:eval-sticky -->"
     body_parts = [marker, "", "# Eval delta — rag-production-kit"]
@@ -330,7 +343,7 @@ def _post_composite_comment(repo: str, pr: int, deltas: dict[str, str], token: s
     if token is None:
         print("(dry-run: no GITHUB_TOKEN; comment body printed below)\n")
         print(body)
-        return
+        return True
 
     # Find an existing sticky comment by marker.
     list_url = f"https://api.github.com/repos/{repo}/issues/{pr}/comments?per_page=100"
@@ -346,7 +359,15 @@ def _post_composite_comment(repo: str, pr: int, deltas: dict[str, str], token: s
                 if marker in (c.get("body") or ""):
                     existing_id = int(c["id"])
                     break
-    except urllib.error.HTTPError as e:
+    # `URLError`, not `HTTPError`: the latter is a *subclass* of the former, so
+    # the old guard covered "the API answered with an error status" but not "we
+    # never reached the API" — a DNS failure or refused connection raised bare
+    # `URLError` and escaped as a traceback from the one call site that had a
+    # guard (#174). A network outage is precisely the condition this warning
+    # exists for, and it was the one condition it did not cover. Failing to
+    # *list* is still non-fatal: the worst case is posting a second sticky
+    # comment instead of editing the first.
+    except urllib.error.URLError as e:
         print(f"warning: failed to list PR comments: {e}", file=sys.stderr)
 
     payload = json.dumps({"body": body}).encode()
@@ -373,31 +394,77 @@ def _post_composite_comment(repo: str, pr: int, deltas: dict[str, str], token: s
                 "Content-Type": "application/json",
             },
         )
-    with urllib.request.urlopen(req) as resp:
-        if resp.status >= 300:
-            raise RuntimeError(f"comment post failed: {resp.status} {resp.read().decode()}")
+    # The write call needs its own guard, and a different one from the read
+    # above. Pre-#174 this `urlopen` was bare while the list call was wrapped,
+    # so the identical exception class was a warning when *reading* comments
+    # and an unhandled crash when *writing* one. The canonical trigger is a
+    # fork PR: on `pull_request` from a fork `GITHUB_TOKEN` is read-only, so
+    # listing succeeds and creating returns 403 — the CI step died with a
+    # `urllib.error.HTTPError: HTTP Error 403: Forbidden` stack instead of a
+    # legible message. 401 (bad token) and 404 (wrong repo/PR) took the same
+    # path.
+    #
+    # `HTTPError` is caught before `URLError` because it is a subclass and
+    # carries the response body, which is where GitHub explains *why*
+    # ("Resource not accessible by integration" for the fork case). The old
+    # `resp.status >= 300` check below this call was dead code: `urlopen`
+    # raises `HTTPError` for every status >= 400 and transparently follows
+    # 3xx, so control never reached it with a >= 300 status — a dead guard
+    # sitting next to the live gap. Reading `resp.status` on the success path
+    # instead keeps a real assertion that the API accepted the write.
+    try:
+        with urllib.request.urlopen(req) as resp:
+            if resp.status not in (200, 201):
+                print(
+                    f"::error::comment post returned unexpected status {resp.status}",
+                    file=sys.stderr,
+                )
+                return False
+    except urllib.error.HTTPError as e:
+        detail = e.read().decode(errors="replace").strip()
+        print(
+            f"::error::failed to post PR comment: HTTP {e.code} {e.reason}"
+            + (f" — {detail}" if detail else ""),
+            file=sys.stderr,
+        )
+        return False
+    except urllib.error.URLError as e:
+        print(f"::error::failed to post PR comment: {e.reason}", file=sys.stderr)
+        return False
+    return True
 
 
 def _diff_markdown(current: Path, baseline: Path) -> str:
     """Shell out to `eval-harness diff-json --format markdown`.
 
     Keeps the diff rendering identical to llm-eval-harness's own output.
+
+    `check=False` covers "the subcommand exited non-zero"; it does not cover
+    "there is no such executable". `eval-harness` ships in the ``[eval]``
+    extra, not the base install, so on a plain `pip install -e .` this raised a
+    raw `FileNotFoundError` traceback mid-way through `--post-comment` (#174) —
+    after the results were already written, which reads as a partial success.
+    `main` pre-checks the binary so the operator gets an actionable exit 2
+    before any work happens; this guard covers the direct-call path.
     """
-    out = subprocess.run(
-        [
-            "eval-harness",
-            "diff-json",
-            "--current",
-            str(current),
-            "--baseline",
-            str(baseline),
-            "--format",
-            "markdown",
-        ],
-        capture_output=True,
-        text=True,
-        check=False,
-    )
+    try:
+        out = subprocess.run(
+            [
+                "eval-harness",
+                "diff-json",
+                "--current",
+                str(current),
+                "--baseline",
+                str(baseline),
+                "--format",
+                "markdown",
+            ],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+    except FileNotFoundError:
+        return _EVAL_HARNESS_MISSING
     return out.stdout or out.stderr
 
 
@@ -443,7 +510,18 @@ def main(argv: list[str] | None = None) -> int:
         runs = [r for r in runs if r.suite == args.suite]
 
     target_dir = BASELINES_DIR if args.write_baselines else CURRENT_DIR
-    written = write_runs(runs, target_dir, dataset_version="rag-qa-v0.1")
+    # `write_runs` delegates to `atomic_write_text`, which raises OSError on an
+    # unwritable target — a read-only mount, a `PermissionError` on the parent,
+    # or a path component that is a file (`NotADirectoryError`). Bare, each
+    # escaped as a raw traceback at exit 1 from a script that already speaks the
+    # 0/2 contract two checks above (#174). `scripts/bench_streaming.py`'s #172
+    # comment asserted this translation already lived here; it did not, which is
+    # how the sweep that fixed that file missed its own stated sibling.
+    try:
+        written = write_runs(runs, target_dir, dataset_version="rag-qa-v0.1")
+    except OSError as e:
+        print(f"::error::failed to write eval results under {target_dir}: {e}", file=sys.stderr)
+        return 2
     for _, path in written.items():
         try:
             rel = path.relative_to(REPO_ROOT)
@@ -457,6 +535,16 @@ def main(argv: list[str] | None = None) -> int:
             print("--post-comment requires --repo and --pr", file=sys.stderr)
             return 2
         import os
+
+        # Fail before rendering anything. `_diff_markdown` shells out to
+        # `eval-harness`, which lives in the `[eval]` extra — on a base install
+        # that used to surface as a raw FileNotFoundError *after* the results
+        # were written, so the operator saw a partially-succeeded run and a
+        # stack (#174). A missing required tool is operator-environment input,
+        # the same class as `--post-comment` without `--repo`, hence 2.
+        if shutil.which("eval-harness") is None:
+            print(f"--post-comment requires {_EVAL_HARNESS_HINT}", file=sys.stderr)
+            return 2
 
         token = os.environ.get(args.token_env)
         deltas: dict[str, str] = {}
@@ -473,7 +561,14 @@ def main(argv: list[str] | None = None) -> int:
                 deltas[suite] = f"_(no baseline at {base.relative_to(REPO_ROOT)})_"
                 continue
             deltas[suite] = _diff_markdown(cur, base)
-        _post_composite_comment(args.repo, args.pr, deltas, token)
+        # A failed post is a real failure, not a warning: the whole point of
+        # `--post-comment` is that the delta reaches the PR. Returning 0 here
+        # let a fork-PR 403 pass as a green CI step with the eval delta silently
+        # missing (#174). 1, not 2 — 2 is this script's operator-input code
+        # (unknown `--suite`, `--post-comment` without `--repo`/`--pr`), and a
+        # rejected API call is neither operator input nor success.
+        if not _post_composite_comment(args.repo, args.pr, deltas, token):
+            return 1
 
     return 0
 

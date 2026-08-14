@@ -1446,3 +1446,17 @@ claim until something diffs them.
 So the new lock diffs them, from the AST of all four entry points, rather than
 adding another comment asking the next author to remember. A comment asking
 the next author to remember is what made this gap.
+
+## 2026-08-13 — Five failure seams in the eval orchestrator (#174)
+
+**Duration:** ~50 min · **Issue:** #174 · **PR:** #175
+
+`evals/run_eval.py` is the script CI runs on every PR to produce the eval delta. It already returned exit 2 for operator mistakes, but five of its failure paths went around that contract entirely.
+
+The find came from reading the file we merged an hour earlier. `scripts/bench_streaming.py`'s new comment said "Same translation `evals/run_eval.py` already does around the same helper" — and it didn't. The results write was completely unguarded, so an unwritable output directory produced a raw traceback. A sweep had closed one branch of that bug class and left exposed the very sibling its own comment named.
+
+Reading further turned up four more. The call that *creates* the PR comment was unguarded while the call that *lists* comments, ten lines above it, was wrapped — so the same failure was a warning when reading and a crash when writing. The canonical way to hit it is a pull request from a fork, where `GITHUB_TOKEN` is read-only: listing works, creating returns 403, and the CI step died with a stack trace. The guard that did exist caught `HTTPError` but not its parent `URLError`, so a refused connection escaped the one place that had protection — a network outage being exactly what that warning was for. A `resp.status >= 300` check below it was dead code, since `urlopen` raises before control ever reaches it. And the delta renderer shelled out to `eval-harness` with `check=False`, which covers the tool failing but not the tool being absent — and `eval-harness` ships in an optional extra, so a plain install crashed after the results had already been written.
+
+`--post-comment` now exits non-zero when the comment genuinely fails to post, so a fork-PR 403 is visible instead of passing as a green step with the delta silently missing. Eleven new tests drive each seam for real — a stub HTTP server on localhost, a blocked path on a real filesystem — and all eleven fail against the pre-fix source.
+
+**Open:** the `#172` note deferred an unvalidated `--pause-seconds` in `scripts/capture_demo.py`; no issue was ever filed for it.
