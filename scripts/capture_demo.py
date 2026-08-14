@@ -45,6 +45,7 @@ from __future__ import annotations
 
 import argparse
 import importlib
+import math
 import shutil
 import subprocess
 import sys
@@ -65,6 +66,40 @@ NEXTJS_DEV_URL = "http://localhost:3000"
 def _banner(stage: int, title: str) -> str:
     line = "=" * 72
     return f"\n{line}\n  STAGE {stage}  {title}\n{line}\n"
+
+
+def _validate_pause_seconds(seconds: float) -> str | None:
+    """Return an error message for an unusable ``--pause-seconds``, else ``None``.
+
+    ``type=float`` is not validation, and both directions of the unguarded
+    domain were live (#176). This was the portfolio's last unguarded
+    ``capture_demo`` pause; the shape is ported from the identical fix in
+    llm-eval-harness#198, including the ``bool`` exclusion (``bool``
+    subclasses ``int``, so ``True`` would otherwise pass as ``1.0`` for a
+    caller reaching ``main(argv=...)`` programmatically).
+
+    - ``inf`` is the loud half: ``time.sleep(inf)`` raises ``OverflowError``
+      ("timestamp out of range for platform time_t"), but only at the first
+      ``_pause`` — which is *after* STAGE 1 has already run its streaming
+      preview, so the operator loses a partial capture to a usage error that
+      is free to reject here. ``1e400`` reaches the same place while looking
+      like a finite, in-range literal: ``float("1e400")`` is ``inf``.
+    - ``nan`` and negatives are the quiet half, and the worse one. ``_pause``
+      guards ``if seconds > 0``; ``nan > 0`` and ``-1 > 0`` are both ``False``,
+      so every stage prints and the script exits 0 having taken no pause at
+      all. The inter-stage pauses are this script's only reason to exist (the
+      module docstring calls them the recorder's cue points), so a silent
+      exit-0 run whose recording is unusable beats a crash for badness.
+
+    ``0`` stays valid — it is the documented CI value.
+    """
+    if not isinstance(seconds, (int, float)) or isinstance(seconds, bool):
+        return f"--pause-seconds must be a number; got {seconds!r}"
+    if math.isnan(seconds) or math.isinf(seconds):
+        return f"--pause-seconds must be finite; got {seconds!r}"
+    if seconds < 0:
+        return f"--pause-seconds must be >= 0; got {seconds!r}"
+    return None
 
 
 def _pause(seconds: float) -> None:
@@ -253,6 +288,14 @@ def main(argv: list[str] | None = None) -> int:
         help="Suppress the STAGE 3 cheat-sheet print. Useful for CI/tests.",
     )
     args = parser.parse_args(argv)
+
+    # Before STAGE 1, not at the first `_pause`. Rejecting here costs
+    # nothing; rejecting later costs the operator a half-finished capture.
+    # `parser.error` exits 2 and names the flag, matching the
+    # `ap.error("--n must be positive")` form bench_streaming.py (#114) and
+    # bench_rewriter.py already use for the same class of usage error.
+    if (msg := _validate_pause_seconds(args.pause_seconds)) is not None:
+        parser.error(msg)
 
     # STAGE 1 — in-process streaming preview, hermetic.
     print(
