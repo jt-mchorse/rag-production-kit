@@ -279,6 +279,14 @@ def main(argv: Sequence[str] | None = None) -> int:
     )
     args = parser.parse_args(argv)
 
+    # An out-of-range port reached `ThreadingHTTPServer`'s bind() and came
+    # back as a raw `OverflowError` traceback at exit 1 (#176) — the wrong
+    # code for a usage error, and a diagnostic pointing at the socket layer
+    # rather than at the flag the operator typed. The sibling scripts
+    # already exit 2 with a flag-named message for this class (#114).
+    if not 0 <= args.port <= 65535:
+        parser.error(f"--port must be in 0-65535; got {args.port}")
+
     if args.seed > 0:
         with TelemetryStore(args.db) as store:
             _seed(store, n=args.seed)

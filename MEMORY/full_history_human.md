@@ -1460,3 +1460,59 @@ Reading further turned up four more. The call that *creates* the PR comment was 
 `--post-comment` now exits non-zero when the comment genuinely fails to post, so a fork-PR 403 is visible instead of passing as a green step with the delta silently missing. Eleven new tests drive each seam for real — a stub HTTP server on localhost, a blocked path on a real filesystem — and all eleven fail against the pre-fix source.
 
 **Open:** the `#172` note deferred an unvalidated `--pause-seconds` in `scripts/capture_demo.py`; no issue was ever filed for it.
+
+## 2026-08-14 — the portfolio's last unguarded capture_demo pause (#176)
+
+Two numeric CLI arguments under `scripts/` accepted values their own code
+cannot use.
+
+`capture_demo.py --pause-seconds` had no validation at all, and both directions
+of the domain were live. `inf` is the loud half: `time.sleep(inf)` raises
+`OverflowError`, but only at the *first* `_pause`, which happens after STAGE 1
+has already run its streaming preview — so the operator loses a partial capture
+to a usage error that costs nothing to reject at parse time. `nan` and
+negatives are the quiet half, and the worse one: `_pause` guards
+`if seconds > 0`, so every stage printed and the script exited 0 having taken
+no pause at all. The inter-stage pauses are this script's only reason to exist
+— its own module docstring calls them the recorder's cue points — so a silent
+exit-0 run whose recording is unusable beats a crash for badness.
+
+Two things made this a clean find rather than a judgement call. First, it was
+sitting in the previous run's log as an explicitly deferred item ("rag
+capture_demo unvalidated `type=float` pause_seconds STILL never filed"). Those
+"deferred and stated, not filed" bullets in prior run logs are a work queue,
+and worth re-reading at repo-selection time. Second, sweeping all five
+`capture_demo` scripts in the portfolio and putting the result in the issue as
+a one-row-per-repo table: llm-cost-optimizer, llm-eval-harness,
+nextjs-streaming-ai-patterns and prompt-regression-suite all guard it, and
+rag was the sole gap. llm-eval-harness#198 is the identical fix to the
+identical script, so the guard shape ported directly.
+
+Enumerating the same directory turned up a second one. `telemetry_dashboard.py
+--port` has no range check, so `-1` or `99999` reaches `ThreadingHTTPServer`'s
+`bind()` and returns a raw `OverflowError` at exit 1 — the wrong code for a
+usage error, with a diagnostic pointing at the socket layer rather than at the
+flag the operator typed. `bench_streaming.py` and `bench_rewriter.py`, in the
+same directory, already exit 2 with a flag-named message from #114. Same repo,
+same class, different answer.
+
+One test shape is worth reusing: a test that pins the *reference
+implementation*. `test_port_guard_matches_the_sibling_scripts_exit_code_contract`
+actually runs `bench_streaming --n 0` and `bench_rewriter --k -3` and asserts
+they still exit 2, so the claim "this now matches the sibling scripts" cannot
+quietly become false later.
+
+Two process notes. `1e400` earned a permanent place in any finite-float variant
+table: it looks like a finite, in-range literal, `float("1e400")` is `inf`, and
+it reaches the same `OverflowError` — it's the row that argues for a finiteness
+check rather than a magnitude check. And argparse bit me exactly where memory
+had already warned it would: a bare `-inf` or `-1` is treated as a *flag*
+because it starts with a dash, so `--pause-seconds -inf` fails with "expected
+one argument", a different error that would have made the tests pass for the
+wrong reason. Every case uses the `--flag=VALUE` form, with a comment saying
+why.
+
+`--seed` was left alone deliberately. It's documented as "If `>0`, insert this
+many" and `main` guards `if args.seed > 0`, so a negative value silently doing
+nothing reads as intended — flagged in the issue rather than silently folded
+into the fix.
