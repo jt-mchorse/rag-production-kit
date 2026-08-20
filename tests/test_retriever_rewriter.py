@@ -55,9 +55,17 @@ class _FakeCursor:
             limit = params[2]
             self._buf = self._conn.lexical_results(query, limit)
         elif "EMBEDDING <=>" in upper:
+            # The dense SQL now selects the distance as a 4th column and binds
+            # the query vector twice — once in the SELECT list, once in the
+            # ORDER BY (#180). `dense_results` still yields 3-tuples, so a
+            # synthetic ascending distance is attached here: the real query
+            # returns rows distance-ascending, so index position models it
+            # faithfully and every existing call site is unchanged. Tests that
+            # need *tied* distances build their own connection.
             qvec = params[0]
-            limit = params[1]
-            self._buf = self._conn.dense_results(qvec, limit)
+            limit = params[2]
+            rows = self._conn.dense_results(qvec, limit)
+            self._buf = [(ext, text, meta, float(i)) for i, (ext, text, meta) in enumerate(rows)]
         else:
             raise AssertionError(f"unexpected SQL: {sql}")
         self._conn.query_log.append((sql, params))
