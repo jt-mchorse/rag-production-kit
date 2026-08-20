@@ -1576,3 +1576,73 @@ and the `generator._SENTENCE_SPLIT` / abbreviation vein is genuinely saturated
 across ten prior issues. The parity claim between the rewriter's
 `_TERMINATORS` and `generator._SENTENCE_SPLIT` also holds — both are the same
 eight-character set.
+
+## 2026-08-20 — a no-op UPDATE turned over the whole retrieved set (#180)
+
+Both channels of `Retriever._hybrid_search` ran `ORDER BY <non-unique key>
+LIMIT n`. SQL leaves the choice among tied rows undefined, and Postgres settles
+it by physical row order — so *which documents came back* moved whenever rows
+moved on disk, which an ordinary `UPDATE`, `VACUUM` or reindex does.
+
+Measured on a real Postgres 16, six documents sharing one term profile (an
+ordinary shape — templated or boilerplate documents do this by construction),
+all tying at `ts_rank_cd` 0.1, `LIMIT 3`, mutated only by a no-op
+`UPDATE ... SET text = text`:
+
+    initial insert     -> doc-alpha,  doc-bravo,   doc-charlie
+    one row rewritten  -> doc-bravo,  doc-charlie, doc-delta
+    two more rewritten -> doc-delta,  doc-echo,    doc-foxtrot
+
+Complete membership turnover. The first and third result sets share no document
+at all. For a RAG kit, that is which chunks get retrieved, generated from, and
+cited.
+
+The interesting part is why `#40` did not already cover it. `#40` gave RRF a
+doc-id tiebreak, and it works — but on a different axis: independence from the
+order *methods* are supplied in. It cannot absorb an unstable input *ranking*,
+because a different input rank changes the fused score itself, which the
+tiebreak never sees. The three orderings Postgres actually returned fused three
+different ways, while a control confirms `#40`'s own property still holds. The
+generalizable question: when a tiebreak already exists somewhere, ask which
+axis it stabilizes and whether that stage's inputs are themselves stable. A
+deterministic fuser over nondeterministic rankers is still nondeterministic.
+
+The two channels got deliberately different fixes, and the code says why. The
+lexical tiebreak goes in the SQL, and `EXPLAIN` confirms it costs nothing:
+`ts_rank_cd` is a computed expression no index can order by, so the query
+already sorts and `external_id` only extends the existing sort key — same plan,
+same `Seq Scan`. The dense channel could not take the same treatment, because
+appending `, external_id` to `ORDER BY embedding <=> ...` is exactly the form
+that stops pgvector using an HNSW index-ordered scan. I could not measure that
+plan — the pgvector image would not pull — so rather than assert it, I took the
+shape that cannot regress a plan I did not observe: select the distance, leave
+the `ORDER BY` alone, impose `(dist, external_id)` on the returned rows.
+
+That makes the dense ranking a function of the data while leaving membership at
+the `LIMIT` boundary to the index — a weaker guarantee than the lexical channel
+gets, and the right place to stop, because HNSW is approximate and its recall is
+already not exact (the open question in `vector-search-at-scale#71`). Exact
+membership is a different problem from determinism.
+
+Worth remembering as a method: the pgvector image would not pull, but
+`postgres:16-alpine` was already local and the lexical channel needs no vector
+extension. Reproducing the schema minus the embedding column was enough to
+measure the defect, the fix, and both `EXPLAIN` plans on a real engine. Don't
+abandon a database finding because the exact image is unavailable — ask which
+half actually needs the extension.
+
+One thing caught before shipping: my first version of the pg test seeded with
+raw `INSERT`s, but `tsv` is a plain column populated by a database *trigger*,
+not a `GENERATED` column. The `WHERE tsv @@ ...` filter would have matched
+nothing and the test would have failed on its own fixture. Switched to the
+repo's own `Indexer`, which is what the rest of the pg suite does.
+
+**Why this work, this session:** the static `priority:high` queue was globally
+empty, and a portfolio-wide sweep for untiebroken `ORDER BY` surfaced this.
+
+**Open questions / blockers:** none. Noted but not filed: `telemetry.since()`'s
+`ORDER BY ts ASC` is also untiebroken, but `ts` is a float `time.time()` rather
+than a one-second string, so collisions are far less reachable.
+
+**Next session:** `vector-search-at-scale`'s `pgvector.py` carries the same bare
+`ORDER BY embedding <=> ... LIMIT` and is worth the same look.
