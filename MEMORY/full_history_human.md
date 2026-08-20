@@ -1516,3 +1516,63 @@ why.
 many" and `main` guards `if args.seed > 0`, so a negative value silently doing
 nothing reads as intended — flagged in the issue rather than silently folded
 into the fix.
+
+## 2026-08-19 — the `--port` guard covered one operand of the bind tuple (#178)
+
+#177 landed in this session's Phase A. It added a `--port` range check to
+`scripts/telemetry_dashboard.py` and its comment stated the contract in
+general terms: a usage error must not surface as a raw traceback at exit 1
+with a diagnostic pointing at the socket layer rather than at the flag the
+operator typed.
+
+That was true of `--port`'s range and of nothing else in `main()`.
+`ThreadingHTTPServer((args.host, args.port), _Handler)` sits one line below
+the new guard, and `args.host` — also operator input — is the first element
+of the same tuple. Measured:
+
+```
+--host 'not a host'          exit=1  socket.gaierror: [Errno 8] nodename nor servname provided
+--port <an in-use port>      exit=1  OSError: [Errno 48] Address already in use
+--db /nonexistent/t.db --seed 3
+                             exit=1  sqlite3.OperationalError: unable to open database file
+```
+
+The in-use port is the one that actually happens. Starting the dashboard
+twice is the most likely operator mistake here, and it had the worst
+diagnostic of the three.
+
+This is the second time in one run that the same shape paid: a guard added to
+protect a multi-operand expression covering only one operand. Earlier today it
+was `render_report` in llm-eval-harness, which validated `threshold_kappa` and
+not `result.cohens_kappa` on either side of the same `>=`. Worth sweeping the
+portfolio for.
+
+`--host` is *classified*, not pre-checked. A hostname cannot be validated
+ahead of the bind without reimplementing the resolver — `localhost`, a
+`.local` name, an IPv6 literal and a bare `""` meaning all-interfaces are all
+valid — so a pre-check carries false-positive risk on working setups where a
+post-failure classifier carries none. `socket.gaierror` subclasses `OSError`,
+so one arm covers both socket cases; `sqlite3.Error` does not, which is why
+the seed seam needs its own arm. Checking the MRO before assuming one `except`
+covers a class is the transferable habit here.
+
+Two smaller things came out of the same reading. The banner `print` moved
+inside the `try`/`finally`, so a failure between a successful bind and
+`serve_forever()` can no longer leak the listening socket. And the seed guard
+runs before the bind, so a typo'd `--db` returns 2 rather than falling through
+to serve an empty database — there's a named test for that ordering.
+
+For the tests, the in-use case binds a **real** socket rather than patching
+`ThreadingHTTPServer`. A mock would assert my model of the failure; a real
+bind asserts the OS's. I measured `999.999.999.999` as failing but left it out
+of the suite deliberately — it is syntactically a valid hostname, so a network
+with a wildcard resolver could answer it and flake CI. The two hosts that
+stayed are network-independent.
+
+Three hunts in this repo came back empty first and are recorded so they aren't
+repeated: `bench_rewriter --k` and `bench_streaming --n/--k` already exit 2
+with flag-named messages, `reciprocal_rank_fusion`'s `k` guard is complete,
+and the `generator._SENTENCE_SPLIT` / abbreviation vein is genuinely saturated
+across ten prior issues. The parity claim between the rewriter's
+`_TERMINATORS` and `generator._SENTENCE_SPLIT` also holds — both are the same
+eight-character set.

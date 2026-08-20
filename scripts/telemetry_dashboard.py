@@ -28,6 +28,7 @@ import argparse
 import html
 import http.server
 import json
+import sqlite3
 import sys
 import time
 from collections.abc import Sequence
@@ -288,17 +289,57 @@ def main(argv: Sequence[str] | None = None) -> int:
         parser.error(f"--port must be in 0-65535; got {args.port}")
 
     if args.seed > 0:
-        with TelemetryStore(args.db) as store:
-            _seed(store, n=args.seed)
+        # `--db` in a directory that doesn't exist came back as a raw
+        # `sqlite3.OperationalError: unable to open database file` traceback at
+        # exit 1 (#178) — reachable through the documented `--seed` path, and a
+        # diagnostic naming SQLite rather than the flag the operator typed.
+        # `sqlite3.Error` is NOT an `OSError` subclass, so it needs its own arm
+        # alongside the `OSError` one (a path component that is a file, a
+        # permission denial).
+        try:
+            with TelemetryStore(args.db) as store:
+                _seed(store, n=args.seed)
+        except (OSError, sqlite3.Error) as e:
+            print(f"::error::--db {args.db!r} is not usable: {e}", file=sys.stderr)
+            return 2
         print(f"seeded {args.seed} synthetic records into {args.db}", file=sys.stderr)
 
     _Handler.db_path = args.db
-    server = http.server.ThreadingHTTPServer((args.host, args.port), _Handler)
-    print(
-        f"serving http://{args.host}:{args.port}/ from {args.db} (Ctrl-C to stop)",
-        file=sys.stderr,
-    )
+    # The `--port` range check above covers one operand of this bind tuple, and
+    # its comment states the contract for both: a usage error must not surface
+    # as a raw traceback at exit 1 with a diagnostic pointing at the socket
+    # layer. Measured on the unguarded call (#178):
+    #
+    #   --host 'not a host'     -> socket.gaierror: [Errno 8] nodename nor
+    #                              servname provided, or not known  (exit 1)
+    #   --port <in-use port>    -> OSError: [Errno 48] Address already in use
+    #                              (exit 1)
+    #
+    # Classified here rather than pre-checked. A hostname cannot be validated
+    # ahead of the bind without reimplementing the resolver — `localhost`, a
+    # `.local` name, an IPv6 literal and a bare `""` (all interfaces) are all
+    # valid — so a pre-check carries false-positive risk on working setups
+    # where a post-failure classifier carries none (the llm-eval-harness#194
+    # posture). `socket.gaierror` subclasses `OSError`, so one arm covers both.
+    #
+    # Starting the dashboard twice, or on a port something else already holds,
+    # is the routine case and the one where a clear message matters most.
     try:
+        server = http.server.ThreadingHTTPServer((args.host, args.port), _Handler)
+    except OSError as e:
+        print(
+            f"::error::could not bind --host {args.host!r} --port {args.port}: {e}",
+            file=sys.stderr,
+        )
+        return 2
+    # From here the socket is open, so every exit path must close it — not just
+    # `serve_forever`'s. The `print` below can raise (a closed or full stdout),
+    # and wrapping only `serve_forever` would leak the listener.
+    try:
+        print(
+            f"serving http://{args.host}:{args.port}/ from {args.db} (Ctrl-C to stop)",
+            file=sys.stderr,
+        )
         server.serve_forever()
     except KeyboardInterrupt:
         pass
