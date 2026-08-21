@@ -1646,3 +1646,68 @@ than a one-second string, so collisions are far less reachable.
 
 **Next session:** `vector-search-at-scale`'s `pgvector.py` carries the same bare
 `ORDER BY embedding <=> ... LIMIT` and is worth the same look.
+
+---
+
+## 2026-08-21 — a citation that pointed at the wrong chunk (#182)
+
+This kit's headline promise is that answers refuse when context is weak and
+every claim cites a chunk. It turned out you could get a citation that pointed
+at a chunk the claim didn't come from — and nothing downstream could tell,
+because the citation object looked perfectly well-formed.
+
+The thread to pull was a comment. `enforce_citations` strips a `[cite: ...]`
+marker before looking it up, because the real Anthropic generator emits padded
+markers and without the strip a fully-grounded answer gets refused. That
+leniency is load-bearing. The comment explaining it ended by ruling out the
+obvious objection: stripping "cannot create a false-accept," because "corpus
+external_ids never carry leading/trailing whitespace, so two distinct valid ids
+can't collide."
+
+Nothing enforced that "never." `Document.__post_init__` checked one thing:
+that `external_id` wasn't empty. So I put ten identifier shapes through both
+ends — index the document, then ask the reader to validate a correct citation to
+it — and printed the two verdicts side by side. Six of the ten were "accepted by
+the writer, unresolvable by the reader." A document indexed as `' doc1'` could
+not be cited back; the marker strips to `doc1`, misses the padded key, and the
+answer is refused as unparseable. `'   '` got in because whitespace is truthy,
+so the emptiness check waved it through. And `'doc]1'` broke a different way
+entirely — the marker pattern terminates at the first `]`, so `[cite:doc]1]`
+captures just `doc`.
+
+The false refusals are annoying. The false accept is the real finding. Put both
+`'doc1'` and `' doc1'` in one corpus — two distinct rows, since the schema's
+UNIQUE constraint sees them as different — and a citation to `' doc1'` resolves
+to `'doc1'` and renders that chunk's body as the source. That's the exact thing
+the comment said couldn't happen, and it's the worse failure mode: a refusal is
+recoverable, a confidently wrong citation is not.
+
+The fix has two sides because they cover different populations. `Document` now
+rejects a padded or `]`-bearing id, which makes the reader's stated assumption
+true at the point a corpus is authored. But that guard structurally cannot reach
+rows already sitting in a database, and `enforce_citations` is handed rows from
+Postgres, not `Document` objects — so it also refuses when two retrieved ids
+collide after stripping. That check compares the ids *before* stripping, which
+matters: a retrieval that returns the same chunk twice is a duplicate, not an
+ambiguity, and conflating the two would break ordinary queries. It has its own
+test.
+
+What I deliberately didn't do is turn this into an identifier grammar.
+`external_id` is documented as caller-supplied — a filename plus chunk index, a
+hash — and a general charset rule here would reject legitimate corpora to fix a
+problem they don't have. Internal spaces, brackets, newlines, dots and non-ASCII
+all round-trip correctly, and each has a test keeping it that way. Only the two
+shapes the marker grammar genuinely can't express are rejected. The
+padded-marker leniency from #88 also has its own test now, so this fix can't
+quietly undo the one it builds on.
+
+Fourteen of the thirty-two new tests fail against the pre-fix source; the rest
+are keep-working pins, which is what they're for.
+
+Also examined and found clean this session: `rerank_delta_ndcg`. Its documented
+`[0.0, 1.0]` range holds across twelve shapes — identity, full reverse, subset,
+superset, all-new ids, either side empty — and the 1.0 ceiling is sound for a
+structural reason worth writing down, so nobody re-checks it later: relevance is
+defined by `before`'s own ordering, so `before` already pairs the largest
+relevance with the largest positional weight, and by the rearrangement
+inequality no other arrangement can beat it.
