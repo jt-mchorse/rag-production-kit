@@ -138,11 +138,38 @@ class Retriever:
         candidate_k = k * _CANDIDATE_MULTIPLIER
 
         # --- Lexical channel ------------------------------------------------
+        # `ORDER BY <non-unique key> LIMIT n` leaves the choice among tied rows
+        # undefined, and Postgres settles it by physical row order — so *which
+        # documents come back* moved whenever rows moved on disk (#180). An
+        # ordinary no-op `UPDATE ... SET text = text` was enough. Measured on
+        # Postgres 16 with six documents sharing one term profile, all at
+        # ts_rank_cd 0.1, LIMIT 3:
+        #
+        #   initial insert     -> doc-alpha,  doc-bravo,   doc-charlie
+        #   one row rewritten  -> doc-bravo,  doc-charlie, doc-delta
+        #   two more rewritten -> doc-delta,  doc-echo,    doc-foxtrot
+        #
+        # Complete membership turnover: the first and third sets share nothing.
+        # For a RAG kit that is which chunks get retrieved, generated from, and
+        # cited. Equal ranks are ordinary, not contrived — templated or
+        # boilerplate documents share a term profile by construction.
+        #
+        # `#40` gave RRF a doc-id tiebreak, but on a different axis: it made the
+        # fused output independent of the order *methods* are supplied in. It
+        # cannot absorb an unstable input *ranking*, because a different input
+        # rank changes the fused score itself, which that tiebreak never sees.
+        # Feeding the three orderings above into `reciprocal_rank_fusion` gave
+        # three different top-3s.
+        #
+        # The tiebreak is free here, verified with EXPLAIN: `ts_rank_cd` is a
+        # computed expression no index can order by, so this query already
+        # sorts, and `external_id` only extends the existing sort key. Same
+        # plan, same Seq Scan.
         lexical_sql = """
         SELECT external_id, text, metadata
         FROM documents
         WHERE tsv @@ plainto_tsquery('english', %s)
-        ORDER BY ts_rank_cd(tsv, plainto_tsquery('english', %s)) DESC
+        ORDER BY ts_rank_cd(tsv, plainto_tsquery('english', %s)) DESC, external_id ASC
         LIMIT %s
         """
         with self.conn.cursor() as cur:
@@ -150,16 +177,40 @@ class Retriever:
             lex_rows = cur.fetchall()
 
         # --- Dense channel --------------------------------------------------
+        # Same defect, deliberately a different shape (#180). Appending
+        # `, external_id` to this ORDER BY would make it deterministic too, but
+        # that is exactly the form that stops pgvector using an HNSW
+        # index-ordered scan, turning an ANN lookup into a full scan plus sort.
+        # So: select the distance, leave the ORDER BY alone so the index scan is
+        # preserved, and impose the deterministic order on the returned rows
+        # below.
+        #
+        # What that fixes and what it does not: the dense *ranking* becomes a
+        # function of the data. Membership at the LIMIT boundary is still the
+        # index's choice, so a tied row can still fall outside `candidate_k` —
+        # a weaker guarantee than the lexical channel gets. That is the right
+        # place to stop, because HNSW is an *approximate* index whose recall is
+        # already not exact (the open question in vector-search-at-scale#71).
+        # Making dense membership exact is a different problem from making it
+        # deterministic.
         qvec = to_pgvector(self.embedder.embed(query))
         dense_sql = """
-        SELECT external_id, text, metadata
+        SELECT external_id, text, metadata, embedding <=> %s::vector AS dist
         FROM documents
         ORDER BY embedding <=> %s::vector
         LIMIT %s
         """
         with self.conn.cursor() as cur:
-            cur.execute(dense_sql, (qvec, candidate_k))
-            dense_rows = cur.fetchall()
+            cur.execute(dense_sql, (qvec, qvec, candidate_k))
+            dense_raw = cur.fetchall()
+        # Sort on (distance, external_id): distance first so the channel's
+        # ranking semantics are untouched, `external_id` only to settle exact
+        # ties. Python's sort is stable, so rows the database already separated
+        # keep their order.
+        dense_rows = [
+            (ext_id, text, meta)
+            for ext_id, text, meta, _dist in sorted(dense_raw, key=lambda r: (r[3], r[0]))
+        ]
 
         # Build a single row-by-external_id index so the fused result can
         # reconstruct full objects without going back to the database.
