@@ -421,6 +421,34 @@ def enforce_citations(
     in the order they first appear, so the caller can render them.
     """
     allowed: dict[str, RetrievalResult] = {r.external_id: r for r in retrieved}
+
+    # The lookup below strips a marker before consulting `allowed`, which is
+    # only safe while no two retrieved ids are equal after stripping. #182
+    # made that true at the write seam (`Document.__post_init__` now rejects a
+    # padded external_id), but a corpus indexed before that guard still has
+    # such rows on disk, and this function is handed rows from the database,
+    # not `Document` objects.
+    #
+    # Silently picking one of two colliding chunks is the specific
+    # false-accept the strip comment below rules out: measured on a corpus
+    # holding both 'doc1' and ' doc1', a citation to ' doc1' resolved to
+    # 'doc1' and rendered that chunk's text as the source of the claim. So
+    # refuse instead -- a refusal is a recoverable answer, a citation pointing
+    # at the wrong chunk is a confidently wrong one, and it is invisible
+    # downstream because the resulting `Citation` is perfectly well-formed.
+    stripped_owners: dict[str, str] = {}
+    for r in retrieved:
+        key = r.external_id.strip()
+        first = stripped_owners.get(key)
+        if first is not None and first != r.external_id:
+            raise CitationError(
+                "unparseable_output",
+                f"retrieved chunks contain ids that collide after stripping: "
+                f"{first!r} and {r.external_id!r} both reduce to {key!r}; a "
+                "citation could not be attributed to one of them unambiguously",
+            )
+        stripped_owners.setdefault(key, r.external_id)
+
     sentences = split_sentences(text)
     if not sentences:
         raise CitationError("unparseable_output", "answer text contained no sentences")
@@ -438,10 +466,18 @@ def enforce_citations(
             # (`AnthropicGenerator`) routinely emits `[cite: doc1]` / `[cite:doc1 ]`;
             # without this, the padded id ` doc1` mismatches the real external_id
             # `doc1`, the marker reads as *dangling*, and a fully-grounded answer is
-            # falsely refused as `unparseable_output` (#88). Stripping is strictly
-            # more lenient and cannot create a false-accept: a genuinely-unknown id
-            # still misses `allowed`, and corpus external_ids never carry
-            # leading/trailing whitespace, so two distinct valid ids can't collide.
+            # falsely refused as `unparseable_output` (#88).
+            #
+            # Stripping is strictly more lenient, and it cannot create a
+            # false-accept *given* that no two retrieved ids are equal after
+            # stripping. That used to be asserted here as "corpus external_ids
+            # never carry leading/trailing whitespace" -- and nothing enforced
+            # the "never", so `Document(' doc1')` was accepted and a corpus
+            # holding both 'doc1' and ' doc1' resolved a citation to the wrong
+            # chunk (#182). Both halves are now closed: `Document.__post_init__`
+            # rejects a padded id at the write seam, and the collision check at
+            # the top of this function covers rows indexed before that guard,
+            # which the write seam structurally cannot reach.
             cite_id = raw_cite_id.strip()
             if cite_id not in allowed:
                 raise CitationError(
