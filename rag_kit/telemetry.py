@@ -138,7 +138,11 @@ class CostRecord:
     without an extra schema.
     """
 
-    ts: float  # seconds since epoch, UTC
+    # Seconds since the Unix epoch, UTC. `build` rejects a non-finite, non-real
+    # or `bool` value (#184) -- this is the key every read path filters and
+    # orders on, so a corrupt one is not merely a wrong column, it decides
+    # whether the row is in a window at all.
+    ts: float
     query: str
     model: str
     retrieved_count: int
@@ -168,6 +172,63 @@ class CostRecord:
         Raises ``UnknownModelError`` if the model is not in the price table.
         ``ts`` defaults to ``time.time()`` when ``None`` (test injection point).
         """
+        # `ts` is the field every read path in this module is keyed on --
+        # `since()` filters `WHERE ts >= ?`, orders `ORDER BY ts ASC`, and
+        # `last_24h()` is defined in terms of it -- and it was the one float on
+        # this record that no seam validated (#184). The rule below is not new:
+        # it is the guard already stated for `total_latency_ms` immediately
+        # after this, and for every `per_phase_ms` value below that, applied to
+        # the operand the sweep skipped.
+        #
+        # Measured before this guard, with `build` accepting each one:
+        #
+        #   nan       -> record() raised sqlite3.IntegrityError:
+        #                NOT NULL constraint failed: cost_records.ts
+        #                (SQLite stores NaN as NULL; an exception type outside
+        #                this module's contract, naming a column rather than
+        #                the caller's mistake)
+        #   inf       -> stored, and in EVERY last_24h() window forever:
+        #                last_24h(now=9_000_000_000) -- the year 2255 -- still
+        #                returns it. The dashboard's headline 24h spend is
+        #                permanently inflated by a row that is not from the
+        #                last 24 hours and never will be.
+        #   -inf      -> stored, and in NO window, ever.
+        #   '2026-08-24' -> stored. `ts REAL NOT NULL` does not stop it: SQLite
+        #                type affinity is a preference, not a constraint, and
+        #                `typeof(ts)` comes back 'text'. TEXT sorts above every
+        #                REAL, so it too is in every window forever, and it
+        #                round-trips out of `since()` as a `str` in a field
+        #                annotated `float`.
+        #   True      -> stored as 1.0, i.e. 1970-01-01T00:00:01Z. Rejected for
+        #                exactly the reason the `per_phase_ms` guard below
+        #                gives: bool is an int subclass, and a stray True must
+        #                not pose as a value in a numeric field.
+        #
+        # An ISO-8601 string is the obvious wrong-type guess for a field named
+        # `ts`, and `time.time_ns()` instead of `time.time()` is the classic
+        # unit slip; both were silent.
+        #
+        # Deliberately NOT bounded from above. `time.time_ns()` gives a finite
+        # 1.7e18 that `time.gmtime` cannot format, but the representable range
+        # is a property of the platform's `time_t`, not of this module, so an
+        # input-domain ceiling here would pin a host property as a contract.
+        # That half is guarded at the outcome instead, in
+        # `scripts/telemetry_dashboard.py`, so one unformattable row does not
+        # take the whole page down with it.
+        #
+        # Negative values are allowed: a pre-1970 timestamp is unusual but
+        # well-defined, and this module has no business deciding an operator's
+        # backfill window is wrong.
+        ts_value = ts if ts is not None else time.time()
+        if isinstance(ts_value, bool) or not isinstance(ts_value, (int, float)):
+            raise ValueError(
+                f"ts must be a finite number of seconds since the Unix epoch (UTC); "
+                f"got {ts_value!r}"
+            )
+        if not math.isfinite(ts_value):
+            raise ValueError(
+                f"ts must be a finite number of seconds since the Unix epoch (UTC); got {ts_value}"
+            )
         # Finiteness guard (#38): NaN latency propagates through percentile()
         # which sorts a list with NaN — Python's sort is stable but NaN
         # comparisons are all false, so the returned percentile is implementation-
@@ -195,7 +256,7 @@ class CostRecord:
                 )
         prompt_usd, completion_usd = price_table.cost(model, prompt_tokens, completion_tokens)
         return CostRecord(
-            ts=ts if ts is not None else time.time(),
+            ts=ts_value,
             query=query,
             model=model,
             retrieved_count=retrieved_count,
