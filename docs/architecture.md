@@ -251,6 +251,26 @@ Dashboard is independently runnable; eval harness (#7) reuses the same
 
 **Why these decisions.**
 
+- **Value-domain guards on `CostRecord` (#38 / #108 / #184).** Every
+  float on the record is validated at `CostRecord.build`, the single
+  write seam: `total_latency_ms` (a not-a-number value propagates through
+  `percentile()`, whose result is then implementation-defined and
+  silently wrong), each `per_phase_ms` value (same contract; `bool`
+  rejected so a stray `True` can't pose as a millisecond count), and
+  `ts`. `ts` was the last one added and matters most, because it is the
+  key every read path filters and orders on — `since()` is
+  `WHERE ts >= ? ORDER BY ts ASC` and `last_24h()` is defined in terms
+  of it. Measured before #184: `inf` and the string `'2026-08-24'` were
+  both accepted and both sat in *every* `last_24h()` window forever
+  (`ts REAL NOT NULL` does not stop a string — SQLite type affinity is
+  a preference, not a constraint), `-inf` sat in none, `float("nan")` came back
+  as a `sqlite3.IntegrityError` naming a column, and `True` meant
+  1970-01-01T00:00:01Z. A *finite* `ts` outside the platform's `time_t`
+  range (`time.time_ns()` in place of `time.time()`) is deliberately not
+  an input-domain rule — that bound is a host property, not a contract —
+  and is guarded at the outcome by `_format_ts` in
+  `scripts/telemetry_dashboard.py`, so one unformattable row renders its
+  raw value instead of raising and taking the whole page with it.
 - **D-015.** `PriceTable` ships no defaults; unknown model id raises
   `UnknownModelError`. Silent zero-cost is the worst failure mode for a
   cost telemetry surface — operators must declare the rates they're
