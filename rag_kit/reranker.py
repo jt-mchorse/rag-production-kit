@@ -228,7 +228,73 @@ class CohereReranker:
                 documents=documents,
                 request_options={"timeout_in_seconds": self.timeout_s},
             )
-            for r in response.results:
+            # `relevance_score` is guarded below because the API is an external,
+            # uncontrolled source. `index` is the OTHER field read off the same
+            # row, and it decides *which document a score is attached to* — in a
+            # kit whose premise is that a citation points at the chunk the claim
+            # came from. It was fed straight into `batch[r.index]` (#186).
+            #
+            # The Protocol above says `rerank` returns "candidates re-sorted",
+            # i.e. a permutation of the input. Measured against 3 candidates
+            # (D0, D1, D2), eight response shapes broke that and five broke it
+            # SILENTLY:
+            #
+            #   index = -1      -> ['D2', 'D1', 'D2']   D2 twice, D0 gone
+            #   index = -3      -> ['D0', 'D1', 'D2']   looks perfect; the 0.9
+            #                                           score belongs to a doc
+            #                                           three positions away
+            #   duplicate index -> ['D0', 'D0', 'D2']   D0 twice, D1 gone
+            #   fewer results   -> ['D0']               2 candidates dropped
+            #   empty results   -> []                   whole retrieval gone
+            #   more results    -> 6 rows out of 3 in
+            #   index = 7       -> raw IndexError
+            #   index = 1.0/'1'/None -> raw TypeError
+            #
+            # The `-3` row is why a "less than length" bounds check is not
+            # enough: Python's negative indexing makes an out-of-range index
+            # look like a perfectly ordinary result. And the empty/short rows
+            # reproduce a harm this module has already named as unacceptable on
+            # the operator-supplied road — see the `batch_size` guard's "every
+            # candidate silently dropped ... no error".
+            #
+            # Per BATCH, not per call: `rerank` chunks by `batch_size`, so each
+            # request is independently a permutation of its own slice.
+            results = list(response.results)
+            if len(results) != len(batch):
+                raise ValueError(
+                    f"Cohere rerank returned {len(results)} result(s) for a batch of "
+                    f"{len(batch)} document(s); the reranker contract is a re-sort of "
+                    "its input, so a short response silently drops candidates and a "
+                    "long one duplicates them"
+                )
+            seen_indices: set[int] = set()
+            for r in results:
+                # `bool` is an `int` subclass, so `index=True` indexed as 1 and
+                # returned the wrong document without tripping any check.
+                if isinstance(r.index, bool) or not isinstance(r.index, int):
+                    raise ValueError(
+                        f"Cohere rerank returned a non-integer index {r.index!r} "
+                        f"({type(r.index).__name__}); it is used to look a document up "
+                        "by position and would otherwise raise a raw TypeError deep in "
+                        "the merge"
+                    )
+                if not 0 <= r.index < len(batch):
+                    raise ValueError(
+                        f"Cohere rerank returned index {r.index} for a batch of "
+                        f"{len(batch)} document(s); a negative index silently resolves "
+                        "to a different document rather than failing, so the score "
+                        "would be attributed to a chunk that did not earn it"
+                    )
+                if r.index in seen_indices:
+                    raise ValueError(
+                        f"Cohere rerank returned index {r.index} more than once in one "
+                        "batch; the reranker contract is a permutation, and a repeated "
+                        "index returns one document twice while dropping another "
+                        "entirely"
+                    )
+                seen_indices.add(r.index)
+
+            for r in results:
                 # The Cohere API is an external, uncontrolled source: a malformed
                 # or erroring response can hand back a non-finite relevance_score.
                 # Unguarded, a NaN flows into ScoredCandidate.rerank_score, then
