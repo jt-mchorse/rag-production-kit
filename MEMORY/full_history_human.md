@@ -1788,3 +1788,49 @@ surface its recent PRs had not touched.
 **Tests.** 27 new (`tests/test_telemetry_ts_value_domain.py`); 16 fail against a
 narrowed revert of the two guards and the three renderer call sites. Suite
 738 → 765 green (8 Postgres tests skip locally), ruff clean.
+
+## 2026-08-25 — the reranker trusted an index it didn't check (#186)
+
+**What got done.** `CohereReranker.rerank` reads two fields off each row of the
+API response. `relevance_score` was guarded, with a comment stating exactly why:
+the Cohere API is an external, uncontrolled source that can hand back a
+malformed value. `index` — the other field, off the same row, two lines below —
+went straight into `batch[r.index]`, and it is the field that decides *which
+document a score is attached to*. Driving twelve malformed-response shapes
+through a stubbed client, eight broke the `Reranker` Protocol's "returns
+candidates re-sorted" contract and five broke it silently: a repeated index
+returned one document twice and dropped another, a short response dropped
+candidates outright, and an empty one made the entire retrieval evaporate with
+no error. The response is now validated as a permutation of the batch it
+answers — count, range, distinctness — each raising `ValueError` like every
+other guard in the module.
+
+**Why this was prioritized.** `rag-production-kit` had zero open issues, so the
+target was found firsthand. It is a priority-tier repo and third in the §8 build
+sequence.
+
+**The row that decides the design.** `index = -3` against a three-element batch
+resolves to `batch[0]`. Three candidates in, three out, in order, no exception —
+the output is indistinguishable from a correct one, and only the score
+attribution is wrong. A bounds check written as "index is less than length" is
+half a check; Python's negative indexing is why the guard has to be a range.
+For a kit whose premise is that a citation points at the chunk a claim came
+from, a silently mispaired score is the failure that matters most.
+
+**Where the harm was already written down.** Twenty lines up, the `batch_size`
+guard's comment says a bad batch size means "every candidate silently dropped,
+the API never called, no error." That guard closed the operator-supplied road to
+that harm. The response-supplied road was still open.
+
+**Open questions.** None for this issue. `Indexer.add_documents` returns
+`len(rows)` while its `executemany` upserts on conflict, so a batch containing a
+duplicate `external_id` reports more rows written than exist — real, but the only
+consumer is a log line and the schema's UNIQUE constraint makes overwriting
+intended across calls. Not filed.
+
+**Tests.** 17 new (`tests/test_reranker_response_contract.py`). Each row is
+fixtured so exactly one of the three checks fires — the first version of the
+probe had the type-error rows tripping the *count* check instead, which would
+have left the type check unexercised while the file still went green. Neutering
+the four conditions turns 14 of the 17 red and leaves all 8 pre-existing reranker
+tests green. Suite 765 → 782 green, ruff clean.
