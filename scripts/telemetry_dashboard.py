@@ -127,6 +127,44 @@ def _seed(store: TelemetryStore, n: int = 60, now: float | None = None) -> None:
         store.record(rec)
 
 
+def _format_ts(ts: float, fmt: str = "%Y-%m-%d %H:%M:%S") -> str:
+    """Format an epoch-seconds timestamp, falling back to its raw value.
+
+    `CostRecord.build` rejects a non-finite, non-real or `bool` `ts` at the
+    write seam (#184), so the values reaching here are finite numbers. A finite
+    number can still be outside what `time.gmtime` can represent -- the classic
+    case being `time.time_ns()` in place of `time.time()`, which yields
+    `1.7e18` and raises `OSError: [Errno 84] Value too large to be stored in
+    data type` on this platform.
+
+    That bound is a property of the platform's `time_t`, not of this repo, so it
+    cannot honestly be expressed as an input-domain rule in `telemetry.py` --
+    an input ceiling there would pin a host property as a contract. Guard the
+    outcome instead, which is the posture `main`'s `--host` classifier below
+    already argues for ("classified here rather than pre-checked").
+
+    The harm being closed is not the ugly cell, it is the *blast radius*.
+    Measured before this helper, a store holding one ordinary record and one
+    with `ts=1e18`::
+
+        _render_dashboard_html(records) -> OSError: [Errno 84] ...
+
+    The whole page died. The operator lost every good row in the window to one
+    bad one, and got a raw traceback naming `data type` rather than the record
+    at fault. Returning the raw value keeps the row visible *and* legible as
+    wrong, which is what an operator needs in order to go delete it.
+
+    `OverflowError` and `ValueError` are caught alongside `OSError` because
+    which one `gmtime` raises for an out-of-range value differs by platform and
+    by magnitude; catching one of the three would reintroduce the defect on the
+    others.
+    """
+    try:
+        return time.strftime(fmt, time.gmtime(ts))
+    except (OSError, OverflowError, ValueError):
+        return f"unrepresentable ts={ts!r}"
+
+
 def _render_chart_svg(records: Sequence[CostRecord], width: int = 720, height: int = 240) -> str:
     """Per-request latency over time, as an inline SVG line chart."""
     if not records:
@@ -162,9 +200,9 @@ def _render_chart_svg(records: Sequence[CostRecord], width: int = 720, height: i
         f'<text x="{margin_l - 6}" y="{margin_t + plot_h}" text-anchor="end" font-size="10" fill="#666">'
         "0ms</text>"
         f'<text x="{margin_l}" y="{height - 8}" font-size="10" fill="#666">'
-        f"{time.strftime('%H:%M', time.gmtime(ts_min))} UTC</text>"
+        f"{_format_ts(ts_min, '%H:%M')} UTC</text>"
         f'<text x="{width - margin_r}" y="{height - 8}" text-anchor="end" font-size="10" fill="#666">'
-        f"{time.strftime('%H:%M', time.gmtime(ts_max))} UTC</text>"
+        f"{_format_ts(ts_max, '%H:%M')} UTC</text>"
         "</svg>"
     )
 
@@ -173,7 +211,7 @@ def _render_dashboard_html(records: Sequence[CostRecord]) -> str:
     agg = aggregate(records)
     chart = _render_chart_svg(records)
     rows_html = "\n".join(
-        f"<tr><td>{time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime(r.ts))} UTC</td>"
+        f"<tr><td>{html.escape(_format_ts(r.ts))} UTC</td>"
         f"<td>{html.escape(r.query)}</td>"
         f"<td>{html.escape(r.model)}</td>"
         f"<td>{r.prompt_tokens}</td>"

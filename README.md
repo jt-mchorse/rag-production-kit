@@ -269,6 +269,14 @@ model that isn't configured raises `UnknownModelError` rather than
 silently emitting `$0.00` — same posture as the no-fabricated-
 benchmarks rule (D-013) extended to prices (D-015).
 
+`CostRecord.build` is the single write seam, and it validates every
+float it stores — including `ts`, which is the key `since()` filters
+and orders on and `last_24h()` is defined in terms of. A non-finite,
+non-real or `bool` timestamp is rejected there rather than reaching
+SQLite: before #184 an `inf` or an ISO-8601 string was accepted and
+then sat in *every* 24-hour window forever, silently inflating the
+dashboard's headline spend.
+
 Launch the dashboard (single-page, inline-SVG chart, no external
 assets) — works air-gapped:
 

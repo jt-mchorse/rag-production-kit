@@ -1711,3 +1711,80 @@ structural reason worth writing down, so nobody re-checks it later: relevance is
 defined by `before`'s own ordering, so `before` already pairs the largest
 relevance with the largest positional weight, and by the rearrangement
 inequality no other arrangement can beat it.
+
+---
+
+## 2026-08-24 — Issue #184: `ts` was the one `CostRecord` float nothing validated
+
+**What got done.** `CostRecord` carries four float fields. Three of them were
+already guarded for finiteness, each with the argument written into the source:
+`total_latency_ms` (#38 — "NaN latency propagates through `percentile()` … the
+returned percentile is implementation-defined and silently wrong"), every
+`per_phase_ms` value (#108 — "the same finiteness/sign contract as
+`total_latency_ms` above … bool is an int subclass"), and `total_usd` (which
+`aggregate` rejects when non-finite). The fourth was `ts`, and nothing anywhere
+validated it — while being the only one the entire query surface is keyed on.
+`since()` is `WHERE ts >= ? ORDER BY ts ASC`, and `last_24h()` is defined in
+terms of it.
+
+Measured, with `CostRecord.build` accepting every value:
+
+| `ts` | what happened |
+|---|---|
+| `float("nan")` | `record()` raised `sqlite3.IntegrityError: NOT NULL constraint failed: cost_records.ts` |
+| `float("inf")` | stored, and in **every** `last_24h()` window forever |
+| `float("-inf")` | stored, and in **no** window, ever |
+| `"2026-08-24"` | stored as SQLite `text`; in every window forever |
+| `True` | stored as `1.0`, i.e. 1970-01-01T00:00:01Z |
+
+```
+last_24h(now=1700000100) -> ['real-now', 'inf', 'iso-string']
+last_24h(now=9000000000) -> ['inf', 'iso-string']      # the year 2255
+```
+
+The dashboard's headline "last 24h spend" was permanently inflated by rows that
+are not from the last 24 hours and never will be.
+
+**Two things I did not expect.** First, `ts REAL NOT NULL` does not stop a
+string — SQLite type affinity is a *preference*, not a constraint, so
+`typeof(ts)` came back `'text'`, TEXT sorts above every REAL (hence the
+every-window residency), and the value round-tripped out of `since()` as a `str`
+in a field annotated `float`. A declared column type is not a validator. Second,
+the one value SQLite *did* reject, NaN, it rejected by storing NULL and tripping
+the `NOT NULL` constraint — so the failure mode was a `sqlite3` exception type
+outside this module's contract, with a message naming a column rather than the
+caller's mistake. That is the same class #176/#178 closed for `--port` and
+`--host`, reached through the data instead of through a flag.
+
+**The split that made the fix honest.** Four of the five bad values close at the
+write seam with the rule the module already states twice. The fifth — `1.7e18`,
+what you get from `time.time_ns()` instead of `time.time()` — is *finite*, and
+the range `time.gmtime` can represent is a property of the platform's `time_t`,
+not of this repo. An input-domain ceiling there would pin a host property as a
+contract. So that half is guarded at the *outcome*, in the dashboard: a
+`_format_ts` helper that falls back to the raw value.
+
+The harm it closes is blast radius, not an ugly cell. Before it, a store holding
+one ordinary record and one with `ts=1e18` made `_render_dashboard_html` raise —
+so the operator lost every good row in the window to one bad one, and got a
+traceback naming "data type" rather than the record at fault. Three different
+exception types were reachable (`OverflowError` for `inf`, `TypeError` for the
+string, `OSError` errno 84 for `1e18`), and which one `gmtime` raises varies by
+platform and magnitude, so the helper catches all three.
+
+**A lesson applied prospectively for once.** The test for the unformattable row
+stubs `time.gmtime` to raise rather than passing a magic large constant, so it
+asserts a property of the *code* and not of the CI host's `time_t` bounds.
+
+**Deliberately allowed.** A negative `ts`. A pre-1970 timestamp is unusual but
+well-defined, and this module has no business deciding an operator's backfill
+window is wrong. The rule is scoped to what the code cannot use, not to what
+looks odd.
+
+**Why this was prioritized.** `rag-production-kit` is a priority-tier repo
+(D-009) with zero open issues, so the issue came from a firsthand probe of the
+surface its recent PRs had not touched.
+
+**Tests.** 27 new (`tests/test_telemetry_ts_value_domain.py`); 16 fail against a
+narrowed revert of the two guards and the three renderer call sites. Suite
+738 → 765 green (8 Postgres tests skip locally), ruff clean.
