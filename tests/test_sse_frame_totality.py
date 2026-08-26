@@ -24,8 +24,12 @@ Measured on `main` before this change, `metadata` on a `retrieved` event::
 The sanitizer was less robust than the call it wraps::
 
     json.dumps alone, circular dict    -> ValueError: Circular reference detected
-    json.dumps alone, 3000-deep dict   -> fine (the C encoder has no Python limit)
-    recursive _json_safe, either one   -> RecursionError
+    recursive _json_safe, circular     -> RecursionError
+
+Depth is bounded by this module's own `_MAX_DEPTH` rather than by out-recursing
+`json.dumps`, because how deep `json.dumps` can go is a property of the
+interpreter version -- see
+`test_depth_beyond_the_limit_is_truncated_rather_than_raising`.
 
 `default=str` cannot rescue any of the key rows: `json.dumps` raises
 `TypeError: keys must be str, int, float, bool or None` *before* consulting
@@ -57,10 +61,13 @@ from __future__ import annotations
 
 import json
 import math
+import sys
 from typing import Any
 
 import pytest
 
+from rag_kit.streaming import _MAX_DEPTH as MAX_DEPTH
+from rag_kit.streaming import _TOO_DEEP as TOO_DEEP_MARKER
 from rag_kit.streaming import StreamEvent, to_sse
 
 # Built from a codepoint, never written literally: a source file containing a
@@ -253,17 +260,70 @@ def test_a_shared_subtree_is_not_mistaken_for_a_cycle() -> None:
     assert _metadata_of(_shared_but_acyclic()) == {"a": {"x": 1}, "b": {"x": 1}}
 
 
-def test_depth_beyond_the_python_recursion_limit_serializes() -> None:
-    """3000 levels. `json.dumps`'s C encoder has no Python recursion limit, so
-    the sanitizer must not be the component that imposes one."""
-    import sys
+def test_depth_within_the_limit_is_reproduced_exactly() -> None:
+    payload = _deep(10)
+    assert _metadata_of(payload) == payload
 
-    levels = 3000
-    assert levels > sys.getrecursionlimit()
-    node = _metadata_of(_deep(levels))
-    for _ in range(levels):
+
+def test_depth_beyond_the_limit_is_truncated_rather_than_raising() -> None:
+    """The limit is *ours*, deliberately, and this is the correction to a claim
+    an earlier revision of this file made.
+
+    That revision asserted 3000 levels serialize, on the reasoning that
+    "`json.dumps`'s C encoder has no Python recursion limit". Two things were
+    wrong with it. `to_sse` passes `default=str`, which disqualifies the C
+    encoder and selects the recursive pure-Python `_make_iterencode`. And how
+    deep *that* can go is a property of the interpreter version: it handled
+    ~14690 levels on CPython 3.14 locally and raised `RecursionError` at 3000 on
+    a CPython 3.11 CI runner, because 3.12 decoupled pure-Python frames from the
+    C stack. The assertion passed locally and failed on CI -- a host-environment
+    assertion, not a test.
+
+    A guarantee that every frame parses cannot be conditional on which Python is
+    running it, so `_json_safe` truncates at its own `_MAX_DEPTH` and the frame
+    is produced either way.
+    """
+    node: Any = _metadata_of(_deep(3000))
+    hops = 0
+    while isinstance(node, dict) and "n" in node:
         node = node["n"]
-    assert node == {"leaf": 1}
+        hops += 1
+    assert node == TOO_DEEP_MARKER
+    assert hops < MAX_DEPTH
+
+
+def test_the_truncation_boundary_is_deterministic_not_host_dependent() -> None:
+    """Every payload deeper than the limit truncates at the same place, on any
+    interpreter -- which is the whole point of pinning our own limit."""
+    depths = [_depth_of(_metadata_of(_deep(n))) for n in (3000, 500, 200, 51)]
+    assert len(set(depths)) == 1, depths
+
+
+def test_totality_holds_under_a_constrained_recursion_limit() -> None:
+    """The portable version of the depth guarantee.
+
+    Rather than asserting what *this* interpreter's `json.dumps` can survive --
+    the assertion that passed on 3.14 and failed on 3.11 -- constrain the stack
+    deliberately and assert `to_sse` still produces a frame. This fails on any
+    interpreter if the bound is ever removed, and passes on any interpreter
+    while it is there.
+    """
+    original = sys.getrecursionlimit()
+    try:
+        sys.setrecursionlimit(200)
+        frame = _frame(_deep(3000))
+        frame.encode("utf-8")
+        json.loads(_data_line(frame))
+    finally:
+        sys.setrecursionlimit(original)
+
+
+def _depth_of(node: Any) -> int:
+    hops = 0
+    while isinstance(node, dict) and "n" in node:
+        node = node["n"]
+        hops += 1
+    return hops
 
 
 def test_tuples_become_lists_at_every_depth() -> None:

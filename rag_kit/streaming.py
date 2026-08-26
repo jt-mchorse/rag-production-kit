@@ -450,6 +450,31 @@ def _safe_key(key: Any) -> str:
 
 _CIRCULAR = "<circular reference>"
 
+_MAX_DEPTH = 50
+"""Deepest nesting `_json_safe` will reproduce; below it, the subtree is a marker.
+
+Making `_json_safe` iterative stopped *this* function from blowing the stack,
+but `json.dumps` is still recursive under the hood -- `to_sse` passes
+`default=str`, which disqualifies the C encoder and selects the pure-Python
+`_make_iterencode`. And *where* that gives out is a property of the interpreter,
+not of this code:
+
+    CPython 3.14 (recursionlimit 1000)   handles ~14690 levels
+    CPython 3.11 (recursionlimit 1000)   raised RecursionError at 3000
+
+Python 3.12 decoupled pure-Python frames from the C stack, so a depth that
+serializes locally can fail on an older runner. A guarantee that "every frame
+parses" cannot be conditional on which Python is running it, so the limit is
+pinned here instead of inherited. 50 is far below the smallest observed
+interpreter limit and far above any real payload -- the event schema is three or
+four levels deep and `metadata` is free-form but not a tree.
+
+Beyond it the subtree becomes a marker, exactly as a cycle does, for the same
+reason: this seam's contract is "stream alive, don't raise" (D-017).
+"""
+
+_TOO_DEEP = f"<nesting deeper than {_MAX_DEPTH} levels>"
+
 
 def _json_safe(obj: Any) -> Any:
     """Return a copy of *obj* that `json.dumps` can always render as valid JSON.
@@ -476,14 +501,14 @@ def _json_safe(obj: Any) -> Any:
     **Iterative, with cycle detection, on purpose.** The recursive version was
     strictly less robust than the `json.dumps` call it exists to protect:
 
-        json.dumps alone, 3000-deep dict  -> fine (the C encoder has no Python
-                                             recursion limit)
         json.dumps alone, circular dict   -> ValueError: Circular reference detected
-        recursive _json_safe, either one  -> RecursionError
+        recursive _json_safe, circular    -> RecursionError
 
     So a helper added to *guarantee* frame validity blew the Python stack before
     `json.dumps` was reached, and turned a diagnosable named error into an
-    opaque one. Same reason `llm-eval-harness#213` and `llm-cost-optimizer#192`
+    opaque one. Depth is handled by `_MAX_DEPTH` rather than by out-recursing
+    `json.dumps`, because how deep `json.dumps` itself can go is a property of
+    the interpreter version, not of this module. Same reason `llm-eval-harness#213` and `llm-cost-optimizer#192`
     walk iteratively. A back-reference becomes `_CIRCULAR` rather than raising,
     because this seam's contract is "stream alive, don't raise" -- the cycle is
     a caller bug, and naming it in the frame tells the operator far more than a
@@ -505,6 +530,12 @@ def _json_safe(obj: Any) -> Any:
             key = _safe_key(raw_key) if isinstance(src, dict) else raw_key
             if isinstance(value, (dict, list, tuple)) and id(value) in ancestors:
                 _place(dst, key, _CIRCULAR)
+                continue
+            if isinstance(value, (dict, list, tuple)) and len(ancestors) >= _MAX_DEPTH:
+                # `json.dumps` is recursive below us and gives out at a
+                # version-dependent depth (see `_MAX_DEPTH`). Truncate here so
+                # the guarantee is ours rather than the interpreter's.
+                _place(dst, key, _TOO_DEEP)
                 continue
             child, child_container = _new_container(value)
             _place(dst, key, child)
