@@ -229,8 +229,14 @@ which speak the *same* SSE protocol.
   frame validity (#106, #188): non-finite floats become `null` at both
   the key and the value position, a key type `json.dumps` would reject
   becomes a string, a coerced key collision resolves to one name
-  instead of a duplicate one, a cycle is named rather than raised, and
-  text with no UTF-8 encoding is replaced with U+FFFD. That last one is
+  instead of a duplicate one, a cycle is named rather than raised,
+  nesting past a pinned `_MAX_DEPTH` is truncated to a marker, and
+  text with no UTF-8 encoding is replaced with U+FFFD. The depth bound
+  is *ours* on purpose: `to_sse` passes `default=str`, which selects
+  `json.dumps`'s recursive pure-Python encoder, and how deep that can
+  go is a property of the interpreter version (~14690 levels on
+  CPython 3.14; a `RecursionError` at 3000 on CPython 3.11). A
+  guarantee cannot be conditional on which Python is running it. That last one is
   the opposite call from `llm-eval-harness#215`, which rejects an
   unencodable input outright — and the difference is the contract. That
   seam writes a file that has to be faithful, and there is no faithful
