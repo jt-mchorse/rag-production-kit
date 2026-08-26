@@ -1908,3 +1908,45 @@ the one field in the frame that is not JSON-encoded.
 9 red, surrogate replacement 5, and restoring the original recursive walk 6 —
 exactly the depth and cycle rows — with no control affected in any of the three.
 Suite 782 → 844 green, ruff and mypy clean.
+
+## 2026-08-26 — CI caught a claim I measured on one interpreter (#188, correction)
+
+**What happened.** The first commit on `#188` claimed, and tested, that
+"`json.dumps` alone handles a 3000-deep dict fine — the C encoder has no Python
+recursion limit". Wrong twice. `to_sse` passes `default=str`, which disqualifies
+the C encoder entirely and selects the recursive pure-Python `_make_iterencode`,
+so the component I cited was never running on this path. And how deep *that* can
+go is a property of the interpreter version: ~14690 levels on CPython 3.14
+locally, a `RecursionError` at 3000 on the CPython 3.11 CI runner, because 3.12
+decoupled pure-Python frames from the C stack. It passed locally and failed on
+four CI jobs.
+
+**I have a standing note that host-environment assertions are not tests,** learned
+two runs ago from a `time.perf_counter` zero-delta assertion that passed on macOS
+and failed on Linux. This is the same class with a different host property —
+interpreter version instead of OS. The tell I missed: my probe answered a
+question about the *runtime*, not about the code, and I treated one interpreter's
+answer as the language's.
+
+**The repair is the general lesson.** Making `_json_safe` iterative only stopped
+*my* function recursing; `json.dumps` was still recursive underneath, so
+`to_sse`'s totality was still the interpreter's to grant. `_MAX_DEPTH = 50` pins
+it here — past that a subtree becomes a marker, exactly as a cycle does. When a
+guarantee depends on a runtime property, pin your own bound rather than
+inheriting theirs.
+
+**And the replacement test is the transferable trick.** Don't assert what this
+host survives; constrain the host deliberately and assert the code still works.
+`sys.setrecursionlimit(200)` is a portable proxy for an older interpreter, and it
+fails everywhere if the bound is ever removed.
+
+**Process.** I posted the correction on the issue and edited the PR body, rather
+than quietly force-pushing a fixed claim. A PR body is a claim about measurement;
+leaving a wrong one standing while fixing the code is the worse half of the
+mistake.
+
+**Incidental, called out rather than smuggled.** The architecture-doc symbol
+resolver flagged the doc's new `RecursionError` as "not in the rag_kit public
+surface". A builtin is a real, resolvable symbol, so the resolver now checks
+`builtins` — which closes that class instead of growing `EXTERNAL_SYMBOLS` one
+exception type at a time. Verified it still flags a made-up CamelCase symbol.
