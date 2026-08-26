@@ -2054,3 +2054,39 @@ decisions_made: []
 followups: []
 ---
 
+
+---
+session: 2026-08-25T07:38Z
+duration_min: 20
+issue: 186
+focus: cohere_rerank_response_index_unvalidated_so_a_malformed_response_mispairs_scores_with_documents
+phase: night_session_multi_issue_loop_issue_3_of_n
+delta:
+  files_changed: 2
+  tests_added: 17
+  suite: 782_green_8_skipped_ruff_clean
+measured:
+  probe: "12 malformed-response shapes x 3 candidates (D0,D1,D2) through a stubbed client"
+  index_minus_1: "['D2','D1','D2'] - D2 twice at ranks 1 and 3 with DIFFERENT scores, D0 gone"
+  index_minus_3: "['D0','D1','D2'] - LOOKS PERFECT, 3 in 3 out in order, but the 0.9 belongs to a doc 3 positions away"
+  duplicate_index: "['D0','D0','D2'] - D0 twice, D1 gone"
+  fewer_results: "['D0'] - 2 candidates silently dropped"
+  empty_results: "[] - entire retrieval evaporates, no error"
+  more_results: "6 rows out of 3 inputs"
+  index_out_of_range: "raw IndexError (not the module's ValueError contract)"
+  index_float_str_none: "raw TypeError"
+  index_True: "['D1'] - bool indexed as 1"
+  after_fix: "all 12 raise ValueError naming the field; CONTROL unchanged"
+context_for_next_session:
+  - THE_LENS_WAS_A_GUARD_COVERS_ONE_OPERAND_IN_ITS_TIGHTEST_FORM_YET_TWO_FIELDS_READ_OFF_THE_SAME_RESPONSE_ROW_TWO_LINES_APART_relevance_score_GUARDED_index_NOT_and_the_score_guards_OWN_COMMENT_states_the_reason_THE_COHERE_API_IS_AN_EXTERNAL_UNCONTROLLED_SOURCE_A_MALFORMED_RESPONSE_CAN_HAND_BACK_which_is_EQUALLY_TRUE_OF_THE_OTHER_FIELD
+  - NEW_AND_HIGHLY_TRANSFERABLE_A_NEGATIVE_INDEX_IS_NOT_AN_OUT_OF_RANGE_INDEX_IN_PYTHON_batch_minus_3_ON_A_3_ELEMENT_LIST_IS_batch_0_SO_THE_OUTPUT_SHAPE_IS_INDISTINGUISHABLE_FROM_CORRECT_3_in_3_out_in_order_ONLY_THE_ATTRIBUTION_IS_WRONG_ANY_BOUNDS_CHECK_WRITTEN_AS_idx_LT_len_IS_HALF_A_CHECK_GREP_THE_PORTFOLIO_FOR_EXTERNALLY_SUPPLIED_LIST_INDICES
+  - THE_CONTRACT_TO_CHECK_WAS_IN_THE_PROTOCOL_DOCSTRING_rerank_RETURNS_CANDIDATES_RE_SORTED_ie_A_PERMUTATION_so_the_test_is_not_is_the_index_valid_but_IS_THE_RESPONSE_A_PERMUTATION_OF_THE_BATCH_which_gives_THREE_checks_count_range_distinct_and_catches_shapes_a_per_row_index_check_alone_would_miss_short_and_empty_responses
+  - THE_HARM_WAS_ALREADY_NAMED_IN_THE_SAME_FILE_the_batch_size_guards_comment_says_EVERY_CANDIDATE_SILENTLY_DROPPED_THE_API_NEVER_CALLED_NO_ERROR_that_guard_closed_the_OPERATOR_SUPPLIED_road_to_that_harm_and_the_RESPONSE_SUPPLIED_road_was_still_open_WHEN_A_COMMENT_NAMES_A_HARM_ASK_WHICH_OTHER_INPUTS_REACH_IT
+  - TEST_DESIGN_NOTE_WORTH_REUSING_EACH_ROW_IS_FIXTURED_SO_EXACTLY_ONE_CHECK_FIRES_my_first_probe_fixtures_for_the_float_str_None_and_bool_index_rows_returned_ONE_row_so_the_COUNT_check_caught_them_and_the_TYPE_check_was_never_exercised_A_ROW_THAT_TRIPS_TWO_CHECKS_PROVES_ONLY_THE_FIRST_ONE
+  - ANTI_VACUOUS_narrow_revert_neutering_ONLY_the_four_if_conditions_14_of_17_new_tests_RED_and_all_8_pre_existing_test_reranker_py_tests_STILL_GREEN_so_the_change_is_additive
+  - PROCESS_MISTAKE_I_APPENDED_git_commit_allow_empty_amend_no_edit_dash_m_noop_TO_A_COMMIT_COMMAND_AS_A_STRAY_GUARD_AND_THE_dash_m_WON_OVERWRITING_A_GOOD_COMMIT_MESSAGE_WITH_noop_recovered_with_git_commit_amend_dash_F_dash_NEVER_CHAIN_AN_AMEND_ONTO_A_COMMIT
+  - REPO_STATE_rag_production_kit_HAD_ZERO_OPEN_ISSUES_this_target_was_found_firsthand_via_ENTRY_POINT_ENUMERATION_which_source_files_have_no_dedicated_test_file_indexer_py_was_the_uncovered_one_but_reranker_pys_EXTERNAL_SDK_SEAM_was_the_richer_surface
+  - DECLINED_indexer_add_documents_returns_len_rows_while_executemany_upserts_ON_CONFLICT_so_a_batch_with_a_duplicate_external_id_reports_MORE_rows_written_than_exist_REAL_but_the_only_consumer_is_a_log_line_and_the_schema_UNIQUE_makes_the_overwrite_intended_across_calls_CHURN_relative_to_the_reranker_finding
+decisions_made: []
+followups: []
+---
