@@ -220,3 +220,45 @@ Same posture as D-005 (which records the rag-kit's `StreamingPipeline` as a sing
 **Reversibility:** Cheap. The route handler is one file (~100 lines). Swapping it for a proxy or a different wire format would touch only `app/api/stream/route.ts` and the client's `handleFrame` parser.
 
 **Related issues:** #8
+
+## D-017 — the SSE wire serializer replaces, it does not reject (2026-08-26)
+
+**Decision.** `to_sse` is *total*: for any input it returns a string that
+`json.loads` accepts and that `.encode("utf-8")` accepts. `_json_safe` gets
+there by replacing what it cannot represent — non-finite floats become `null`
+at the key position as well as the value position, a key type `json.dumps`
+would reject becomes a string, a coerced key collision resolves to a single
+name, a cycle is named rather than raised, and text with no UTF-8 encoding is
+replaced with U+FFFD.
+
+**Why.** `to_sse` runs outside every error handler that could soften a failure.
+`StreamingPipeline.run` wraps its generator body in
+`except Exception -> yield StreamEvent("error", ...)`, but `to_sse` is called
+*after* each event is yielded. And `demo/streaming/server.py` calls
+`to_sse(event).encode("utf-8")` outside its `try`, which guards only
+`wfile.write` and only for `BrokenPipeError` — with `send_response(200)` and the
+headers already sent. So a raise there is not an error the operator sees; it is
+a truncated `text/event-stream` with no `error` frame and no `done` frame, which
+is byte-indistinguishable from a network drop. Against that, one replacement
+character in one `metadata` field is a clear improvement.
+
+**And it is deliberately the opposite of `llm-eval-harness#215`,** which rejects
+an unencodable input outright at its dataset seam. The difference is the
+contract, not a disagreement. That seam writes a file that has to be faithful,
+and there is no faithful spelling of a lone surrogate to write, so refusing the
+input is the only honest option. This seam's documented contract is "stream
+alive, don't raise". Recording it so a later session does not "harmonise" the
+two into a single rule and break one of them.
+
+**Alternatives considered.** (1) Reject, matching `llm-eval-harness#215` —
+rejected for the reason above. (2) Flip `ensure_ascii` to `True`, which would
+make every frame pure ASCII and therefore always encodable — rejected because it
+changes the bytes of every non-ASCII frame in the repo to fix a rare case, and
+the existing comment in `tests/test_streaming.py` records `ensure_ascii=False`
+as a deliberate compactness choice. (3) Catch at the demo server's write seam
+only — rejected: it leaves the library's own documented guarantee false, and
+`to_sse` is exported in `__all__` for callers who have no such server. (4) Let
+`json.dumps` raise — that is the status quo being fixed.
+
+**Reversibility.** Cheap. One helper, one chokepoint, and the whole "before"
+behaviour is a measured variant table in `tests/test_sse_frame_totality.py`.

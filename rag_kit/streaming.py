@@ -359,29 +359,212 @@ class StreamingPipeline:
             return
 
 
-def _json_safe(obj: Any) -> Any:
-    """Replace non-finite floats with ``None`` so the result is valid JSON.
+_UNREPRESENTABLE = "\ufffd"
+"""U+FFFD REPLACEMENT CHARACTER, substituted for text with no UTF-8 encoding.
 
-    ``json.dumps`` defaults to ``allow_nan=True``, emitting the bare tokens
-    ``NaN`` / ``Infinity`` / ``-Infinity`` — which are **invalid JSON**, so a
-    browser's ``EventSource`` (which runs ``JSON.parse`` on the ``data:`` line)
-    rejects the whole frame. ``default=str`` doesn't help: it only intercepts
-    non-serializable *objects*, never floats. We map non-finite floats to
-    ``null`` for parity with JavaScript's own ``JSON.stringify(NaN)`` /
-    ``JSON.stringify(Infinity)`` (both → ``null``), keeping the documented
-    "stream alive, don't raise" contract while guaranteeing every frame parses.
+Deliberately the *opposite* call from `llm-eval-harness#215`, which rejects an
+unencodable input outright (D-017). That seam writes a file that has to be
+faithful, and there is no faithful spelling of a lone surrogate to write. This
+seam's documented contract is "stream alive, don't raise", and a replacement
+character in one metadata field beats a torn connection with no diagnostic.
+"""
 
-    ``metadata`` / ``rerank_score`` flow verbatim from free-form caller data
-    and arbitrary reranker models, so the wire serializer is the correct single
-    chokepoint to enforce frame validity (#106).
+
+def _safe_text(text: str) -> str:
+    """Return *text* with any character that has no UTF-8 encoding replaced.
+
+    A lone surrogate is legal JSON escape syntax and Python decodes it happily,
+    but it has no UTF-8 encoding -- so `json.dumps(..., ensure_ascii=False)`
+    produces a `str` that looks fine and then dies at
+    `to_sse(event).encode("utf-8")` in `demo/streaming/server.py`, *after* the
+    200 and the headers have gone out. The client sees a truncated
+    `text/event-stream` with no `error` and no `done` frame, which is
+    byte-indistinguishable from a network drop (#188).
+
+    The fast path allocates nothing: the overwhelming majority of frames are
+    already encodable and return the same object. Only a string that actually
+    fails is rebuilt, character by character, so a single bad codepoint costs
+    the surrounding text nothing.
+
+    Built explicitly rather than via `errors="replace"`, which substitutes
+    `"?"` on the *encode* side -- U+FFFD is only what the *decode* side
+    produces. `"?"` is a character a caller can legitimately have written, so
+    it would make a substitution indistinguishable from real data.
     """
-    if isinstance(obj, float):
-        return obj if math.isfinite(obj) else None
-    if isinstance(obj, dict):
-        return {k: _json_safe(v) for k, v in obj.items()}
-    if isinstance(obj, (list, tuple)):
-        return [_json_safe(v) for v in obj]
-    return obj
+    try:
+        text.encode("utf-8")
+    except UnicodeEncodeError:
+        return "".join(ch if _encodable(ch) else _UNREPRESENTABLE for ch in text)
+    return text
+
+
+def _encodable(ch: str) -> bool:
+    try:
+        ch.encode("utf-8")
+    except UnicodeEncodeError:
+        return False
+    return True
+
+
+def _safe_key(key: Any) -> str:
+    """Return the JSON object name `json.dumps` should emit for *key*.
+
+    `json.dumps` coerces `int` / `float` / `bool` / `None` keys itself and
+    raises `TypeError: keys must be str, int, float, bool or None` on anything
+    else -- *before* consulting `default=`, which is only ever called for
+    values. So `default=str` cannot rescue a key, and a `tuple` or `frozenset`
+    key raised straight out of `to_sse` (#188).
+
+    Doing the coercion here rather than leaving it to `json.dumps` buys two
+    things beyond not raising:
+
+    - non-finite floats are handled at the key position too. `_json_safe` maps
+      them to `null` as *values* (#106) and passed them through as *keys*, so
+      `{float("inf"): "x"}` reached the wire as the string key `"Infinity"`.
+    - a coerced collision resolves to one key. `{1: "a", "1": "b"}` is two
+      entries in Python and one JSON name, and `json.dumps` emitted **both**:
+      `{"1": "a", "1": "b"}`. RFC 8259 leaves duplicate names undefined and
+      `JSON.parse` keeps the last, so an entry vanished with no diagnostic.
+      Building the dict here keeps the wire semantics identical (last-in wins)
+      while making the frame well-defined JSON.
+    """
+    if isinstance(key, str):
+        return _safe_text(key)
+    # `bool` before `int`, which it subclasses, so `True` stays `"true"` rather
+    # than becoming `"1"` -- json.dumps' own spelling, preserved.
+    if key is True:
+        return "true"
+    if key is False:
+        return "false"
+    if key is None:
+        return "null"
+    if isinstance(key, int):
+        return str(key)
+    if isinstance(key, float):
+        # Same rule the value position already applies (#106): a non-finite
+        # float has no JSON spelling. `null` is what `JSON.stringify` produces
+        # and what `_json_safe` already puts in the value position.
+        return "null" if not math.isfinite(key) else repr(key)
+    return _safe_text(str(key))
+
+
+_CIRCULAR = "<circular reference>"
+
+_MAX_DEPTH = 50
+"""Deepest nesting `_json_safe` will reproduce; below it, the subtree is a marker.
+
+Making `_json_safe` iterative stopped *this* function from blowing the stack,
+but `json.dumps` is still recursive under the hood -- `to_sse` passes
+`default=str`, which disqualifies the C encoder and selects the pure-Python
+`_make_iterencode`. And *where* that gives out is a property of the interpreter,
+not of this code:
+
+    CPython 3.14 (recursionlimit 1000)   handles ~14690 levels
+    CPython 3.11 (recursionlimit 1000)   raised RecursionError at 3000
+
+Python 3.12 decoupled pure-Python frames from the C stack, so a depth that
+serializes locally can fail on an older runner. A guarantee that "every frame
+parses" cannot be conditional on which Python is running it, so the limit is
+pinned here instead of inherited. 50 is far below the smallest observed
+interpreter limit and far above any real payload -- the event schema is three or
+four levels deep and `metadata` is free-form but not a tree.
+
+Beyond it the subtree becomes a marker, exactly as a cycle does, for the same
+reason: this seam's contract is "stream alive, don't raise" (D-017).
+"""
+
+_TOO_DEEP = f"<nesting deeper than {_MAX_DEPTH} levels>"
+
+
+def _json_safe(obj: Any) -> Any:
+    """Return a copy of *obj* that `json.dumps` can always render as valid JSON.
+
+    Three rules, all enforced at every depth and at both the key and the value
+    position:
+
+    - **non-finite floats become `null`.** `json.dumps` defaults to
+      `allow_nan=True`, emitting the bare tokens `NaN` / `Infinity` /
+      `-Infinity`, which are **invalid JSON**, so a browser's `EventSource`
+      (which runs `JSON.parse` on the `data:` line) rejects the whole frame.
+      `null` matches JavaScript's own `JSON.stringify(NaN)` (#106).
+    - **keys are coerced to the name `json.dumps` would emit**, so a key type
+      it rejects cannot raise and a coerced collision cannot put a duplicate
+      name on the wire. See `_safe_key` (#188).
+    - **text with no UTF-8 encoding is replaced**, so the frame survives
+      `.encode("utf-8")` at the write seam. See `_safe_text` (#188, D-017).
+
+    `metadata` / `rerank_score` flow verbatim from free-form caller data --
+    `RetrieverLike` is a documented Protocol and a caller supplying its own
+    `RetrievalResult`s controls `metadata` entirely -- so the wire serializer is
+    the correct single chokepoint to enforce frame validity.
+
+    **Iterative, with cycle detection, on purpose.** The recursive version was
+    strictly less robust than the `json.dumps` call it exists to protect:
+
+        json.dumps alone, circular dict   -> ValueError: Circular reference detected
+        recursive _json_safe, circular    -> RecursionError
+
+    So a helper added to *guarantee* frame validity blew the Python stack before
+    `json.dumps` was reached, and turned a diagnosable named error into an
+    opaque one. Depth is handled by `_MAX_DEPTH` rather than by out-recursing
+    `json.dumps`, because how deep `json.dumps` itself can go is a property of
+    the interpreter version, not of this module. Same reason `llm-eval-harness#213` and `llm-cost-optimizer#192`
+    walk iteratively. A back-reference becomes `_CIRCULAR` rather than raising,
+    because this seam's contract is "stream alive, don't raise" -- the cycle is
+    a caller bug, and naming it in the frame tells the operator far more than a
+    torn connection does.
+
+    `to_sse` is total: for any input, it returns a string that `json.loads`
+    accepts and that `.encode("utf-8")` accepts. `tests/test_sse_frame_totality.py`
+    runs that property over a table rather than restating it in prose.
+    """
+    root, container = _new_container(obj)
+    if container is None:
+        return root
+    # (source node, destination container, ancestor ids on the path to it)
+    stack: list[tuple[Any, Any, frozenset[int]]] = [(obj, root, frozenset({id(obj)}))]
+    while stack:
+        src, dst, ancestors = stack.pop()
+        items = src.items() if isinstance(src, dict) else enumerate(src)
+        for raw_key, value in items:
+            key = _safe_key(raw_key) if isinstance(src, dict) else raw_key
+            if isinstance(value, (dict, list, tuple)) and id(value) in ancestors:
+                _place(dst, key, _CIRCULAR)
+                continue
+            if isinstance(value, (dict, list, tuple)) and len(ancestors) >= _MAX_DEPTH:
+                # `json.dumps` is recursive below us and gives out at a
+                # version-dependent depth (see `_MAX_DEPTH`). Truncate here so
+                # the guarantee is ours rather than the interpreter's.
+                _place(dst, key, _TOO_DEEP)
+                continue
+            child, child_container = _new_container(value)
+            _place(dst, key, child)
+            if child_container is not None:
+                stack.append((value, child, ancestors | {id(value)}))
+    return root
+
+
+def _new_container(value: Any) -> tuple[Any, Any]:
+    """Return ``(node, container_or_None)`` -- the scalar, or an empty shell to fill."""
+    if isinstance(value, float):
+        return (value if math.isfinite(value) else None), None
+    if isinstance(value, str):
+        return _safe_text(value), None
+    if isinstance(value, dict):
+        shell: Any = {}
+        return shell, shell
+    if isinstance(value, (list, tuple)):
+        # tuple -> list, matching what `json.dumps` does anyway.
+        shell = []
+        return shell, shell
+    return value, None
+
+
+def _place(dst: Any, key: Any, value: Any) -> None:
+    if isinstance(dst, list):
+        dst.append(value)
+    else:
+        dst[key] = value
 
 
 def to_sse(event: StreamEvent) -> str:

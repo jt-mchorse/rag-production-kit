@@ -224,6 +224,29 @@ which speak the *same* SSE protocol.
   callers via `iter(...)`.
 - **D-011.** Demo HTTP server is `http.server` from the stdlib, not
   FastAPI. Demos in this repo show *the pipeline*, not the web layer.
+- **D-017.** The wire serializer *replaces* input it cannot represent
+  rather than rejecting it. `_json_safe` is the single chokepoint for
+  frame validity (#106, #188): non-finite floats become `null` at both
+  the key and the value position, a key type `json.dumps` would reject
+  becomes a string, a coerced key collision resolves to one name
+  instead of a duplicate one, a cycle is named rather than raised,
+  nesting past a pinned `_MAX_DEPTH` is truncated to a marker, and
+  text with no UTF-8 encoding is replaced with U+FFFD. The depth bound
+  is *ours* on purpose: `to_sse` passes `default=str`, which selects
+  `json.dumps`'s recursive pure-Python encoder, and how deep that can
+  go is a property of the interpreter version (~14690 levels on
+  CPython 3.14; a `RecursionError` at 3000 on CPython 3.11). A
+  guarantee cannot be conditional on which Python is running it. That last one is
+  the opposite call from `llm-eval-harness#215`, which rejects an
+  unencodable input outright — and the difference is the contract. That
+  seam writes a file that has to be faithful, and there is no faithful
+  spelling of a lone surrogate to write. This seam's contract is "stream
+  alive, don't raise", and `to_sse` runs *outside* both the pipeline's
+  `error`-event arm and the demo server's `try`, with the 200 and the
+  headers already sent — so a raise here is a truncated stream with no
+  `error` frame and no `done` frame, indistinguishable from a network
+  drop. One replacement character in one metadata field is strictly
+  better than that.
 
 ---
 

@@ -205,6 +205,7 @@ def test_doc_symbol_refs_resolve(doc_text: str) -> None:
     adapted to the two citation styles this doc uses, with an
     ``EXTERNAL_SYMBOLS`` allowlist for cross-repo references (#118).
     """
+    import builtins
     import importlib
 
     pkg = importlib.import_module("rag_kit")
@@ -226,7 +227,13 @@ def test_doc_symbol_refs_resolve(doc_text: str) -> None:
         if not hasattr(module, symbol):
             unresolved.append(f"rag_kit.{module_name}.{symbol}")
     for symbol in sorted(camel):
-        if not hasattr(pkg, symbol):
+        # A Python builtin is a real, resolvable symbol -- the doc quoting
+        # `RecursionError` or `ValueError` is naming something that exists, not
+        # claiming a rag_kit export. Resolving against `builtins` closes that
+        # class rather than growing EXTERNAL_SYMBOLS by one exception type at a
+        # time; the allowlist stays for genuine cross-*repo* references like
+        # `RunResult`. A symbol that is neither is still flagged.
+        if not hasattr(pkg, symbol) and not hasattr(builtins, symbol):
             unresolved.append(f"{symbol} (not in the rag_kit public surface)")
 
     assert not unresolved, (

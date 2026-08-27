@@ -1834,3 +1834,119 @@ probe had the type-error rows tripping the *count* check instead, which would
 have left the type check unexercised while the file still went green. Neutering
 the four conditions turns 14 of the 17 red and leaves all 8 pre-existing reranker
 tests green. Suite 765 → 782 green, ruff clean.
+
+## 2026-08-26 — the seam that promised valid frames raised on four inputs (#188)
+
+**What got done.** `_json_safe` is the documented single chokepoint for SSE
+frame validity. It walked *values only* — `{k: _json_safe(v) for k, v in
+obj.items()}` passes every key straight through — and it recursed over
+caller-supplied data. It is now an iterative walk with per-path cycle detection
+that normalizes keys as well as values and replaces text with no UTF-8 encoding.
+`to_sse` is total: for any input it returns a string that `json.loads` accepts
+and that `.encode("utf-8")` accepts.
+
+**The lens was a prose assertion.** The docstring says "guaranteeing every frame
+parses" and calls itself "the correct single chokepoint to enforce frame
+validity". So I built a table and ran it instead of reading the code. Ten rows;
+four raised, one corrupted the wire silently.
+
+**The structural tell was one line.** A dict comprehension that transforms only
+`v` is a guard covering one operand. Worth grepping for.
+
+**The best finding shape of the run: a sanitizer less robust than the call it
+wraps.** `json.dumps` alone handles a 3000-deep dict fine — its C encoder has no
+Python recursion limit — and gives a clean `ValueError: Circular reference
+detected` on a cycle. The Python helper added to *guarantee* validity blew the
+stack first with `RecursionError`, turning a named error into an opaque one.
+Always ask what the unwrapped call does with the same input; the wrapper may be
+the weaker link.
+
+**`default=str` is a value-only hook.** `json.dumps` raises
+`TypeError: keys must be str, int, float, bool or None` *before* `default=` is
+consulted. The docstring already worried about `default=str` — about the wrong
+gap.
+
+**The quiet row.** `{1: "from-int", "1": "from-str"}` is two Python entries and
+one JSON name, and `json.dumps` emitted both. RFC 8259 leaves duplicate names
+undefined and `JSON.parse` keeps the last, so an entry vanished from `metadata`
+with no error anywhere.
+
+**Why a raise here is worse than a normal exception.** `to_sse` runs outside
+every handler that could soften it. The pipeline's
+`except Exception -> yield StreamEvent("error", ...)` wraps the generator body,
+and `to_sse` runs after each yield. The demo server's `try` guards only
+`wfile.write`, only for `BrokenPipeError`, with the 200 and headers already sent.
+The client gets a truncated event-stream with no `error` and no `done` frame —
+indistinguishable from a network drop. Ask where a seam sits relative to the
+error handling, not just whether it raises.
+
+**D-017 is deliberately the opposite of `llm-eval-harness#215`,** which shipped
+forty minutes earlier tonight and *rejects* an unencodable input. That seam
+writes a file that has to be faithful and there is no faithful spelling to write.
+This seam's contract is "stream alive, don't raise". Two seams facing the same
+input class can correctly disagree; the decision exists so a later session
+doesn't harmonise them and break one.
+
+**Two implementation details worth keeping.** `errors="replace"` substitutes
+`"?"` on the *encode* side — U+FFFD is only what the decode side produces — and
+`"?"` is a character a caller can legitimately have written, which would make a
+substitution indistinguishable from real data. And cycle detection has to be
+per-*path*, not a global seen-set: a DAG is not a cycle, and a global set would
+truncate the second reference. Both are pinned as their own tests.
+
+**A process win.** I applied the doc-lock lesson from `#215` *before* running the
+suite this time — D-017 into `docs/architecture.md` and the README range bumped
+first — so the full run was green on the final state. A new D-NNN is a code
+change to two documents.
+
+**Measured and not filed.** `event.type` is interpolated raw into the frame with
+no escaping, but every event is constructed by `StreamingPipeline` itself from a
+closed `EventType` set, not from caller data. Not a defect today — though it is
+the one field in the frame that is not JSON-encoded.
+
+**Tests.** 62 new. Anti-vacuous at all three rules: neutering key coercion turns
+9 red, surrogate replacement 5, and restoring the original recursive walk 6 —
+exactly the depth and cycle rows — with no control affected in any of the three.
+Suite 782 → 844 green, ruff and mypy clean.
+
+## 2026-08-26 — CI caught a claim I measured on one interpreter (#188, correction)
+
+**What happened.** The first commit on `#188` claimed, and tested, that
+"`json.dumps` alone handles a 3000-deep dict fine — the C encoder has no Python
+recursion limit". Wrong twice. `to_sse` passes `default=str`, which disqualifies
+the C encoder entirely and selects the recursive pure-Python `_make_iterencode`,
+so the component I cited was never running on this path. And how deep *that* can
+go is a property of the interpreter version: ~14690 levels on CPython 3.14
+locally, a `RecursionError` at 3000 on the CPython 3.11 CI runner, because 3.12
+decoupled pure-Python frames from the C stack. It passed locally and failed on
+four CI jobs.
+
+**I have a standing note that host-environment assertions are not tests,** learned
+two runs ago from a `time.perf_counter` zero-delta assertion that passed on macOS
+and failed on Linux. This is the same class with a different host property —
+interpreter version instead of OS. The tell I missed: my probe answered a
+question about the *runtime*, not about the code, and I treated one interpreter's
+answer as the language's.
+
+**The repair is the general lesson.** Making `_json_safe` iterative only stopped
+*my* function recursing; `json.dumps` was still recursive underneath, so
+`to_sse`'s totality was still the interpreter's to grant. `_MAX_DEPTH = 50` pins
+it here — past that a subtree becomes a marker, exactly as a cycle does. When a
+guarantee depends on a runtime property, pin your own bound rather than
+inheriting theirs.
+
+**And the replacement test is the transferable trick.** Don't assert what this
+host survives; constrain the host deliberately and assert the code still works.
+`sys.setrecursionlimit(200)` is a portable proxy for an older interpreter, and it
+fails everywhere if the bound is ever removed.
+
+**Process.** I posted the correction on the issue and edited the PR body, rather
+than quietly force-pushing a fixed claim. A PR body is a claim about measurement;
+leaving a wrong one standing while fixing the code is the worse half of the
+mistake.
+
+**Incidental, called out rather than smuggled.** The architecture-doc symbol
+resolver flagged the doc's new `RecursionError` as "not in the rag_kit public
+surface". A builtin is a real, resolvable symbol, so the resolver now checks
+`builtins` — which closes that class instead of growing `EXTERNAL_SYMBOLS` one
+exception type at a time. Verified it still flags a made-up CamelCase symbol.
