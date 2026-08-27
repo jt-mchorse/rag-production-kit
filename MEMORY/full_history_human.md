@@ -1950,3 +1950,49 @@ resolver flagged the doc's new `RecursionError` as "not in the rag_kit public
 surface". A builtin is a real, resolvable symbol, so the resolver now checks
 `builtins` — which closes that class instead of growing `EXTERNAL_SYMBOLS` one
 exception type at a time. Verified it still flags a made-up CamelCase symbol.
+
+## 2026-08-27 — #190: the deliberately-excluded list that had already lost a member
+
+The citation layer merges a sentence fragment into the next when it ends in a
+known abbreviation, so `"Dr. Chen founded the company [cite:doc-1]."` stays one
+sentence and its single marker counts. When the abbreviation also spells
+something that naturally *ends* a claim, that merge is a false-accept: an
+uncited sentence rides on the following one's citation. Five refined subsets
+already existed for exactly this — numeric references, the `ms`/`Ms.` collision,
+times, enumerations, attributions.
+
+The interesting part was not finding a sixth. It was the comment that ruled it
+out. `_NUMERIC_REFERENCE_ABBREVIATIONS` carried a sentence saying `"co"`,
+`"st"` and `"al"` were "deliberately NOT gated: they are followed by proper
+nouns, not digits, and are not common standalone claim-endings". `"al"` had
+since been gated anyway, by a different discriminator — and being followed by a
+proper noun was exactly what made it unsafe, not what made it safe. Two of the
+three members of one sentence still carried a rationale that had been falsified
+for the third, and that is why nobody re-checked across four issues. When a
+stated reason turns out to be the *mechanism* of the harm, it isn't a weak
+reason; it's a backwards one. The comment is corrected in place rather than
+deleted, because a deleted wrong comment teaches nobody.
+
+Running the table mattered more than reading the code. All 25 unrefined
+abbreviations merge unconditionally, but only ten carry a claim-ending a model
+would plausibly produce — the rest needed sentences like "The study was led by
+Dr." that nothing writes. Running the variant table is step one; triaging it for
+naturalness is step two, and the fifteen artifacts are recorded as a negative
+result rather than padding the fix.
+
+The two-sided table is what scoped it correctly. Alongside the rows that must
+start refusing, it carries the rows that must keep being accepted — and those
+are what proved the geo initialisms must *not* take the same gate.
+`"U.S. Federal Reserve"`, `"U.N. Security Council"` and `"St. Peter"` all take a
+capitalized continuation, so the follow-on signal that separates the two senses
+everywhere else carries no information for them; gating them would trade one
+false-accept for a frequent false-refusal of correctly-grounded answers. A
+one-sided table would have shipped a fix that breaks half a news corpus.
+
+So the same bug class split into two issues: the half with a clean
+discriminator ships, and the half where closing it costs more than leaving it is
+a decision-revisit with the measured tradeoff. The leaky rows are pinned in a
+test with a pointer, so the gap is a recorded fact rather than an absence — and
+a second test puts the *other* half of the tradeoff in running code, so whoever
+eventually closes it can see what they are trading away without reconstructing
+the argument.
