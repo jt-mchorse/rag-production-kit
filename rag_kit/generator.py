@@ -133,10 +133,25 @@ _ABBREVIATIONS = frozenset(
 # ("vitamin C."). So they count as a non-boundary only when a digit follows
 # (the numeric sense); the word sense stays a real boundary. False-refusing the
 # rare non-numeric use ("See No. IV") is the safe direction (#126); false-
-# accepting an uncited claim is the bug. Name/proper-noun-context abbreviations
-# ("co"→"Acme Co.", "st"→"Main St.", "al"→"et al.") are deliberately NOT gated:
-# they are followed by proper nouns, not digits, and are not common standalone
-# claim-endings, so gating them would false-refuse legitimate cited text.
+# accepting an uncited claim is the bug.
+#
+# CORRECTION (#190). This comment used to say that the name/proper-noun-context
+# abbreviations ("co"→"Acme Co.", "st"→"Main St.", "al"→"et al.") were
+# "deliberately NOT gated: they are followed by proper nouns, not digits, and
+# are not common standalone claim-endings". Every one of those three has since
+# been shown to be a common standalone claim-ending. "al" was gated first, by a
+# *different* discriminator (lowercase follow-on) — being followed by a proper
+# noun is what made it unsafe, not what made it safe. "co" is now gated the same
+# way, with the rest of the company suffixes (`_ORG_SUFFIX_ABBREVIATIONS`).
+# "st" still is not, and #191 records why: unlike the others its mid-sentence
+# sense takes a *capitalized* continuation ("St. Peter"), so the follow-on
+# signal carries no information for it. The sentence stays here, corrected
+# rather than deleted, because being wrong in a comment is what kept anyone
+# from re-checking for four issues.
+#
+# The rule this leaves: "not a digit-gated case" is not the same statement as
+# "safe to merge unconditionally". Each abbreviation needs the discriminator
+# that separates *its* two senses, or an explicit record of why none exists.
 _NUMERIC_REFERENCE_ABBREVIATIONS = frozenset({"no", "vol", "fig", "eq", "pp"})
 
 # The subset of `_ABBREVIATIONS` that also spells a common *unit* which naturally
@@ -177,8 +192,8 @@ _UNIT_COLLISION_ABBREVIATIONS = frozenset({"ms"})
 _TIME_ABBREVIATIONS = frozenset({"a.m", "p.m"})
 
 # The subset of `_ABBREVIATIONS` that spells an *enumeration* marker which very
-# commonly ENDS a claim ("We support JSON, CSV, etc."). Unlike "Dr."/"U.S." — the
-# "vanishingly rare" claim-enders the general `_ABBREVIATIONS` leniency assumes —
+# commonly ENDS a claim ("We support JSON, CSV, etc."). Unlike "Dr." — a
+# genuinely rare claim-ender, since a title is always followed by a name —
 # "etc." is one of the MOST common sentence-ending abbreviations in English, so
 # treating it as an unconditional non-boundary let an uncited claim ending in it
 # ("We support JSON, CSV, etc.") merge into the next (cited) sentence and ride on
@@ -208,6 +223,36 @@ _ENUMERATION_ABBREVIATIONS = frozenset({"etc"})
 # a clause and are commonly followed by a *capitalized* example, so this
 # lowercase-follow-on gate would wrongly split them.)
 _ATTRIBUTION_ABBREVIATIONS = frozenset({"al"})
+
+# The subset of `_ABBREVIATIONS` that spells a *company suffix* which very
+# commonly ENDS a claim ("The vendor of record is Acme Inc."). A filings /
+# contracts / company-news corpus is squarely this kit's target, and an LLM
+# naming an entity it did not retrieve is exactly the hallucination the citation
+# layer exists to catch — so treating these as unconditional non-boundaries let
+# an uncited entity claim merge into the next (cited) sentence and ride on ITS
+# `[cite:...]` marker, bypassing enforcement. Measured, all five bypassed (#190).
+#
+# Told apart, like the enumeration/time/attribution markers, by what FOLLOWS: a
+# lowercase continuation ("Acme Inc. reported a loss", "Acme Ltd. and Beta Corp.
+# merged") is a genuine mid-clause use, while a capitalized/digit/bracket/empty
+# follow-on ("… is Acme Inc. The filing …") is a real boundary. The one form this
+# costs is a title-case continuation, "Acme Inc. Reports Record Revenue" — a
+# headline, not a claim sentence, and false-refusing is the safe direction (#126).
+#
+# This is the case the `_NUMERIC_REFERENCE_ABBREVIATIONS` comment above ruled out
+# by name, on a rationale that had already been disproved for one of the three
+# members it listed. See the correction there.
+#
+# Deliberately NOT extended to the geo initialisms ("u.s"/"u.k"/"u.n"/"e.u") or
+# "st", which have the identical false-accept: the discriminator that works for
+# every other subset carries no information for them, because their attributive
+# sense takes a CAPITALIZED continuation — "U.S. Federal Reserve", "U.N. Security
+# Council", "St. Peter". Gating them would trade one false-accept for a frequent
+# false-refusal of correctly-grounded answers. That is a posture question with no
+# clean discriminator, filed as #191 rather than decided here;
+# `tests/test_citation_org_suffix_boundary.py` pins their current behaviour so
+# the gap is recorded rather than forgotten.
+_ORG_SUFFIX_ABBREVIATIONS = frozenset({"inc", "ltd", "llc", "corp", "co"})
 
 _HAS_DIGIT_RE = re.compile(r"\d")
 
@@ -355,6 +400,15 @@ def _ends_with_abbreviation(fragment: str, following: str = "") -> bool:
             # is a real boundary so an uncited attribution claim ("The method was
             # introduced by Vaswani et al.") can't ride on the next sentence's
             # citation (see `_ATTRIBUTION_ABBREVIATIONS`).
+            stripped = following.lstrip()
+            return bool(stripped) and stripped[0].islower()
+        if last.lower() in _ORG_SUFFIX_ABBREVIATIONS:
+            # Non-boundary only when the continuation is unambiguously mid-clause:
+            # a lowercase-letter follow-on ("Acme Inc. reported a loss"). A
+            # capitalized/digit/bracket/empty follow-on ("... is Acme Inc. The
+            # filing ...") is a real boundary so an uncited entity claim ("The
+            # vendor of record is Acme Inc.") can't ride on the next sentence's
+            # citation (see `_ORG_SUFFIX_ABBREVIATIONS`, #190).
             stripped = following.lstrip()
             return bool(stripped) and stripped[0].islower()
         return True
