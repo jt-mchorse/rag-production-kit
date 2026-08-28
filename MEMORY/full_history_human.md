@@ -1996,3 +1996,48 @@ test with a pointer, so the gap is a recorded fact rather than an absence — an
 a second test puts the *other* half of the tradeoff in running code, so whoever
 eventually closes it can see what they are trading away without reconstructing
 the argument.
+
+## 2026-08-28 - issue #193: to_sse writes two fields and sanitized one
+
+The repo had no open issues, so this was a hunt. I counted commits per module to
+find where the attention had not gone - the generator has twenty, the small
+modules two each - read the four quiet ones, found them clean, and then ran a grep
+for absolute words across the rest. `streaming.py` claims a frame is "always valid
+JSON".
+
+That claim turned out to be about the payload, applied to the frame. `to_sse`
+formats `event: <type>` and `data: <json>` into one string. The payload half is
+guarded thoroughly - non-finite floats, unrepresentable keys, unencodable text,
+nesting depth, at every level and in both key and value position. The type half
+went to the wire untouched. `EventType` looks like a closed nine-member vocabulary
+but it is a `typing.Literal`, which does nothing at runtime, on a frozen dataclass
+with no validation hook, and both the dataclass and the formatter are public API.
+
+So a newline in the event type opened a second `data:` line, and because a client
+concatenates consecutive data fields before parsing them, that is invalid JSON. A
+blank line was worse: it ended the frame early and let a caller-supplied string
+fabricate a complete, well-formed `done` event that a client cannot tell from a
+real one. A lone surrogate broke the encode call the demo server makes, which is
+the truncated-stream failure an earlier issue was written to prevent - and that
+issue's own docstring names the exact expression, `to_sse(event).encode("utf-8")`.
+The guard covered one operand of the expression its rationale describes. The same
+docstring also says the wire serializer is the right single place to enforce frame
+validity, which is the argument for fixing it there, and for both fields.
+
+The fix substitutes rather than raising, because this seam's recorded contract is
+to keep the stream alive, and a formatter that raised mid-stream would recreate
+the failure it guards. It covers carriage return and CRLF as well as newline,
+since the spec ends a field at any of the three - I kept the naive newline-only
+version as an anti-vacuous arm, and it fails two cases.
+
+The tests parse the frame rather than looking at the string, because the entire
+defect is that a frame can look right and be two. They run the same hostile values
+through both fields, so what is asserted is that the halves now agree rather than
+that the new one works.
+
+Two things I checked and did not file. The atomic-write filename cap, whose comment
+names three sibling repos, is genuinely present in all of them. And `to_pgvector`'s
+claim that both embedding entry points funnel through it is true - exactly two call
+sites. That second one is why I did file the width gap as a follow-up: it validates
+every component of a vector and never how many there are, while the schema pins 64,
+and the indexer embeds an entire batch before issuing any SQL.
