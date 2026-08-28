@@ -43,6 +43,23 @@ mirroring the reranker pattern: a dep-free `TemplateGenerator` for
 hermetic CI, and an `AnthropicGenerator` behind the `[rag-anthropic]`
 extra.
 
+"Every claim sentence" is carried by a sentence splitter, and the hard part
+is abbreviations: a fragment ending in one is merged into the next so its
+lone `[cite:...]` marker still counts. When an abbreviation *also* spells
+something that naturally **ends** a claim, merging unconditionally lets an
+uncited claim ride on the following sentence's marker — a false-accept, in
+the layer whose whole job is catching ungrounded text. Six refined subsets
+now exist for exactly that: numeric references (`No. 5` vs "the answer is
+no."), the unit/title collision (`5 ms.` vs `Ms. Chen`), times (`5 p.m.`),
+enumerations (`etc.`), attributions (`et al.`), and company suffixes
+(`Acme Inc.`, #190). The geo initialisms (`in the U.S.`) and `Main St.`
+have the same false-accept and are knowingly **not** closed: their
+attributive sense takes a capitalized continuation (`U.S. Federal Reserve`,
+`St. Peter`), so the discriminator that works for the others would trade one
+false-accept for a frequent false-refusal of correctly-grounded answers.
+That tradeoff is open as #191, and the current behaviour is pinned in a test
+so the gap is a recorded fact rather than an absence.
+
 **Streaming intermediate events** turn the pipeline into a typed event
 stream. `StreamingPipeline.run(query, k)` is a sync generator that
 yields a `StreamEvent` at every phase boundary (`retrieving` /
