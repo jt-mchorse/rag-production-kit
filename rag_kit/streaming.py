@@ -406,6 +406,52 @@ def _encodable(ch: str) -> bool:
     return True
 
 
+#: Stands in for an SSE line terminator that a caller put inside `event.type`.
+#: U+241B SYMBOL FOR ESCAPE is not a character that appears in real event
+#: names, so a substitution stays visible as a substitution -- the same
+#: property `_safe_text` protects when it declines `errors="replace"`.
+_TERMINATOR_SUBSTITUTE = "\u241b"
+
+
+def _safe_event_type(event_type: str) -> str:
+    """Return *event_type* rendered safe for the `event:` field of one frame.
+
+    `to_sse` builds its frame from two caller-controlled fields and, until
+    #193, sanitized one. `_json_safe` guards the payload at every depth in both
+    key and value position; `event.type` was interpolated raw, and
+    `EventType` is a `typing.Literal` -- a static hint with no runtime effect
+    -- on a frozen dataclass with no `__post_init__`, so any value reached the
+    wire. `StreamEvent` and `to_sse` are both public API.
+
+    Two rules, matching the two ways the payload is already protected.
+
+    **Line terminators.** The SSE grammar ends a field at CR, LF, *or* CRLF,
+    so all three have to go, not just `\n`. A newline in the type let the
+    caller open a second `data:` line -- and consecutive `data:` fields are
+    concatenated with `\n` before the client parses them, so
+    `{"injected": true}\n{"payload": ...}` is what `JSON.parse` sees. A blank
+    line was worse: it terminated the frame outright and let a caller-supplied
+    string fabricate a complete, well-formed `done` event indistinguishable
+    from a real one.
+
+    **Encodability.** `_safe_text`'s own docstring names the expression that
+    breaks -- "dies at `to_sse(event).encode(\"utf-8\")` in
+    `demo/streaming/server.py`, *after* the 200 and the headers have gone out"
+    -- and `demo/streaming/server.py:197` is exactly that call. A lone
+    surrogate in the *payload* was replaced; the same surrogate in the *type*
+    reproduced the truncated `text/event-stream` #188 closed, because the guard
+    covered one operand of the expression its rationale describes.
+
+    Substitutes rather than raising: D-017's contract for this seam is "stream
+    alive, don't raise", which is why `_json_safe` replaces too. A `to_sse`
+    that raised mid-stream would recreate the very failure it is guarding.
+    """
+    for terminator in ("\r\n", "\n", "\r"):
+        if terminator in event_type:
+            event_type = event_type.replace(terminator, _TERMINATOR_SUBSTITUTE)
+    return _safe_text(event_type)
+
+
 def _safe_key(key: Any) -> str:
     """Return the JSON object name `json.dumps` should emit for *key*.
 
@@ -575,11 +621,22 @@ def to_sse(event: StreamEvent) -> str:
     `EventSource` parses this directly; for the JS-free demo we also
     accept plain `fetch()` and a streamed text decoder.
 
-    Non-finite floats anywhere in the payload are mapped to JSON ``null`` by
-    `_json_safe` so the emitted frame is always valid JSON (#106); everything
-    else, including the `default=str` fallback for unjsonifiable objects, is
-    unchanged.
+    The frame is built from **two** caller-controlled fields and both are
+    sanitized. `_json_safe` makes the `data:` line valid JSON -- non-finite
+    floats become ``null``, unrepresentable keys are coerced, unencodable text
+    is replaced (#106, #188) -- and `_safe_event_type` keeps the `event:` field
+    on one line and encodable (#193). Everything else, including the
+    `default=str` fallback for unjsonifiable objects, is unchanged.
+
+    This docstring used to say the frame was "always valid JSON" because
+    `_json_safe` guarded the payload. That was a claim about the *payload*
+    applied to the *frame*: a newline in `event.type` opened a second `data:`
+    line (which the client concatenates before parsing), a blank line split
+    one event into two, and a lone surrogate broke
+    `to_sse(event).encode("utf-8")` -- the exact call `demo/streaming/server.py`
+    makes. One `StreamEvent` now yields exactly one frame, with exactly one
+    `event:` field and one `data:` field, for any input.
     """
     payload_obj = {"payload": event.payload, "elapsed_ms": event.elapsed_ms}
     data = json.dumps(_json_safe(payload_obj), default=str, ensure_ascii=False)
-    return f"event: {event.type}\ndata: {data}\n\n"
+    return f"event: {_safe_event_type(event.type)}\ndata: {data}\n\n"
