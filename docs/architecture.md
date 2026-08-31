@@ -81,8 +81,16 @@ that needs ranked candidates — rerank, generation, eval — reads from
 **Why these decisions.**
 
 - **D-003.** Dense vector dimensionality is configured per deployment;
-  default 64 matches `HashEmbedder`. Production callers reset it on
-  table init to match their real embedder.
+  default 64 matches `HashEmbedder`. Production callers reset it in
+  **two** places to match their real embedder — the `vector(N)` column in
+  `infra/postgres/init.sql` and the `EMBEDDING_DIM` constant in
+  `rag_kit/embedder.py` — because the package deliberately does not
+  auto-detect the embedder's dimension; that would hide a schema
+  migration behind library code. Both halves of that obligation are now
+  enforced: `to_pgvector` rejects a wrong-width embedding at the Python
+  seam before any SQL is issued, and
+  `tests/test_embedding_width_seam.py` asserts the schema column and the
+  constant agree (#194).
 - **D-004.** RRF with `k=60` from the original RRF paper. Returns
   per-method ranks alongside the fused score so consumers can debug
   *which channel* surfaced a doc — eyeball-debuggable wins beat a

@@ -137,6 +137,15 @@ class Retriever:
         # user query (see `search`).
         candidate_k = k * _CANDIDATE_MULTIPLIER
 
+        # Embed and validate before either channel issues SQL (#194). The
+        # dense literal isn't used until the second channel, but `to_pgvector`
+        # is also the width/finiteness guard, and a query embedding of the
+        # wrong width means this search cannot succeed either way — so running
+        # the lexical query first only buys a round-trip whose results get
+        # thrown away. Hoisting it makes "rejected before any SQL is issued"
+        # true on the query path as well as the write path.
+        qvec = to_pgvector(self.embedder.embed(query))
+
         # --- Lexical channel ------------------------------------------------
         # `ORDER BY <non-unique key> LIMIT n` leaves the choice among tied rows
         # undefined, and Postgres settles it by physical row order — so *which
@@ -193,7 +202,9 @@ class Retriever:
         # already not exact (the open question in vector-search-at-scale#71).
         # Making dense membership exact is a different problem from making it
         # deterministic.
-        qvec = to_pgvector(self.embedder.embed(query))
+        #
+        # (`qvec` is computed at the top of this method, before the lexical
+        # channel — see the note there.)
         dense_sql = """
         SELECT external_id, text, metadata, embedding <=> %s::vector AS dist
         FROM documents
