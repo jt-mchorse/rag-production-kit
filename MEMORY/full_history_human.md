@@ -2041,3 +2041,18 @@ claim that both embedding entry points funnel through it is true - exactly two c
 sites. That second one is why I did file the width gap as a follow-up: it validates
 every component of a vector and never how many there are, while the schema pins 64,
 and the indexer embeds an entire batch before issuing any SQL.
+
+## 2026-08-31 — Issue #194: `to_pgvector` now validates the embedding's width
+**Duration:** ~1 session block · **Branch:** `session/2026-08-31-0735-issue-194`
+
+- `to_pgvector` checked every component of an embedding for finiteness and never how many components there were, while `infra/postgres/init.sql` pins the count at `vector(64)`. The `Embedder` Protocol carries no dimension, and swapping in a real embedder is the documented intent of the seam — Voyage, Cohere and BGE default to 1024, 1024 and 768 — so a wrong width is the expected first mistake, not an exotic one.
+- The issue left open *where the width should come from*, offering three designs. D-003 had already answered it: the package deliberately does not auto-detect the embedder's dimension, because that would hide a schema migration behind library code, and the operator edits both `init.sql` and `EMBEDDING_DIM`. That rules out two of the three options and names the constant as the Python-side source of truth.
+- The larger finding was one level up: **nothing enforced that obligation.** `init.sql` and `EMBEDDING_DIM` could drift apart freely. There is now a test that parses the column declaration out of the DDL and asserts the two agree, plus a third arm asserting the shipped `HashEmbedder` actually produces that width — two constants agreeing with each other says nothing if the default embedder disagrees with both.
+- One behavior change beyond the guard: the query path computed its embedding *between* the lexical and dense channels, so a wrong-width query ran the lexical SQL and discarded the rows. The issue's first criterion is "before any SQL is issued"; the write path met it for free and the query path did not. `qvec` is now computed first.
+- 18 new tests, 904 → 922 green. Removing the width check turns 13 red; reverting the hoist alone turns 2.
+
+**Why this work, this session:** it was the repo's only open issue, it was fully specified, and its one genuinely open question turned out to be already decided.
+
+**Open questions / blockers:** none.
+
+**Next session:** no open issues remain in this repo.
