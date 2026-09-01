@@ -130,11 +130,19 @@ def test_stripped_collision_refuses_rather_than_citing_the_wrong_chunk(first, se
 
     These rows bypass `Document` on purpose — the write guard cannot reach a
     corpus already on disk, which is precisely the population this check covers.
+
+    The asserted fragment moved in #197. It used to be "collide after
+    stripping", which was accurate only while the check *was* a strip rule —
+    and being a strip rule is what let a `]`-truncation collision through with
+    the identical harm. The check now asks what the real marker grammar reads
+    each id back as, so the message names that instead. The behaviour asserted
+    here is unchanged: these pairs still refuse.
     """
     corpus = [_chunk(first), _chunk(second)]
     with pytest.raises(CitationError) as exc:
         enforce_citations(f"A claim [cite:{second}].", corpus)
-    assert "collide after stripping" in exc.value.detail
+    assert "read back as" in exc.value.detail
+    assert repr(second.strip()) in exc.value.detail
     assert exc.value.reason == "unparseable_output"
 
 
