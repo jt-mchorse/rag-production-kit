@@ -2056,3 +2056,35 @@ and the indexer embeds an entire batch before issuing any SQL.
 **Open questions / blockers:** none.
 
 **Next session:** no open issues remain in this repo.
+
+## 2026-09-01 — Issue #197: half a guard on the read side
+**Branch:** `session/2026-09-01-0737-issue-197`
+
+- #182 found two ways a document id can fail to be citable back — surrounding
+  whitespace, and a `]` that truncates the `[cite:...]` marker — and said so in
+  its own comment: "two distinct causes, deliberately kept as two rules." It
+  closed both where documents are written. It also added a read-side backstop
+  for corpora already on disk, and that backstop implemented one of the two.
+  A corpus holding `doc` and `doc]1` accepted a citation to `doc]1` and rendered
+  `doc`'s text as the source of the claim, with a perfectly well-formed
+  `Citation` that nothing downstream could question.
+- Rather than add the missing rule, the check now *derives* it: a helper
+  synthesises the marker an answer would carry, runs the real regex and the real
+  strip over it, and reports what a citation to that id actually resolves to.
+  Two ids that resolve the same are refused. A future change to the marker
+  syntax is covered without anyone remembering this code exists.
+- The half that keeps it honest is a parity test: every id the write seam
+  accepts must survive that round trip unchanged. That is the test that would
+  have caught this the day #182 shipped, and it is the reason the write seam
+  gets to keep its two specific, operator-friendly error messages.
+
+**Why this work, this session:** the repo had no open issues, so the session
+hunted. Ranking modules by how much issue traffic each had ever attracted put
+`indexer.py` first (four mentions in the repo's entire issue history); reading
+its `external_id` rules is what pointed at the reader that backstops them.
+
+**Open questions / blockers:** none. A single `]`-bearing legacy row with no
+prefix collision still refuses as a dangling citation rather than saying "this
+id can never be cited back" — a message improvement, not a correctness one.
+
+**Next session:** the repo is again at zero open issues.
