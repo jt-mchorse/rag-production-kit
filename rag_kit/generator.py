@@ -461,6 +461,33 @@ def split_sentences(text: str) -> list[str]:
     return [p for p in merged if any(ch.isalnum() for ch in p)]
 
 
+def _marker_readback(external_id: str) -> str | None:
+    """What a `[cite:<external_id>]` marker actually resolves to, or `None`.
+
+    Synthesises the marker an answer would carry for this id, then runs the
+    *real* reader over it: `_CITE_PATTERN` for the capture, and the same
+    `.strip()` `enforce_citations` applies to every captured id. `None` means
+    the grammar does not match at all, i.e. no marker can name this id.
+
+    Derived rather than described, on purpose (#197). #182 identified two ways
+    an id fails to be citable back -- surrounding whitespace, defeated by the
+    strip, and a `]`, defeated by `_CITE_PATTERN` stopping at the first one --
+    and stated them as two separate rules. The read-side collision check then
+    re-stated one of them, and the half it left out silently cited the wrong
+    chunk. A helper that *calls* the grammar cannot fall behind the grammar, so
+    a future marker-syntax change is covered without anyone remembering this
+    file exists.
+
+    `tests/test_citation_id_readback.py` pins the write seam against this
+    helper, so `Document.__post_init__`'s two operator-facing messages and this
+    function cannot disagree about which ids are legal.
+    """
+    match = _CITE_PATTERN.search(f"[cite:{external_id}]")
+    if match is None:
+        return None
+    return match.group(1).strip()
+
+
 def enforce_citations(
     text: str,
     retrieved: Sequence[RetrievalResult],
@@ -476,32 +503,55 @@ def enforce_citations(
     """
     allowed: dict[str, RetrievalResult] = {r.external_id: r for r in retrieved}
 
-    # The lookup below strips a marker before consulting `allowed`, which is
-    # only safe while no two retrieved ids are equal after stripping. #182
-    # made that true at the write seam (`Document.__post_init__` now rejects a
-    # padded external_id), but a corpus indexed before that guard still has
-    # such rows on disk, and this function is handed rows from the database,
-    # not `Document` objects.
+    # Two retrieved ids that a `[cite:...]` marker cannot tell apart make every
+    # citation to either of them a coin flip, and the loser is rendered as the
+    # source of a claim it did not come from. Measured on a corpus holding both
+    # 'doc1' and ' doc1', a citation to ' doc1' resolved to 'doc1' and rendered
+    # that chunk's text (#182). Refuse instead -- a refusal is a recoverable
+    # answer, a citation pointing at the wrong chunk is a confidently wrong one,
+    # and it is invisible downstream because the resulting `Citation` is
+    # perfectly well-formed.
     #
-    # Silently picking one of two colliding chunks is the specific
-    # false-accept the strip comment below rules out: measured on a corpus
-    # holding both 'doc1' and ' doc1', a citation to ' doc1' resolved to
-    # 'doc1' and rendered that chunk's text as the source of the claim. So
-    # refuse instead -- a refusal is a recoverable answer, a citation pointing
-    # at the wrong chunk is a confidently wrong one, and it is invisible
-    # downstream because the resulting `Citation` is perfectly well-formed.
-    stripped_owners: dict[str, str] = {}
+    # #182 closed this at the write seam, where `Document.__post_init__` rejects
+    # both shapes it identified: a padded id (defeated by the reader's `.strip()`
+    # below) and one containing `]` (defeated by `_CITE_PATTERN`, which stops at
+    # the first `]`). This function is handed rows from the *database*, not
+    # `Document` objects, so a corpus indexed before that guard still needs
+    # checking here.
+    #
+    # That backstop used to be written as its own rule -- ids equal after
+    # `.strip()` -- and so it covered exactly one of the two causes #182 names
+    # in the same breath. A corpus holding 'doc' and 'doc]1' passed it, and
+    # `[cite:doc]1]` was ACCEPTED, citing 'doc' and rendering 'doc's text as the
+    # source (#197). Two hand-listed rules on the write side and one on the read
+    # side is what produced that gap, and a third grammar feature would produce
+    # it again.
+    #
+    # So the rule is derived, not restated: ask what a citation to each id would
+    # actually resolve to by running the *real* grammar over a synthesised
+    # marker, and refuse when two distinct ids answer the same. Whitespace, `]`,
+    # and whatever the marker grammar grows next are covered by construction,
+    # because `_marker_readback` calls `_CITE_PATTERN` and the same `.strip()`
+    # the loop below applies rather than describing them.
+    readback_owners: dict[str, str] = {}
     for r in retrieved:
-        key = r.external_id.strip()
-        first = stripped_owners.get(key)
+        key = _marker_readback(r.external_id)
+        if key is None:
+            # No `[cite:<id>]` marker can name this id at all (the grammar does
+            # not match). Such an id is unreachable rather than ambiguous: a
+            # citation aimed at it reads as dangling and the answer is refused,
+            # which is the safe direction, so it is not this check's business.
+            continue
+        first = readback_owners.get(key)
         if first is not None and first != r.external_id:
             raise CitationError(
                 "unparseable_output",
-                f"retrieved chunks contain ids that collide after stripping: "
-                f"{first!r} and {r.external_id!r} both reduce to {key!r}; a "
-                "citation could not be attributed to one of them unambiguously",
+                f"retrieved chunks contain ids a citation cannot tell apart: "
+                f"{first!r} and {r.external_id!r} both read back as {key!r} from a "
+                "[cite:...] marker; a citation could not be attributed to one of "
+                "them unambiguously",
             )
-        stripped_owners.setdefault(key, r.external_id)
+        readback_owners.setdefault(key, r.external_id)
 
     sentences = split_sentences(text)
     if not sentences:
