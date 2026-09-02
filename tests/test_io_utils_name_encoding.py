@@ -199,16 +199,22 @@ def test_bench_streaming_unencodable_out_honors_the_exit_code_contract(tmp_path:
         [sys.executable, "-m", "scripts.bench_streaming", "--n", "3", "--out", str(out)],
         cwd=str(_REPO_ROOT),
         capture_output=True,
-        text=True,
         check=False,
     )
+    # Captured as bytes, not `text=True`. On a filesystem that accepts the name
+    # (ext4, i.e. CI) the write succeeds, the child prints the path, and
+    # `sys.stdout`'s `surrogateescape` handler puts the original raw byte on the
+    # stream. `text=True` decodes that strictly *in the parent* and raises
+    # `UnicodeDecodeError` inside `subprocess` — a failure of the harness, not of
+    # the code under test.
+    stderr = proc.stderr.decode("utf-8", errors="replace")
 
-    assert "UnicodeEncodeError" not in proc.stderr, (
-        "an unencodable --out must not escape as a traceback:\n" + proc.stderr
+    assert "UnicodeEncodeError" not in stderr, (
+        "an unencodable --out must not escape as a traceback:\n" + stderr
     )
-    assert "Traceback" not in proc.stderr, proc.stderr
+    assert "Traceback" not in stderr, stderr
     if not out.exists():
         assert proc.returncode == 2, (
             "an unusable --out is an I/O error: exit 2, not the success range"
         )
-        assert "::error::failed to write" in proc.stderr
+        assert "::error::failed to write" in stderr
