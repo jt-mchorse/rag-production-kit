@@ -2088,3 +2088,77 @@ prefix collision still refuses as a dangling citation rather than saying "this
 id can never be cited back" — a message improvement, not a correctness one.
 
 **Next session:** the repo is again at zero open issues.
+
+## 2026-09-02 — #199: the temp-name byte budget was counting the wrong bytes
+
+`io_utils._cap_base_for_temp` shortens a destination's basename before it goes
+into the temp filename `.<base>.<random>.tmp`, so a name already close to
+NAME_MAX doesn't push the temp name past the 255-byte limit (#128). The comment
+above it says "Budget is in BYTES (NAME_MAX is a byte limit)", and that is
+true. The code under it counted `base.encode("utf-8")` with the strict error
+handler, which is a *different* set of bytes from the ones NAME_MAX limits.
+
+The two counts agree for every name that is valid UTF-8, which is why it sat
+here. They disagree for the rest by raising. POSIX path bytes — and `sys.argv`
+— decode through `surrogateescape`, so a byte that isn't valid UTF-8 arrives as
+a lone surrogate in U+DC80–U+DCFF, and strict encoding refuses to encode it.
+`bench_streaming --out $'bench\xff.json'` was enough: the cap raised
+`UnicodeEncodeError` before it ever got as far as measuring anything.
+
+**The interesting part is the guard it walked past, and how that guard is
+worded.** `scripts/bench_streaming.py` wraps its write and lists what it is
+guarding against: "a file parent (`FileExistsError`), a directory target
+(`IsADirectoryError`), a read-only parent (`PermissionError`)". All three are
+true, and all three are `OSError` subclasses, so `except OSError` covers the
+list exactly. But the list isn't the population. The population is *ways an
+operator-supplied `--out` can be unusable*, and an unencodable name is a fourth
+member that isn't an `OSError` at all. It walked past the arm and produced
+precisely the outcome the same comment describes: the full benchmark table
+prints, and then a traceback at exit 1 — "a complete, successful-looking
+benchmark followed by a stack".
+
+That comment also ends by warning about exactly this failure in its own
+history: it used to claim `evals/run_eval.py` already did the same translation,
+"and that unchecked claim is how #172 closed one branch of the class while
+leaving the sibling it named exposed". A comment that has already been burned
+once by an incomplete enumeration turns out to be a very good place to look for
+the next one. `run_eval.py` carries the mirrored list and the same single arm;
+its target directory is a module constant rather than operator input, so it has
+no argv road in, and it picks up the fix through the shared helper anyway.
+
+The fix is one line: measure with `os.fsencode`, the filesystem encoding plus
+its own error handler, which is exactly what the kernel receives. It returns the
+identical number for every valid-UTF-8 name, so no name that worked before
+changes budget, and it never raises.
+
+**On testing.** For an argv bug the honest test is a real subprocess: passing a
+`str` holding a lone surrogate through `subprocess` puts the raw byte on the
+command line and the child decodes it back with `surrogateescape`, which is the
+same road a shell's `$'bench\xff.json'` takes. An in-process `main()` call
+would have skipped the layer the bug lives in. Measured end to end: exit 2 with
+`::error::failed to write ... [Errno 92] Illegal byte sequence`, no traceback.
+
+And the host must not decide the verdict. ext4 accepts any non-NUL byte in a
+filename, so on CI the write *succeeds*; APFS validates UTF-8 and returns
+`EILSEQ`. Both are correct, so the property asserted is "if it fails, it fails
+as an `OSError`" — the class, not the outcome — and at the CLI, "no traceback
+on any host, and if nothing was written the code is 2". The pure-function half
+is a variant table over short/long crossed with ASCII, multibyte,
+surrogate-bearing and mixed, asserting the capped name is a character-boundary
+prefix, within budget, and **maximal** — that last one because a cap returning
+`""` for everything satisfies the first two.
+
+Reverting the single measurement line turns 9 of the 15 new assertions red and
+leaves the 6 encodable-name controls green.
+
+**Why this work, this session:** found by grepping the portfolio for
+`_MAX_TEMP_BASE_BYTES` after hitting the same defect in `llm-eval-harness#226`.
+Nine repos carry a verbatim copy of this helper; the line is the same every
+time, and the work per repo is establishing what the local write-seam callers
+actually catch.
+
+**Open questions / blockers:** none.
+
+**Next session:** the remaining copies live in `chunking-strategies-lab`,
+`prompt-regression-suite`, `embedding-model-shootout`, `vector-search-at-scale`,
+`python-async-llm-pipelines`, and `mcp-server-cookbook`'s `filesystem-sandbox-py`.
