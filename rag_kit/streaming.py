@@ -452,6 +452,49 @@ def _safe_event_type(event_type: str) -> str:
     return _safe_text(event_type)
 
 
+#: Stands in for an object whose `__str__` itself raises. Same visible-marker
+#: property as `_UNREPRESENTABLE` and `_CIRCULAR`: a substitution has to read as
+#: a substitution.
+_UNSTRINGABLE = "<unstringable object>"
+
+
+def _safe_fallback(value: Any) -> str:
+    """The `default=` `json.dumps` consults for a value it cannot serialize.
+
+    `to_sse` passed the bare `str`, and that made this the one string in the
+    frame not routed through `_safe_text` (#201). `_json_safe` cannot cover it:
+    `_new_container` deliberately passes any non-`float`/`str`/`dict`/`list`/
+    `tuple` value through unchanged, which is precisely what *defers* it to
+    `default=`. So the object reaches `json.dumps` un-sanitized by design, and
+    nothing sanitized what came back out.
+
+    `_safe_key` already had this right for its own `str()` coercion -- it ends
+    `return _safe_text(str(key))`. One helper, one coercion, two positions, and
+    only the key position was guarded; #193 named that same operand-enumeration
+    shape for `to_sse`'s two *fields*, and this is the third road into the same
+    failure. Measured: a `pathlib.Path` built from a non-UTF-8 filename --
+    `os.fsdecode` maps every such byte into `U+DC80..U+DCFF` -- put a lone
+    surrogate on the wire and `to_sse(event).encode("utf-8")` raised at
+    `demo/streaming/server.py:197`, after the 200 and the headers.
+    `RetrievalResult.metadata` is `dict[str, Any]` and lands verbatim in an
+    event payload, so no exotic input is needed.
+
+    A `__str__` that *raises* is the same limb and the same claim, not a second
+    concern: `default=str` propagated it straight out of `to_sse`. Both are
+    substituted rather than raised, because this seam's contract is "stream
+    alive, don't raise" (D-017) -- a `to_sse` that raised mid-stream would
+    recreate the failure it exists to guard.
+    """
+    try:
+        text = str(value)
+    except Exception:
+        # Deliberately broad: `__str__` is arbitrary caller code and *any*
+        # exception it raises tears the stream. Narrowing to a guessed set
+        # would leave the seam's totality contingent on that guess.
+        return _UNSTRINGABLE
+    return _safe_text(text)
+
+
 def _safe_key(key: Any) -> str:
     """Return the JSON object name `json.dumps` should emit for *key*.
 
@@ -625,8 +668,16 @@ def to_sse(event: StreamEvent) -> str:
     sanitized. `_json_safe` makes the `data:` line valid JSON -- non-finite
     floats become ``null``, unrepresentable keys are coerced, unencodable text
     is replaced (#106, #188) -- and `_safe_event_type` keeps the `event:` field
-    on one line and encodable (#193). Everything else, including the
-    `default=str` fallback for unjsonifiable objects, is unchanged.
+    on one line and encodable (#193).
+
+    `_json_safe` is not the *whole* chokepoint, which this docstring used to
+    imply by calling the `default=str` fallback "unchanged". `_json_safe`
+    passes an unjsonifiable object through untouched -- that is what defers it
+    to `default=` -- so the string `default=` returns is the last one written
+    into the frame and the only one that was never sanitized. A `pathlib.Path`
+    from a non-UTF-8 filename was enough to tear the stream (#201). The
+    fallback is now `_safe_fallback`, which routes its coercion through
+    `_safe_text` exactly as `_safe_key` routes its own.
 
     This docstring used to say the frame was "always valid JSON" because
     `_json_safe` guarded the payload. That was a claim about the *payload*
@@ -638,5 +689,5 @@ def to_sse(event: StreamEvent) -> str:
     `event:` field and one `data:` field, for any input.
     """
     payload_obj = {"payload": event.payload, "elapsed_ms": event.elapsed_ms}
-    data = json.dumps(_json_safe(payload_obj), default=str, ensure_ascii=False)
+    data = json.dumps(_json_safe(payload_obj), default=_safe_fallback, ensure_ascii=False)
     return f"event: {_safe_event_type(event.type)}\ndata: {data}\n\n"
