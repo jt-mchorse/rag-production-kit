@@ -431,23 +431,72 @@ def test_fallback_rows_actually_reach_the_default_limb(label: str, metadata: Any
         json.dumps({"payload": {"metadata": metadata}, "elapsed_ms": 1.0}, ensure_ascii=False)
 
 
+def _reaches_default_limb(metadata: Any) -> bool:
+    """Whether `json.dumps` would hand any node of *metadata* to `default=`.
+
+    Answered by walking the value's types, **not** by calling `json.dumps` on
+    it. The obvious probe -- dump it and see whether `TypeError` comes out --
+    makes this a Python-version assertion: `_json_safe`'s own docstring
+    measures `json.dumps` handling ~14690 levels on CPython 3.14 and raising
+    `RecursionError` at 3000 on CPython 3.11, and `TABLE` carries a
+    3000-level row on purpose. That probe passed locally on 3.14 and failed CI
+    on 3.11 for a reason that has nothing to do with the property being
+    measured.
+
+    `json.JSONEncoder` serializes `dict`/`list`/`tuple`/`str`/`int`/`float`/
+    `bool`/`None` natively and hands everything else to `default=`, so the
+    question is a type question and the walk is iterative for the same reason
+    `_json_safe`'s is.
+    """
+    native = (dict, list, tuple, str, int, float, bool)
+    stack = [metadata]
+    seen: set[int] = set()
+    while stack:
+        node = stack.pop()
+        if id(node) in seen:
+            continue
+        seen.add(id(node))
+        if node is None or isinstance(node, native):
+            if isinstance(node, dict):
+                stack.extend(node.keys())
+                stack.extend(node.values())
+            elif isinstance(node, (list, tuple)):
+                stack.extend(node)
+            continue
+        return True
+    return False
+
+
 def test_the_table_exercises_both_limbs() -> None:
     """Floor for the split. The pre-#201 table had zero rows on the `default=`
     limb, which is how a property proven "over a table" missed it; a future edit
     that drops them would restore exactly that state, silently."""
-    reaches_fallback = 0
-    for _label, metadata in TABLE:
-        try:
-            json.dumps({"metadata": metadata}, ensure_ascii=False)
-        except TypeError:
-            reaches_fallback += 1
-        except ValueError:
-            pass  # circular -- a different limb, and already covered
+    reaches_fallback = sum(1 for _label, metadata in TABLE if _reaches_default_limb(metadata))
     assert reaches_fallback >= 5, (
         f"only {reaches_fallback} TABLE rows reach json.dumps's default= limb; "
         "the totality property is unproven there"
     )
     assert len(TABLE) - reaches_fallback >= 15, "the JSON-native rows were lost"
+
+
+def test_the_limb_classifier_agrees_with_json_dumps_on_the_shallow_rows() -> None:
+    """Keeps the type walk above honest against the real encoder.
+
+    Restricted to `FALLBACK_ROWS` and the shallow controls on purpose: those
+    are the rows where `json.dumps` gives a version-independent answer, which
+    is exactly the property the walk exists to avoid depending on.
+    """
+    for label, metadata in FALLBACK_ROWS:
+        assert _reaches_default_limb(metadata), label
+        with pytest.raises(TypeError):
+            json.dumps({"metadata": metadata}, ensure_ascii=False)
+    for label, metadata in [
+        ("str", {"src": "doc1"}),
+        ("nested", {"xs": [1, {"y": [None, True]}]}),
+        ("tuple value", {"xs": ("a", "b")}),
+    ]:
+        assert not _reaches_default_limb(metadata), label
+        json.dumps({"metadata": metadata}, ensure_ascii=False)
 
 
 def test_an_unencodable_str_from_the_fallback_is_replaced_not_dropped() -> None:
