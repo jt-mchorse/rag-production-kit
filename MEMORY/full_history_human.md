@@ -2162,3 +2162,66 @@ actually catch.
 **Next session:** the remaining copies live in `chunking-strategies-lab`,
 `prompt-regression-suite`, `embedding-model-shootout`, `vector-search-at-scale`,
 `python-async-llm-pipelines`, and `mcp-server-cookbook`'s `filesystem-sandbox-py`.
+
+## 2026-09-03 — #201: the one string in the frame nobody sanitized
+
+`to_sse` promised totality: "for any input, it returns a string that
+`json.loads` accepts and that `.encode("utf-8")` accepts." It serializes with
+`json.dumps(..., default=str, ensure_ascii=False)`, and the string `default=`
+hands back is the last one written into the frame — and the only one never
+routed through `_safe_text`.
+
+`_json_safe` structurally cannot cover it. `_new_container` passes any value
+that isn't a `float`/`str`/`dict`/`list`/`tuple` through unchanged, and that is
+precisely what defers it to `default=`. The guard and the gap are the same
+line: a passthrough branch in a sanitizer is a *handoff*, and nobody audited the
+receiver.
+
+`_safe_key` already had this right for its own `str()` coercion — it ends
+`return _safe_text(str(key))`. So the same object was safe in key position and
+unsafe in value position. One helper, one coercion, two positions, one guarded.
+#193 named that exact operand-enumeration shape for `to_sse`'s two *fields*;
+this is the third road into the same failure.
+
+Reachability needed no contrivance. `os.fsdecode` maps every non-UTF-8 path
+byte into `U+DC80..U+DCFF`, so a `pathlib.Path` for an ordinary corpus file with
+a badly-named filename carries a lone surrogate. `RetrievalResult.metadata` is
+`dict[str, Any]`, documented as free-form caller data, and lands verbatim in an
+event payload. `to_sse(event).encode("utf-8")` at `demo/streaming/server.py:197`
+runs after the 200 and the headers, so the client gets a truncated
+`text/event-stream` with no `error` and no `done` frame — the failure #188 was
+written to close.
+
+An object whose `__str__` *raises* is the same limb and the same claim, not a
+second concern: `default=str` propagated the caller's exception straight out of
+`to_sse`. Both substitute rather than raise, per D-017.
+
+**Two pieces of prose pointed straight at it.** `to_sse`'s own docstring said
+"Everything else, **including the `default=str` fallback for unjsonifiable
+objects**, is unchanged" — true, and simultaneously a confession: the fix named
+the limb it did not touch. And `docs/architecture.md` called `_json_safe` "the
+single chokepoint for frame validity" in a bullet that goes on to mention
+`default=str` two sentences later. A doc that names a mechanism and then calls
+something else the single chokepoint is a diff worth running.
+
+**Why the table missed it.** `tests/test_sse_frame_totality.py` exists to run
+the totality property "over a table rather than restating it in prose" — and
+not one of its 21 rows reached the `default=` limb, because every row was built
+from JSON-native types. The property was proven over a population that excluded
+the counterexample. The new rows carry an anti-vacuous arm asserting each one
+raises `TypeError` *without* a `default=` — literally the condition under which
+`json.dumps` consults it — plus a floor so a later edit can't silently restore
+the zero-coverage state.
+
+The neighbour worth building here was the over-broad one: sanitize by replacing
+every fallback value with a marker. It passes every "parses and encodes"
+assertion and quietly destroys the diagnostic. The control row — an ordinary
+object that must still render as its string — is the only thing that kills it.
+
+One clean negative also worth recording: I swept `Document.external_id`'s
+accept/reject against what a `[cite:...]` marker actually reads back, over all
+69k codepoints in three placements. Zero disagreements. The #182/#197 citation-id
+vein is genuinely closed.
+
+**Next session:** #191 is a JT-gated decision-revisit; the repo is otherwise at
+zero open issues.
