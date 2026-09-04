@@ -61,13 +61,16 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import sys
+from pathlib import Path
 from typing import Any
 
 import pytest
 
 from rag_kit.streaming import _MAX_DEPTH as MAX_DEPTH
 from rag_kit.streaming import _TOO_DEEP as TOO_DEEP_MARKER
+from rag_kit.streaming import _UNSTRINGABLE as UNSTRINGABLE_MARKER
 from rag_kit.streaming import StreamEvent, to_sse
 
 # Built from a codepoint, never written literally: a source file containing a
@@ -95,6 +98,57 @@ def _shared_but_acyclic() -> dict[str, Any]:
     return {"a": inner, "b": inner}
 
 
+# --- #201: values that reach `json.dumps(default=...)` ----------------------
+#
+# Every row above is built from JSON-native types, so not one of them reaches
+# the `default=` limb at all -- which is why a table that claimed to prove
+# totality proved it over a population excluding the counterexample. These
+# rows are the limb.
+
+
+class _SurrogateStr:
+    """Unjsonifiable, and its `str()` carries text with no UTF-8 encoding."""
+
+    def __str__(self) -> str:
+        return "chunk-" + SURROGATE + "-id"
+
+
+class _RaisingStr:
+    """Unjsonifiable, and its `__str__` raises. `default=str` propagated this
+    straight out of `to_sse` -- the same limb, the same totality claim."""
+
+    def __str__(self) -> str:
+        raise RuntimeError("boom")
+
+
+class _OrdinaryObject:
+    """CONTROL. Must still render as its string -- the fix is a sanitizer on the
+    fallback, not a removal of the fallback."""
+
+    def __str__(self) -> str:
+        return "ordinary-object"
+
+
+def _non_utf8_path() -> Path:
+    """A `pathlib.Path` for a filename that is not valid UTF-8.
+
+    The realistic road in. `os.fsdecode` maps every non-UTF-8 path byte into
+    `U+DC80..U+DCFF`, so no exotic caller input is needed -- a corpus file with
+    a non-UTF-8 name and a `Path` in `RetrievalResult.metadata` is enough, and
+    `metadata` is `dict[str, Any]` that lands verbatim in an event payload.
+    """
+    return Path("/corpus") / os.fsdecode(b"report\xff.md")
+
+
+FALLBACK_ROWS: list[tuple[str, Any]] = [
+    ("CONTROL unjsonifiable object with an ordinary str", {"o": _OrdinaryObject()}),
+    ("unjsonifiable object with an unencodable str", {"o": _SurrogateStr()}),
+    ("unjsonifiable object nested in a list", {"xs": [{"o": _SurrogateStr()}]}),
+    ("Path from a non-UTF-8 filename", {"source": _non_utf8_path()}),
+    ("Path nested two levels down", {"chunks": [{"source": _non_utf8_path()}]}),
+    ("unjsonifiable object whose __str__ raises", {"o": _RaisingStr()}),
+]
+
 # (label, metadata) -- every row must produce a parseable, encodable frame.
 TABLE: list[tuple[str, Any]] = [
     ("CONTROL str key and str value", {"src": "doc1"}),
@@ -118,6 +172,7 @@ TABLE: list[tuple[str, Any]] = [
     ("deeply nested (3000 levels)", _deep(3000)),
     ("circular reference", _circular()),
     ("shared but acyclic (a DAG)", _shared_but_acyclic()),
+    *FALLBACK_ROWS,
 ]
 
 
@@ -356,3 +411,128 @@ def test_json_dumps_alone_would_still_fail_on_the_raw_inputs() -> None:
     assert json.dumps({1: "a", "1": "b"}) == '{"1": "a", "1": "b"}'  # duplicate name
     assert json.dumps({float("inf"): "x"}) == '{"Infinity": "x"}'
     assert math.isinf(float("inf"))
+
+
+# ----------------------------------------------------------------------
+# #201: the `default=` limb
+# ----------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(("label", "metadata"), FALLBACK_ROWS, ids=[r[0] for r in FALLBACK_ROWS])
+def test_fallback_rows_actually_reach_the_default_limb(label: str, metadata: Any) -> None:
+    """Anti-vacuous arm, and the one that makes the rows above mean anything.
+
+    A row that `json.dumps` can serialize on its own never consults `default=`,
+    so it would be another JSON-native case wearing a `#201` label. Assert each
+    row raises `TypeError` *without* a `default=`, which is exactly the
+    condition under which `json.dumps` calls it.
+    """
+    with pytest.raises(TypeError):
+        json.dumps({"payload": {"metadata": metadata}, "elapsed_ms": 1.0}, ensure_ascii=False)
+
+
+def _reaches_default_limb(metadata: Any) -> bool:
+    """Whether `json.dumps` would hand any node of *metadata* to `default=`.
+
+    Answered by walking the value's types, **not** by calling `json.dumps` on
+    it. The obvious probe -- dump it and see whether `TypeError` comes out --
+    makes this a Python-version assertion: `_json_safe`'s own docstring
+    measures `json.dumps` handling ~14690 levels on CPython 3.14 and raising
+    `RecursionError` at 3000 on CPython 3.11, and `TABLE` carries a
+    3000-level row on purpose. That probe passed locally on 3.14 and failed CI
+    on 3.11 for a reason that has nothing to do with the property being
+    measured.
+
+    `json.JSONEncoder` serializes `dict`/`list`/`tuple`/`str`/`int`/`float`/
+    `bool`/`None` natively and hands everything else to `default=`, so the
+    question is a type question and the walk is iterative for the same reason
+    `_json_safe`'s is.
+    """
+    native = (dict, list, tuple, str, int, float, bool)
+    stack = [metadata]
+    seen: set[int] = set()
+    while stack:
+        node = stack.pop()
+        if id(node) in seen:
+            continue
+        seen.add(id(node))
+        if node is None or isinstance(node, native):
+            if isinstance(node, dict):
+                stack.extend(node.keys())
+                stack.extend(node.values())
+            elif isinstance(node, (list, tuple)):
+                stack.extend(node)
+            continue
+        return True
+    return False
+
+
+def test_the_table_exercises_both_limbs() -> None:
+    """Floor for the split. The pre-#201 table had zero rows on the `default=`
+    limb, which is how a property proven "over a table" missed it; a future edit
+    that drops them would restore exactly that state, silently."""
+    reaches_fallback = sum(1 for _label, metadata in TABLE if _reaches_default_limb(metadata))
+    assert reaches_fallback >= 5, (
+        f"only {reaches_fallback} TABLE rows reach json.dumps's default= limb; "
+        "the totality property is unproven there"
+    )
+    assert len(TABLE) - reaches_fallback >= 15, "the JSON-native rows were lost"
+
+
+def test_the_limb_classifier_agrees_with_json_dumps_on_the_shallow_rows() -> None:
+    """Keeps the type walk above honest against the real encoder.
+
+    Restricted to `FALLBACK_ROWS` and the shallow controls on purpose: those
+    are the rows where `json.dumps` gives a version-independent answer, which
+    is exactly the property the walk exists to avoid depending on.
+    """
+    for label, metadata in FALLBACK_ROWS:
+        assert _reaches_default_limb(metadata), label
+        with pytest.raises(TypeError):
+            json.dumps({"metadata": metadata}, ensure_ascii=False)
+    for label, metadata in [
+        ("str", {"src": "doc1"}),
+        ("nested", {"xs": [1, {"y": [None, True]}]}),
+        ("tuple value", {"xs": ("a", "b")}),
+    ]:
+        assert not _reaches_default_limb(metadata), label
+        json.dumps({"metadata": metadata}, ensure_ascii=False)
+
+
+def test_an_unencodable_str_from_the_fallback_is_replaced_not_dropped() -> None:
+    """The substitution has to stay visible as a substitution, same as
+    `_safe_text` everywhere else -- the surrounding text survives and only the
+    offending codepoint becomes U+FFFD."""
+    assert _metadata_of({"o": _SurrogateStr()}) == {"o": "chunk-�-id"}
+
+
+def test_a_non_utf8_path_survives_as_a_readable_path() -> None:
+    """The operator still gets the filename. Dropping the value, or replacing
+    the whole string, would make the frame valid and the diagnostic useless."""
+    served = _metadata_of({"source": _non_utf8_path()})["source"]
+    assert served.startswith("/corpus/report")
+    assert served.endswith(".md")
+    assert "�" in served
+
+
+def test_an_ordinary_object_still_renders_as_its_string() -> None:
+    """CONTROL. The plausible over-broad neighbour -- sanitize by dropping or
+    by replacing every fallback value with a marker -- passes every assertion
+    above and fails this one."""
+    assert _metadata_of({"o": _OrdinaryObject()}) == {"o": "ordinary-object"}
+
+
+def test_a_raising_str_becomes_a_named_marker_not_a_torn_stream() -> None:
+    """`default=str` propagated the caller's exception straight out of `to_sse`,
+    which at `demo/streaming/server.py:197` is a truncated `text/event-stream`
+    with no `error` and no `done` frame. D-017's contract is "stream alive,
+    don't raise", so it becomes a visible marker."""
+    assert _metadata_of({"o": _RaisingStr()}) == {"o": UNSTRINGABLE_MARKER}
+    assert "object" in UNSTRINGABLE_MARKER
+
+
+def test_the_fallback_marker_is_not_a_string_a_caller_could_have_written() -> None:
+    """Same property `_safe_text` protects by declining `errors="replace"`: a
+    substitution a caller could have produced is indistinguishable from data."""
+    assert UNSTRINGABLE_MARKER.startswith("<")
+    assert UNSTRINGABLE_MARKER.endswith(">")

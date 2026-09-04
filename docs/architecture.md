@@ -233,8 +233,15 @@ which speak the *same* SSE protocol.
 - **D-011.** Demo HTTP server is `http.server` from the stdlib, not
   FastAPI. Demos in this repo show *the pipeline*, not the web layer.
 - **D-017.** The wire serializer *replaces* input it cannot represent
-  rather than rejecting it. `_json_safe` is the single chokepoint for
-  frame validity (#106, #188): non-finite floats become `null` at both
+  rather than rejecting it. Frame validity is enforced at three places,
+  not one: `_json_safe` for the payload, `_safe_event_type` for the
+  `event:` field (#193), and `_safe_fallback` for the string
+  `json.dumps` gets back from `default=` (#201). Calling `_json_safe`
+  the *single* chokepoint was the gap — it passes an unjsonifiable
+  object through untouched, which is exactly what defers it to
+  `default=`, so the last string written into the frame was the one
+  nothing sanitized, and a `pathlib.Path` for a non-UTF-8 filename tore
+  the stream. `_json_safe` handles (#106, #188): non-finite floats become `null` at both
   the key and the value position, a key type `json.dumps` would reject
   becomes a string, a coerced key collision resolves to one name
   instead of a duplicate one, a cycle is named rather than raised,
