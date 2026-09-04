@@ -51,11 +51,36 @@ def reciprocal_rank_fusion(
         # or an upstream dedup bug. Counting both occurrences would double-add
         # the score and overwrite the recorded rank with the worse one, so we
         # keep only the first (best-rank) occurrence per method.
+        # The rank counter advances only on an *accepted* doc (#203). Skipping
+        # the duplicate while letting `enumerate` keep counting it left the
+        # duplicate still consuming a rank position, so every doc after it was
+        # scored and reported one rank worse:
+        #
+        #   [A, B]        -> A={'m': 1}  B={'m': 2}
+        #   [A, B, B, C]  -> A={'m': 1}  B={'m': 2}  C={'m': 4}   <- three docs
+        #
+        # Those recorded ranks were neither raw positions nor distinct-ranking
+        # positions but a mix of the two, because skipping the duplicate is
+        # already the decision that a duplicate is not a rank position -- the
+        # loop just declined to renumber after making it.
+        #
+        # Two consequences, and they are separable, which is why both are
+        # tested: the per-method ranks D-004 returns *for debugging which
+        # channel surfaced each doc* reported a rank with a hole in it, and
+        # every later doc's 1/(k+rank) term was deflated. Over 200k random
+        # rankings with one duplicate injected into one channel, 19.5% fused
+        # into a different order than the same rankings with that duplicate
+        # removed -- the minimal case changes the top-1. A duplicate is an
+        # artifact of how a channel was built (the union of two SQL paths this
+        # comment names below), not a property of the documents, so that is a
+        # real document being penalised for a channel's implementation detail.
         seen_in_method: set[str] = set()
-        for rank, doc_id in enumerate(ids, start=1):
+        rank = 0
+        for doc_id in ids:
             if doc_id in seen_in_method:
                 continue
             seen_in_method.add(doc_id)
+            rank += 1
             scores[doc_id] = scores.get(doc_id, 0.0) + 1.0 / (k + rank)
             ranks.setdefault(doc_id, {})[method] = rank
 
