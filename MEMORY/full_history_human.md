@@ -2225,3 +2225,50 @@ vein is genuinely closed.
 
 **Next session:** #191 is a JT-gated decision-revisit; the repo is otherwise at
 zero open issues.
+
+## 2026-09-04 — Issue #203: a deduplicated doc still consumed a rank position
+**Branch:** `session/2026-09-04-0724-issue-203` · **PR:** #204
+
+#65 made a doc that a method emits twice contribute one `1/(k+rank)` term at
+its best rank. It skipped the duplicate but let `enumerate` keep counting it,
+so the duplicate contributed no term and still consumed a rank *slot* — every
+doc after it was scored and reported one rank worse. `[A, B, B, C]` reported
+`C` at rank 4 out of three distinct docs.
+
+The tell was incoherence rather than obvious wrongness: the recorded ranks were
+neither raw positions nor distinct-ranking positions but a mix of the two.
+Skipping the duplicate is already the decision that a duplicate is not a rank
+position; the loop simply declined to renumber after making it.
+
+My first two hand-built examples changed the scores but not the final order, and
+I nearly wrote this up as cosmetic. Searching instead of constructing settled
+it: over 200 000 random rankings with one duplicate injected into one channel,
+19.5% fused into a *different order* than the same rankings with that duplicate
+removed, and the minimal case moves the top-1 — the result an end user sees. A
+duplicate is an artifact of how a channel was built (a union of two SQL paths),
+not a property of the documents, so this was a real document being penalised for
+a channel's implementation detail.
+
+The most transferable part is *why #65 missed it*. All three of its tests use
+`["d1", "d2", "d1"]` — the duplicate last, where it displaces nothing — and one
+of them asserts that `d2` is "unaffected at rank 2", which is true only because
+nothing follows the duplicate. The population was "rankings containing a
+duplicate" and the tests sampled the single position in that population where
+the bug is invisible. Every test in `test_fusion.py` passes against both the old
+and the new code.
+
+Three neighbouring fixes are built and run in the new test file. Renumbering
+only the recorded ranks is the tempting one, because the most legible symptom is
+a rank of 4 out of three docs and it makes exactly that symptom disappear while
+leaving the scores deflated; renumbering only the score is its mirror; and a
+global cross-method seen-set passes every single-method test in the file while
+destroying the multi-channel agreement RRF exists to measure. The local
+reimplementation those neighbours run through has its own test asserting it
+agrees with the real module, or it would just be a second copy drifting quietly.
+
+Reachability, stated plainly: no in-repo channel emits a duplicate today. The
+reachable surface is the public one, and #65 had already accepted this input
+class and shipped a guard for it — this is that guard's other half.
+
+`docs/architecture.md`'s D-004 bullet now says what a rank *is*: the doc's
+position in the method's distinct ranking, always `1..n` with no holes.
