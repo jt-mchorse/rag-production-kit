@@ -94,7 +94,11 @@ that needs ranked candidates — rerank, generation, eval — reads from
 - **D-004.** RRF with `k=60` from the original RRF paper. Returns
   per-method ranks alongside the fused score so consumers can debug
   *which channel* surfaced a doc — eyeball-debuggable wins beat a
-  weighted-blend black box.
+  weighted-blend black box. A rank is the doc's 1-indexed position in
+  that method's **distinct** ranking: a method may emit the same doc
+  twice (a union of two SQL paths, a row surfacing by two routes), and
+  the repeat contributes no term and consumes no position, so the ranks
+  a method reports are always `1..n` with no holes (#65, #203).
 
 ---
 
