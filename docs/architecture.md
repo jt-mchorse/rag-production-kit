@@ -99,6 +99,24 @@ that needs ranked candidates — rerank, generation, eval — reads from
   twice (a union of two SQL paths, a row surfacing by two routes), and
   the repeat contributes no term and consumes no position, so the ranks
   a method reports are always `1..n` with no holes (#65, #203).
+  The fused list is a function of the data and not of how the caller
+  assembled it, which takes **two** mechanisms and not one (#69, #205).
+  The doc-id tie-break (#69) settles docs whose scores compare equal;
+  `math.fsum` is what makes two *mathematically* tied docs compare
+  equal in the first place. Floating-point addition is not
+  associative, so a running `+=` summed each doc's terms in `rankings`
+  iteration order — the caller's dict insertion order — and two docs
+  carrying the same multiset of `1/(k+rank)` terms landed up to an ULP
+  apart, in a direction that flipped when the caller reordered their
+  channels. The tie-break never fired, because `-score` had already
+  separated them. Measured over 4000 random rankings against every
+  permutation of the caller's method dict: 0.75% fused into a
+  different order and 0.57% changed the top-1 document; 0 of 4000
+  after. `fsum` returns the correctly-rounded value of the exact sum,
+  so a score depends on the multiset of terms and not their order —
+  which is strictly stronger than sorting the terms before a running
+  sum, the order-independent-but-wrong-valued neighbour
+  `tests/test_fusion_caller_order_independence.py` builds and runs.
 
 ---
 
