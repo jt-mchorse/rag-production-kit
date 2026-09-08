@@ -2272,3 +2272,40 @@ class and shipped a guard for it — this is that guard's other half.
 
 `docs/architecture.md`'s D-004 bullet now says what a rank *is*: the doc's
 position in the method's distinct ranking, always `1..n` with no holes.
+
+## 2026-09-07 — Issue #205: the tie-break only worked for exact ties
+**Duration:** ~24 min · **Branch:** `session/2026-09-07-0741-issue-205`
+
+- `fusion.py`'s comment claimed "a stable, caller-order-independent ranking".
+  It held only for docs whose scores compare *exactly* equal in IEEE-754 — and
+  #69's own case, two mathematically tied docs, usually was not one of those.
+  A running `+=` summed each doc's terms in the caller's dict insertion order,
+  so two docs carrying the same multiset of terms landed an ULP apart in a
+  direction the caller's ordering decided, and the doc-id tie-break never fired
+  because the score had already separated them.
+- Measured: 0.75% of 4000 random rankings fuse into a different order under a
+  permutation of the same data; 0.57% change the top-1 document. Zero after
+  switching to `math.fsum`.
+- **A tie-break only runs when the primary key compares equal.** So a tie-break
+  added to fix ordering instability is dead wherever the primary key is a float
+  accumulation, because the accumulation itself separates mathematically equal
+  values. #69 fixed the sort and left the thing that feeds it.
+- **The green neighbour taught the most.** Sorting the terms before a running
+  sum is fully order-independent, passes every permutation assertion I wrote,
+  and returns a *different float* from the correctly-rounded answer. Order
+  independence is not correctness; the separating test is the one that pins the
+  value against an independent exact oracle.
+- I overclaimed that oracle once — `math.fsum` returns the correctly-rounded
+  sum of the *float* terms, not of the exact rationals, because `1.0/61` is not
+  `Fraction(1, 61)`. Seven corpus rows went red and told me. Two oracles now.
+
+**Why this work, this session:** rag had zero open issues, so the hunt was the
+work, and the entry point was the PR merged in this same session's Phase A —
+#204, the fusion rank counter. A run's own Phase A merges are the freshest
+surface in the portfolio.
+
+**Open questions / blockers:** none.
+
+**Next session:** the `Iterable[str]` annotation permits a bare `str` as one
+method's ranking, which would iterate into characters; unmeasured, and worth a
+`priority:low` issue rather than a drive-by.
