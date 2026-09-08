@@ -262,3 +262,54 @@ only — rejected: it leaves the library's own documented guarantee false, and
 
 **Reversibility.** Cheap. One helper, one chokepoint, and the whole "before"
 behaviour is a measured variant table in `tests/test_sse_frame_totality.py`.
+
+---
+
+## D-018 — The reranker seam's tie rule is "preserve input order", stated on the Protocol
+**Date:** 2026-09-08
+
+**Decision.** Among equal scores, a `Reranker` returns candidates in their input
+order. The rule lives on the `Reranker` Protocol docstring and is tested against
+every backend in the module through one contract test that discovers the
+backends rather than listing them. It is deliberately *not* `fusion.py`'s
+tie-break by document id.
+
+**Why.** `CohereReranker.rerank` ended with `merged.sort(key=lambda pair:
+pair[0], reverse=True)` — no tie-break — and, unlike its sibling backend, its
+insertion order is not the input order. `merged` is filled per batch in
+`response.results` order, which the API returns sorted by relevance. So among
+equal scores the output was decided by two things that are not properties of the
+documents: whatever order the API happened to return the tied rows in, and which
+batch each candidate landed in, i.e. `batch_size` — a knob documented purely as
+a request-size limit. `rerank_rank` flows into the citation payload, so two runs
+over one corpus could cite a different chunk id for the same claim while the
+scores a consumer would inspect stay identical.
+
+Ties here are guaranteed rather than coincidental: `documents = [c.text for c in
+batch]` is all the API sees, so two candidates carrying the same text score
+identically by construction. Chunk overlap, a passage indexed twice, and the
+"union of two SQL paths" `fusion.py`'s own comment names all produce that.
+
+**Why input order rather than doc id.** The input to a reranker is already a
+ranking — `Retriever.search`'s fused list — and it carries signal a
+lexicographic rule would discard. RRF has no incoming order to inherit, which is
+why the two seams answer differently. And `LexicalOverlapReranker` already
+satisfied input order via its stable sort and said so in a comment; making that
+the seam's rule promotes an existing property rather than changing a working
+backend.
+
+**Alternatives considered.**
+- Fusion's doc-id tie-break — rejected: discards the fused ranking, and would
+  have moved `LexicalOverlapReranker` for no reason.
+- Sorting each batch before merging — rejected, and built and run: it
+  normalizes *within* a request and leaves the cross-request order exactly where
+  it was, so the answer still moves with `batch_size`.
+- `reverse=True` while carrying the position — rejected: it reverses the
+  tie-break along with the score and ranks the *last* tied candidate first.
+- Documenting that ties are undefined — rejected: that is the status quo with a
+  sentence on it, and the status quo puts a different chunk id on a citation.
+
+**Reversibility:** Cheap. One sort key and a Protocol docstring; the contract
+test is the thing that would need rewriting, and it is one file.
+
+**Related issues:** #207, #205, #180, #40

@@ -2309,3 +2309,55 @@ surface in the portfolio.
 **Next session:** the `Iterable[str]` annotation permits a bare `str` as one
 method's ranking, which would iterate into characters; unmeasured, and worth a
 `priority:low` issue rather than a drive-by.
+
+## 2026-09-08 — Issue #207: the layer between two tie fixes that nobody asked
+**Duration:** ~30 min · **Branch:** `session/2026-09-08-1445-issue-207`
+
+- Three tie-determinism fixes have shipped in this repo — #40 (RRF caller method
+  order), #180 (SQL physical row order), #205 (the float artifact that stopped
+  the tie-break ever firing). The reranker sits between two of them and was
+  never asked the question.
+- `CohereReranker.rerank` ended with `merged.sort(key=lambda pair: pair[0],
+  reverse=True)`. No tie-break — and unlike its sibling backend, its insertion
+  order is not the input order: `merged` is filled per batch in
+  `response.results` order, which the API returns sorted by relevance. So among
+  equal scores the ranking was decided by the API's arbitrary tie ordering and
+  by which batch each candidate landed in, i.e. `batch_size`.
+- **The sibling's stated reason did not transfer, and that is the whole
+  finding.** `LexicalOverlapReranker` says "Stable sort so equal scores preserve
+  input order — tests rely on this", and that is *true there*, because `scored`
+  is built by iterating `candidates` in order. Two call sites with identical
+  code can carry different contracts, because the thing they sort was built
+  differently.
+- **Ties are guaranteed, not coincidental.** `documents = [c.text for c in
+  batch]` is all the API sees, so two candidates carrying the same text score
+  identically by construction — chunk overlap, a passage indexed twice, and the
+  "union of two SQL paths" `fusion.py` itself names all produce that.
+- Measured: input `[D1, D2, A, Z]` with D1/D2 sharing text, a client returning
+  ties in reverse input order — `batch_size=1` gives `[A, D1, D2, Z]` and
+  `batch_size=2` gives `[A, D2, D1, Z]`. `batch_size` is documented as a
+  request-size knob. `rerank_rank` flows into the citation payload.
+- The rule now lives on the `Reranker` Protocol and is run against every backend
+  by a contract test that *discovers* them from the module, because a Protocol
+  docstring does not execute.
+- **The sweep is the test.** The unfixed sort is red on only 6 of the 21
+  `batch_size` × API-tie-order combinations — batching only matters when it
+  splits the tied group, and the API's tie order only matters within a batch. A
+  single hand-picked batch size would have agreed with the fixed answer 15 times
+  out of 21. A companion test asserts the batching really did issue three
+  requests, so the parametrize is not seven copies of one case.
+- Four neighbours built and run: the unfixed sort (8 red), `reverse=True`
+  carrying the position (23 red — it reverses the tie-break too), fusion's
+  doc-id tie-break (23 red), and the in-batch index instead of the input
+  position (11 red). Suite 1460 → 1489.
+
+**Why this work, this session:** rag has zero open issues, so the hunt was the
+work, and the entry point was #205 — merged in this session's own Phase A.
+
+**Open questions / blockers:** none.
+
+**Next session:** `list(response.results)` reads the results *container*
+unguarded while every field inside it is validated — index bounds, duplicates,
+the bool-is-int trap, score finiteness. A `results` of `null` gives a raw
+`TypeError`. Same container-versus-element class as `llm-cost-optimizer#213`;
+worth measuring before filing.
