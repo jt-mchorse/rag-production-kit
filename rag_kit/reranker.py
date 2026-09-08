@@ -54,7 +54,26 @@ class Reranker(Protocol):
     """Single-method seam for swapping reranker backends."""
 
     def rerank(self, query: str, candidates: Sequence[Candidate]) -> list[ScoredCandidate]:
-        """Return candidates re-sorted by relevance to query, with score + new rank."""
+        """Return candidates re-sorted by relevance to query, with score + new rank.
+
+        **Among equal scores, the input order is preserved** (#207). Scores tie
+        by construction rather than by coincidence — two candidates carrying the
+        same `text` are the same document to any scorer that only sees the text
+        — so "sorted by score" does not by itself define an output. Leaving the
+        rest to insertion order makes the ranking a function of whatever built
+        that order, which for a batching backend is the API's arbitrary tie
+        ordering and the operator's `batch_size`.
+
+        Input order is the rule rather than `fusion.py`'s doc-id tie-break
+        because the input here is already a ranking — `Retriever.search`'s fused
+        list — and it carries signal a lexicographic rule would discard. RRF has
+        no such incoming order to inherit, which is why the two seams answer
+        differently.
+
+        `tests/test_reranker_tie_order_contract.py` runs this against every
+        backend in this module, so a third one inherits the contract instead of
+        re-deriving it.
+        """
 
 
 # ----------------------------------------------------------------------
@@ -126,7 +145,11 @@ class LexicalOverlapReranker:
             penalty = self.length_penalty * (len(c.text) / (len(c.text) + 1))
             scored.append((overlap - penalty, c))
 
-        # Stable sort so equal scores preserve input order — tests rely on this.
+        # Stable sort so equal scores preserve input order — the `Reranker`
+        # Protocol's tie rule, which this backend gets for free because
+        # `scored` is built by iterating `candidates` in order. `CohereReranker`
+        # does not: it appends per batch in *API-response* order, so it has to
+        # carry the input position explicitly (#207).
         scored.sort(key=lambda pair: pair[0], reverse=True)
         return [
             ScoredCandidate(
@@ -218,7 +241,13 @@ class CohereReranker:
         # so very large candidate lists don't trip request-size limits, then
         # merge by score (the API returns scores on a comparable scale within
         # one model + version).
-        merged: list[tuple[float, Candidate]] = []
+        # `(score, input_position, candidate)`. The position is what makes the
+        # Protocol's tie rule hold here: `merged` is filled per batch in the
+        # order the API returned each batch's rows, which is by relevance and
+        # not by input position, so a stable sort on score alone left tied docs
+        # ordered by the API's own arbitrary tie choice — and moved them again
+        # whenever `batch_size` put them in different requests (#207).
+        merged: list[tuple[float, int, Candidate]] = []
         for start in range(0, len(candidates_list), self.batch_size):
             batch = candidates_list[start : start + self.batch_size]
             documents = [c.text for c in batch]
@@ -313,9 +342,14 @@ class CohereReranker:
                         "a NaN/Inf score would poison the generator's refusal gate "
                         "(top < threshold is False for NaN, answering when it should refuse)"
                     )
-                merged.append((score, batch[r.index]))
+                # `start` is the batch's offset into `candidates_list` and
+                # `r.index` is validated in `[0, len(batch))` above, so the sum
+                # is the candidate's position in the caller's own list.
+                merged.append((score, start + r.index, batch[r.index]))
 
-        merged.sort(key=lambda pair: pair[0], reverse=True)
+        # `(-score, position)` rather than `reverse=True`: reversing would
+        # reverse the tie-break too, ranking the *last* tied candidate first.
+        merged.sort(key=lambda row: (-row[0], row[1]))
         return [
             ScoredCandidate(
                 external_id=c.external_id,
@@ -324,7 +358,7 @@ class CohereReranker:
                 rerank_score=score,
                 rerank_rank=i + 1,
             )
-            for i, (score, c) in enumerate(merged)
+            for i, (score, _position, c) in enumerate(merged)
         ]
 
 
