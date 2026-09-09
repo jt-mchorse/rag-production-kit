@@ -2420,3 +2420,42 @@ exercised by CI's pg job.
 
 **Next session:** nothing outstanding here. The width mechanism is now stated
 identically in four places and two of them are enforced.
+
+## 2026-09-09 — Issue #209 follow-up: my comment broke the gated pg job
+**Branch:** `session/2026-09-09-0808-issue-209`
+
+The first push turned `integration-pg` red, and the cause was mine: a new
+comment in `init.sql` ended in `(#182);`, and `_split_sql_statements` ends a
+statement at any line whose last character is `;`. It cut the enclosing
+`CREATE TABLE` in half.
+
+The lesson is not "avoid semicolons in comments". Rewording would have gone
+green and left the landmine for whoever writes the next one — and the failure is
+invisible outside the `DATABASE_URL`-gated job, which cannot run on this host at
+all. The splitter is wrong, and it had no test of its own; its only exercise was
+that gated job.
+
+Its docstring said so, too: "split on `;` boundaries, **respecting `$$...$$`**".
+A docstring that names the one hazard it handles is a survey of hazards, and the
+one it does not name is the finding — the same lens that paid in every other
+repo today.
+
+Writing the test found a second defect. A comment-only chunk was emitted as a
+"statement" and handed to `cur.execute()`. Postgres accepts an empty command
+without complaint, so it was harmless *and* invisible, which is exactly what
+makes it worth dropping: executing nothing is also what a split gone wrong looks
+like.
+
+The assertion that carries the most is `test_every_emitted_statement_is_balanced`
+— a cut `CREATE TABLE` has unbalanced parentheses, which is precisely what
+"syntax error at end of input" means. A statement count alone would be satisfied
+by the right number of wrong fragments. Parentheses are counted over code only,
+because the schema's comments legitimately contain unmatched ones.
+
+The `--`-inside-a-string-literal case is declared rather than pretended: a named
+test pins the known-wrong answer, plus an assertion that this schema has no such
+literal so the limit stays unreachable.
+
+**Next session:** nothing outstanding. Worth remembering that this host has no
+Docker, so a repo with a gated job needs its PR status checked after pushing —
+local green is not the whole gate.
