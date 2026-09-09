@@ -147,6 +147,24 @@ defaults to `None` so the existing hybrid-only path stays unchanged.
   belongs in the production backend, hermetic exercise belongs in CI.
 - **D-007.** `reranker` kwarg defaults to `None` so callers opt in
   rather than discover a new step in their hot path.
+- **D-018 (#207).** Among equal scores, a reranker preserves **input
+  order** — a property of the `Reranker` Protocol, tested against every
+  backend by a contract test that discovers them from the module.
+  `CohereReranker` sorted on score alone and, unlike its sibling, its
+  insertion order is not the input order: `merged` is filled per batch
+  in `response.results` order, which the API returns sorted by
+  relevance. So the ranking among ties was decided by the API's
+  arbitrary tie ordering and by `batch_size` — a knob documented purely
+  as a request-size limit — and `rerank_rank` flows into the citation
+  payload, so two runs over one corpus could cite a different chunk id
+  for the same claim with identical scores on display. Ties are
+  guaranteed rather than coincidental: `documents = [c.text ...]` is
+  all the API sees, so two candidates carrying the same text score
+  identically by construction. Input order rather than `fusion.py`'s
+  doc-id tie-break, because the input here is *already* a ranking (the
+  fused list) and carries signal a lexicographic rule discards — RRF
+  has no incoming order to inherit, which is why the two seams answer
+  differently.
 
 ---
 
