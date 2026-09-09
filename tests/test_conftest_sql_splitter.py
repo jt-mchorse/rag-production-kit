@@ -33,7 +33,9 @@ INIT_SQL = REPO_ROOT / "infra" / "postgres" / "init.sql"
 
 def _code_lines(statement: str) -> list[str]:
     return [
-        line for line in statement.splitlines() if line.strip() and not line.strip().startswith("--")
+        line
+        for line in statement.splitlines()
+        if line.strip() and not line.strip().startswith("--")
     ]
 
 
