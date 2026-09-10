@@ -19,6 +19,12 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 INIT_SQL = REPO_ROOT / "infra" / "postgres" / "init.sql"
 
 
+#: A dollar-quote delimiter: ``$$`` or ``$tag$`` where *tag* is an identifier.
+#: Postgres allows the tag to be empty (``$$``) or any identifier, and a body
+#: is closed only by its own tag (#211).
+_DOLLAR_TAG = re.compile(r"\$(?:[A-Za-z_][A-Za-z_0-9]*)?\$")
+
+
 def _code_before_comment(line: str) -> str:
     """The part of *line* before a ``--`` comment.
 
@@ -32,14 +38,23 @@ def _code_before_comment(line: str) -> str:
     schema has no such literal, a real one would need a SQL lexer, and a helper
     that pretends to lex is worse than one whose limits are written down —
     ``test_conftest_sql_splitter.py`` has a named row for it so the choice is
-    visible rather than assumed.
+    visible rather than assumed. A ``/* ... */`` block comment is declared the
+    same way and for the same reason (#211).
+
+    Called on *every* line since #211, including lines inside a dollar-quoted
+    body. #209 made the splitter comment-aware through a ternary --
+    ``_code_before_comment(line) if not in_dollar else line`` -- and only the
+    ``not in_dollar`` arm got it, so a ``--`` comment inside a PL/pgSQL body
+    had its text scanned for delimiters. A comment mentioning the ``$$`` the
+    body itself is quoted with closed the block and flushed mid-function: the
+    same defect #209 fixed, on the other branch of the same expression.
     """
     marker = line.find("--")
     return line if marker == -1 else line[:marker]
 
 
 def _split_sql_statements(sql: str) -> list[str]:
-    """Split a SQL script on ``;`` boundaries in code, respecting ``$$...$$``.
+    """Split a SQL script on ``;`` boundaries in code, respecting dollar quotes.
 
     psycopg3 executes one statement per ``execute()`` call, and the init
     script contains a PL/pgSQL function defined inside a dollar-quoted
@@ -50,10 +65,37 @@ def _split_sql_statements(sql: str) -> list[str]:
     docstring named the one hazard it respected and was silent on the other,
     which is how a schema comment ending in ``(#182);`` broke the
     ``DATABASE_URL``-gated job and nothing else (#209).
+
+    #211 closed two more, both of them in the delimiter scan rather than in the
+    ``;`` test:
+
+    * ``--`` comments are stripped on **both** arms now. #209's fix went in as
+      ``_code_before_comment(line) if not in_dollar else line`` and only the
+      first arm got it, so a comment *inside* a body had its text read as code
+      — a comment mentioning ``$$`` closed the block and flushed mid-function.
+      Measured: 3 statements where there is 1.
+    * The **tagged** form ``$tag$ ... $tag$`` is recognised, and the close must
+      carry the same tag as the open. ``AS $func$`` and ``AS $BODY$`` are the
+      conventional PL/pgSQL spellings and were not dollar-quoted at all as far
+      as this scan was concerned, so every ``;`` in the body split. Measured: 4
+      statements where there is 1.
+
+      Requiring the tag to match is the whole content of the second half. A
+      scan that toggles on any ``$...$`` treats a bare ``$$`` inside a
+      ``$func$`` body as a delimiter, when it is body text — the wrong fix is
+      green on the tagged rows and re-breaks the untagged one.
+
+    Still a line-oriented helper, deliberately, and its limits are declared in
+    ``_code_before_comment`` and pinned as named rows with reachability
+    assertions in ``test_conftest_sql_splitter.py``. A helper that pretends to
+    lex SQL is worse than one whose limits are written down.
     """
     out: list[str] = []
     buf: list[str] = []
-    in_dollar = False
+    # The open delimiter's full text (``$$`` or ``$tag$``) while inside a body,
+    # else None. Holding the *text* and not a bool is what makes the close
+    # have to match the open.
+    open_tag: str | None = None
 
     def _flush() -> None:
         stmt = "\n".join(buf).strip()
@@ -69,13 +111,18 @@ def _split_sql_statements(sql: str) -> list[str]:
             out.append(stmt)
 
     for line in sql.splitlines():
-        code = _code_before_comment(line) if not in_dollar else line
-        if re.search(r"\$\$", code):
-            # toggle once per `$$` occurrence on the line
-            for _ in re.findall(r"\$\$", code):
-                in_dollar = not in_dollar
+        # Both arms (#211). Inside a body a `--` comment is still a comment.
+        code = _code_before_comment(line)
+        for tag in _DOLLAR_TAG.findall(code):
+            if open_tag is None:
+                open_tag = tag
+            elif tag == open_tag:
+                open_tag = None
+            # else: a different tag inside an open body is body text, not a
+            # delimiter. `$$` inside a `$func$` body is the case that makes
+            # this an `elif` and not an `else`.
         buf.append(line)
-        if not in_dollar and code.rstrip().endswith(";"):
+        if open_tag is None and code.rstrip().endswith(";"):
             _flush()
             buf = []
     _flush()

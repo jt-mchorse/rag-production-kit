@@ -181,3 +181,166 @@ def test_the_string_literal_limit_is_declared_not_pretended() -> None:
         "the schema gained a string literal containing '--'; the splitter's "
         "declared limit is now reachable and needs a real lexer"
     )
+
+
+# ---------------------------------------------------------------------------
+# #211 — the delimiter scan, not the `;` test
+#
+# #209's fix went in as a ternary:
+#
+#     code = _code_before_comment(line) if not in_dollar else line
+#
+# and the comment-awareness landed on ONE arm of it. Inside a dollar-quoted
+# body the raw line was used and the `$$` scan ran against it, so a `--`
+# comment inside a PL/pgSQL body had its text read as code. That is the same
+# defect #209 fixed, on the other branch of the same expression.
+#
+# Measured on the parent commit:
+#
+#     $$ inside a -- comment INSIDE a dollar body   -> 3 statements
+#     tagged dollar quote $func$                    -> 4 statements
+#     block comment whose line ends in ';'          -> 2 statements
+#     control: plain $$ body                        -> 1 statement
+#     control: -- comment ending in ';'             -> 1 statement
+#
+# The first is reachable in `init.sql` today: it has exactly one dollar-quoted
+# function and it is spelled `$$`, so a comment inside that body documenting
+# the delimiter it is quoted with closes the block. The second becomes
+# reachable the moment a second function is written the conventional way.
+# ---------------------------------------------------------------------------
+
+
+def test_a_dollar_delimiter_named_inside_a_comment_does_not_close_the_body() -> None:
+    """The #211 shape, and the mirror of the #209 shape one branch over.
+
+    A comment that documents the delimiter the body is quoted with is the
+    ordinary way this gets written, which is what makes it reachable rather
+    than adversarial.
+    """
+    sql = "\n".join(
+        [
+            "CREATE FUNCTION f() RETURNS void AS $$",
+            "BEGIN",
+            "  -- the $$ delimiter is written like this",
+            "  RAISE NOTICE 'x';",
+            "END;",
+            "$$ LANGUAGE plpgsql;",
+        ]
+    )
+    statements = _split_sql_statements(sql)
+    assert len(statements) == 1, f"body was cut into {len(statements)}: {statements}"
+    # Not just the count: the whole body has to be in there. A split that
+    # happened to rejoin would satisfy a count assertion.
+    assert "RAISE NOTICE 'x';" in statements[0]
+    assert statements[0].rstrip().endswith("$$ LANGUAGE plpgsql;")
+
+
+@pytest.mark.parametrize(
+    ("label", "tag"),
+    [
+        ("lowercase identifier", "$func$"),
+        ("uppercase identifier", "$BODY$"),
+        ("underscore-led", "$_x$"),
+        ("digits after the first char", "$b2$"),
+        ("untagged, the control", "$$"),
+    ],
+)
+def test_a_tagged_dollar_body_is_one_statement(label: str, tag: str) -> None:
+    """`AS $func$ ... $func$` is the conventional PL/pgSQL spelling.
+
+    The scan matched `\\$\\$` only, so a tagged body was not dollar-quoted at
+    all as far as it was concerned and every `;` in it split.
+    """
+    sql = "\n".join(
+        [
+            f"CREATE FUNCTION g() RETURNS void AS {tag}",
+            "BEGIN",
+            "  RAISE NOTICE 'a';",
+            "  RAISE NOTICE 'b';",
+            "END;",
+            f"{tag} LANGUAGE plpgsql;",
+        ]
+    )
+    statements = _split_sql_statements(sql)
+    assert len(statements) == 1, f"{label}: body cut into {len(statements)}"
+    assert "RAISE NOTICE 'b';" in statements[0], label
+
+
+def test_a_bare_dollar_dollar_inside_a_tagged_body_is_body_text() -> None:
+    """The separating row for the tagged half.
+
+    This is the whole reason the close has to carry the *same* tag as the open.
+    A scan that toggles on any `$...$` reads this `$$` as a delimiter, closes
+    the body early, and splits on the next `;` — so it is green on the tagged
+    rows above and red here. Tagging exists in Postgres precisely so a body can
+    contain `$$`.
+    """
+    sql = "\n".join(
+        [
+            "CREATE FUNCTION g() RETURNS void AS $func$",
+            "BEGIN",
+            "  RAISE NOTICE 'uses $$ here';",
+            "  RETURN;",
+            "END;",
+            "$func$ LANGUAGE plpgsql;",
+        ]
+    )
+    statements = _split_sql_statements(sql)
+    assert len(statements) == 1, f"body cut into {len(statements)}: {statements}"
+    assert "RETURN;" in statements[0]
+
+
+def test_the_schema_really_does_contain_a_dollar_quoted_body() -> None:
+    """Anti-vacuous arm for the two rows above.
+
+    They are hermetic by design, but the reason they matter is that `init.sql`
+    has a dollar-quoted function *right now*. If it ever loses one, these rows
+    stop covering anything reachable and someone should be told rather than
+    left with a green suite.
+    """
+    text = INIT_SQL.read_text(encoding="utf-8")
+    assert "$$" in text, "init.sql no longer contains a dollar-quoted body"
+    assert "LANGUAGE plpgsql" in text
+    # And the body is spelled untagged, which is what makes the comment shape
+    # in the first test reachable in this file today.
+    assert "AS $$" in text
+
+
+def test_the_block_comment_limit_is_declared_not_pretended() -> None:
+    """`/* ... */` is deliberately not modelled, like `--` in a string literal.
+
+    Same reasoning, same shape of test: pin the known-wrong answer, then assert
+    the limit is unreachable in the real schema so the declaration cannot
+    quietly become a live bug.
+    """
+    sql = "\n".join(["CREATE TABLE t (", "  /* note ends here;", "  */", "  id INT", ");"])
+    statements = _split_sql_statements(sql)
+    # The known-wrong answer, pinned: the first line of the block comment ends
+    # in `;`, which the line-oriented scan reads as a statement boundary.
+    assert len(statements) == 2
+    assert "/*" not in INIT_SQL.read_text(encoding="utf-8"), (
+        "the schema gained a /* ... */ block comment; the splitter's declared "
+        "limit is now reachable and needs a real lexer"
+    )
+
+
+def test_the_real_schema_statement_count_is_unchanged_by_the_widening() -> None:
+    """A delimiter scan that got wider could merge statements that should split.
+
+    The two widenings only ever *keep a body together*, never break one apart,
+    so the real file must produce exactly what it produced before. Pinned
+    against the count the `integration-pg` job has been executing.
+    """
+    statements = _split_sql_statements(INIT_SQL.read_text(encoding="utf-8"))
+    # 8, measured on the parent commit and again after the change. The number
+    # is written down rather than guessed: I guessed 11 first and the test
+    # said 8, which is the only reason this assertion is worth anything.
+    assert len(statements) == 8, (
+        f"init.sql now splits into {len(statements)} statements; if that is "
+        "intended, update this number and check integration-pg"
+    )
+    # And the function is one of them, whole.
+    bodies = [s for s in statements if "LANGUAGE plpgsql" in s]
+    assert len(bodies) == 1
+    assert "to_tsvector" in bodies[0]
+    assert "RETURN NEW;" in bodies[0]
