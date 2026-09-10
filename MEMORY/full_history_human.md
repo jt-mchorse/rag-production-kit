@@ -2459,3 +2459,61 @@ literal so the limit stays unreachable.
 **Next session:** nothing outstanding. Worth remembering that this host has no
 Docker, so a repo with a gated job needs its PR status checked after pushing —
 local green is not the whole gate.
+
+---
+
+## 2026-09-10 — a one-line fix has two arms, and the guard went on one (#211)
+
+**Focus:** `tests/conftest.py`'s `_split_sql_statements`, the helper that feeds
+`infra/postgres/init.sql` to psycopg one statement at a time.
+
+**What got done.** #209 made this splitter comment-aware, twenty minutes before
+this session started, after a schema comment ending in `(#182);` cut a
+`CREATE TABLE` in half and turned `integration-pg` red. The fix was a single
+line — `code = _code_before_comment(line) if not in_dollar else line` — and the
+comment-awareness landed on one arm of that ternary. Inside a dollar-quoted
+body the raw line was used and the `$$` scan ran against it, so a `--` comment
+inside a PL/pgSQL body had its text read as code. A comment mentioning the `$$`
+the body is quoted with closes the block, and the next line ending in `;`
+flushes mid-function. Three statements where there is one.
+
+That shape is reachable in `init.sql` today: it has exactly one dollar-quoted
+function, and it is spelled `AS $$`. #209's own conclusion applies word for
+word — rewording the comment would leave the landmine for the next person.
+
+A second gap sat in the same scan. `re.findall(r"\$\$", ...)` matches the
+untagged form only, so `AS $func$` and `AS $BODY$` — the conventional PL/pgSQL
+spellings — were not dollar-quoted at all as far as the splitter was concerned,
+and every `;` in the body split. Four statements where there is one. Fixing it
+required `in_dollar` to stop being a bool: it now holds the delimiter's text,
+because the close has to carry the same tag as the open. That requirement *is*
+the fix. A scan that toggles on any `$…$` reads a bare `$$` inside a `$func$`
+body as a delimiter, when tagging exists in Postgres precisely so that a body
+can contain `$$` — and that wrong version is green on all four tagged rows.
+
+The block-comment case is declared rather than fixed, the same way the
+`--`-inside-a-string-literal limit already was: a named test pinning the
+known-wrong answer plus an assertion that `init.sql` contains no `/*`, so the
+declaration cannot quietly become a live bug. A helper that pretends to lex SQL
+is worse than one whose limits are written down, and that was #209's argument,
+not a new one.
+
+**Two process notes.** I falsified each half separately rather than reverting
+the whole diff. Reverting both at once would have shown five red and said
+nothing about independence; reverting one arm showed the four tagged rows stay
+green, which is what proves these are two fixes and not one wearing two hats.
+And I guessed a number in an assertion — 11 statements for the real schema —
+where the answer is 8. It is now measured on both the parent commit and this
+one, because a widened delimiter scan can only ever keep a body together, never
+break one apart, so "unchanged" is the actual claim being made.
+
+**Why this was prioritized.** `rag-production-kit` has zero open issues, and
+the freshest surface in the portfolio is the PR merged at the top of the same
+run.
+
+**Open questions / blockers:** none. This helper is exercised only by the
+`DATABASE_URL`-gated job, and there is no Docker on the session host, so all
+three failures were invisible to a local run and to every other CI job. Both
+ruff versions were checked — the local venv is 0.15.13 and CI's unpinned
+install resolves to 0.16.6 today, which is the skew that produced #209's own
+follow-up commit.
