@@ -19,30 +19,66 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 INIT_SQL = REPO_ROOT / "infra" / "postgres" / "init.sql"
 
 
+def _code_before_comment(line: str) -> str:
+    """The part of *line* before a ``--`` comment.
+
+    A statement ends at a ``;`` in CODE, never at one inside a comment. The
+    splitter below respected ``$$...$$`` and nothing else, so a comment whose
+    last character happened to be ``;`` cut the enclosing statement in half and
+    psycopg reported ``syntax error at end of input`` pointing at the comment
+    text (#209). A schema file is mostly prose, and prose has semicolons.
+
+    ``--`` inside a single-quoted string is deliberately NOT modelled. This
+    schema has no such literal, a real one would need a SQL lexer, and a helper
+    that pretends to lex is worse than one whose limits are written down —
+    ``test_conftest_sql_splitter.py`` has a named row for it so the choice is
+    visible rather than assumed.
+    """
+    marker = line.find("--")
+    return line if marker == -1 else line[:marker]
+
+
 def _split_sql_statements(sql: str) -> list[str]:
-    """Split a SQL script on ``;`` boundaries, respecting ``$$...$$``.
+    """Split a SQL script on ``;`` boundaries in code, respecting ``$$...$$``.
 
     psycopg3 executes one statement per ``execute()`` call, and the init
     script contains a PL/pgSQL function defined inside a dollar-quoted
     block — a naive split on ``;`` would cut the function body in half.
+
+    Two things end a statement's line and only one of them was modelled: a
+    ``;`` in code, and — wrongly — a ``;`` at the end of a ``--`` comment. The
+    docstring named the one hazard it respected and was silent on the other,
+    which is how a schema comment ending in ``(#182);`` broke the
+    ``DATABASE_URL``-gated job and nothing else (#209).
     """
     out: list[str] = []
     buf: list[str] = []
     in_dollar = False
+
+    def _flush() -> None:
+        stmt = "\n".join(buf).strip()
+        # A chunk with no code is a comment block, not a statement. Postgres
+        # accepts an empty command without complaint, so emitting one is
+        # harmless AND invisible -- which is exactly what makes it worth
+        # dropping: a caller iterating "statements" should never be handed
+        # something that executes nothing, because that is also what a split
+        # gone wrong looks like.
+        if stmt and any(
+            line.strip() and not line.strip().startswith("--") for line in stmt.splitlines()
+        ):
+            out.append(stmt)
+
     for line in sql.splitlines():
-        if re.search(r"\$\$", line):
+        code = _code_before_comment(line) if not in_dollar else line
+        if re.search(r"\$\$", code):
             # toggle once per `$$` occurrence on the line
-            for _ in re.findall(r"\$\$", line):
+            for _ in re.findall(r"\$\$", code):
                 in_dollar = not in_dollar
         buf.append(line)
-        if not in_dollar and line.rstrip().endswith(";"):
-            stmt = "\n".join(buf).strip()
-            if stmt:
-                out.append(stmt)
+        if not in_dollar and code.rstrip().endswith(";"):
+            _flush()
             buf = []
-    tail = "\n".join(buf).strip()
-    if tail:
-        out.append(tail)
+    _flush()
     return out
 
 

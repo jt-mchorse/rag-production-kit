@@ -2361,3 +2361,101 @@ unguarded while every field inside it is validated — index bounds, duplicates,
 the bool-is-int trap, score finiteness. A `results` of `null` gives a raw
 `TypeError`. Same container-versus-element class as `llm-cost-optimizer#213`;
 worth measuring before filing.
+
+## 2026-09-09 — Issue #209: the schema told the operator to edit a settings table that does not exist
+**Branch:** `session/2026-09-09-0808-issue-209`
+
+`infra/postgres/init.sql` calls itself "the single source of truth the Python
+indexer/retriever assume" and gave two pointers for changing the dense vector
+width. Both were wrong: there is no settings table anywhere in the repo, and
+neither `pyproject.toml` nor `README.md` mentions the dimension at all.
+
+Three other places already described the real mechanism and agreed with each
+other — D-003, `docs/architecture.md`, and the runtime error `to_pgvector`
+raises. The schema was the outlier, and it is the worst one to be wrong,
+because it is the file an operator opens first and `db.py`'s error is the only
+thing that would correct them — after they have already got it wrong.
+
+`tests/test_embedding_width_seam.py` (#194) already parses this exact file and
+pins the number. Its docstring says "An operator obligation with no check is a
+convention, not a contract." The obligation it enforces was stated correctly in
+`architecture.md` and incorrectly in the file the test reads: a lock on the
+value, none on the instructions.
+
+The most useful thing that happened was two of my own probes coming back green,
+and both rewrites came from that rather than from reading the code again. I
+first keyed the scan on a verb, and it matched none of my own corrected prose.
+Then I keyed it on the subject and it still missed the actual bug — twice: the
+scan read only lines *starting* with `--`, and the stale pointer trailed the
+column declaration; and once that was fixed, the wording turned out to be the
+abbreviation "dim", which the vocabulary did not have.
+
+So the width discussion is now the union of a structural half — the `embedding
+vector(N)` line's own trailing comment, in scope because the width is declared
+there whatever words it uses — and a lexical half for everything else. The
+structural half is the one that carries this file's original defect, and it has
+its own anti-vacuous arm for the day the column is renamed.
+
+I also dropped a hand-listed negative arm ("settings table" must not appear)
+because it false-hit on my own prose explaining the fix. The derived arm
+replaces it: a width discussion that names no file fails the check that the
+other half of the two-place obligation is stated, so a re-introduced settings
+table is caught without a denylist.
+
+Second finding in the same file: `external_id TEXT UNIQUE` with no `NOT NULL`,
+while `indexer.py` claims "It's UNIQUE in the schema, so re-indexing the same
+chunk overwrites cleanly". Postgres UNIQUE permits multiple NULLs, so the
+upsert's `ON CONFLICT` never fires for one. Unreachable from Python thanks to
+#182's `Document` guard; reachable by direct SQL, which is an ordinary
+corpus-loader path.
+
+**Why this work, this session:** the repo had zero open issues, so the hunt was
+the work, and the surface was the PR this same run merged during Phase A. The
+reranker fix led to the least-read modules, and `indexer.py` (two issues in its
+history) led to the schema.
+
+**Open questions / blockers:** none. There is no Docker on the session host, so
+the eight `DATABASE_URL`-gated tests skip locally; the `NOT NULL` change is
+exercised by CI's pg job.
+
+**Next session:** nothing outstanding here. The width mechanism is now stated
+identically in four places and two of them are enforced.
+
+## 2026-09-09 — Issue #209 follow-up: my comment broke the gated pg job
+**Branch:** `session/2026-09-09-0808-issue-209`
+
+The first push turned `integration-pg` red, and the cause was mine: a new
+comment in `init.sql` ended in `(#182);`, and `_split_sql_statements` ends a
+statement at any line whose last character is `;`. It cut the enclosing
+`CREATE TABLE` in half.
+
+The lesson is not "avoid semicolons in comments". Rewording would have gone
+green and left the landmine for whoever writes the next one — and the failure is
+invisible outside the `DATABASE_URL`-gated job, which cannot run on this host at
+all. The splitter is wrong, and it had no test of its own; its only exercise was
+that gated job.
+
+Its docstring said so, too: "split on `;` boundaries, **respecting `$$...$$`**".
+A docstring that names the one hazard it handles is a survey of hazards, and the
+one it does not name is the finding — the same lens that paid in every other
+repo today.
+
+Writing the test found a second defect. A comment-only chunk was emitted as a
+"statement" and handed to `cur.execute()`. Postgres accepts an empty command
+without complaint, so it was harmless *and* invisible, which is exactly what
+makes it worth dropping: executing nothing is also what a split gone wrong looks
+like.
+
+The assertion that carries the most is `test_every_emitted_statement_is_balanced`
+— a cut `CREATE TABLE` has unbalanced parentheses, which is precisely what
+"syntax error at end of input" means. A statement count alone would be satisfied
+by the right number of wrong fragments. Parentheses are counted over code only,
+because the schema's comments legitimately contain unmatched ones.
+
+The `--`-inside-a-string-literal case is declared rather than pretended: a named
+test pins the known-wrong answer, plus an assertion that this schema has no such
+literal so the limit stays unreachable.
+
+**Next session:** nothing outstanding. Worth remembering that this host has no
+Docker, so a repo with a gated job needs its PR status checked after pushing —
+local green is not the whole gate.
