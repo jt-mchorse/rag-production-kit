@@ -362,6 +362,60 @@ Dashboard is independently runnable; eval harness (#7) reuses the same
   `dump_stats_json` so one log-parsing config consumes all portfolio
   observability artifacts.
 
+- **Both clauses of "finite non-negative", at the read boundaries too
+  (#213).** Both latency write boundaries state the same two-clause rule
+  in the same words — `CostRecord.build` ("total_latency_ms must be a
+  finite non-negative number") and `PhaseTimings.record` ("ms must be a
+  finite non-negative number"), with `per_phase_ms` and
+  `PriceTable.cost`'s token counts carrying it too. The **non-finite**
+  clause was then swept to every read and egress boundary across #38,
+  #58, #63, #80, #81, #82, #87, #106, #135 and #168. The
+  **non-negative** clause was never swept past the two write boundaries
+  it was written at. Both guards exist *because* the data can arrive
+  without meeting them: `CostRecord` and `PhaseTimings` are public
+  dataclasses with no `__post_init__` — deliberately, since
+  `TelemetryStore.since` rebuilds records from SQLite rows — which is
+  the explicit premise of #80's and #168's own docstrings. That premise
+  covers everything the write guard checks, not the one clause that got
+  ported.
+
+  Measured: `PhaseTimings(total=[-5.0, 1.0])` published
+  `p50_ms = -2.0` through `summary()` → `to_dict()` →
+  `dump_summary_json`; a `CostRecord(total_latency_ms=-5000.0)` survived
+  `record()` → SQLite → `since()` → `aggregate()` →
+  `dump_aggregate_json`; and the dashboard's SVG drew a point at
+  `y = 9545` in a 240-pixel viewport. With two samples the negative
+  *becomes* the reported number; with twenty it is invisible and still
+  moves p50/p95/p99 down, so a latency SLO computed from the window
+  reads better than reality.
+
+  Three design points the fix turns on. The clause goes where the
+  **domain** is known — `PhaseTimings.percentile`, whose four lists are
+  durations by construction, and `aggregate`, beside the `total_usd`
+  guard — and *not* into `telemetry.percentile`, which is a general
+  percentile over `Sequence[float]` whose signed answers are correct; a
+  guard there would reject valid input, which is worse than the gap, and
+  a passing control pins it. `_render_chart_svg` **clamps geometry on
+  both axes** rather than rejecting, because the raw value stays in the
+  table row and in `/json`, so the chart staying in bounds never becomes
+  the only account of the data — #135's presentation-boundary posture
+  applied to the other clause. And `_render_dashboard_html` now
+  **degrades instead of propagating**: a metric boundary that refuses is
+  right for `dump_aggregate_json` and becomes a bare 500 and a blank
+  page when it reaches an HTTP handler, which is the failure mode #135
+  added `_json_safe` to prevent. The summary row is replaced by a named
+  error and the chart and table still render.
+
+  The fourth guarded site — negative token counts summing to
+  `total_prompt_tokens: -4900` in the published aggregate — was **not**
+  in #213's hand-written list of three. It was found by the inventory
+  lock in `tests/test_latency_domain_boundaries.py`, which collects every
+  "non-negative" rejection in the package from the AST and hard-pins the
+  set, so the next clause added at a write boundary cannot go unswept.
+  The member the hand list missed has the least arguable consequence of
+  the four: a negative duration can be read as a clock artifact, a
+  negative token count cannot be read at all.
+
 ---
 
 ## 7. Eval-harness integration

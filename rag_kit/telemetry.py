@@ -524,6 +524,56 @@ def aggregate(records: Iterable[CostRecord]) -> Aggregate:
     # dashboard `/json` egress sibling sanitizes at the presentation boundary.
     if any(not math.isfinite(c) for c in costs):
         raise ValueError(f"total_usd values must all be finite numbers; got {costs!r}")
+    # The latency domain, at the same boundary and for the same reason (#213).
+    # `CostRecord.build` rejects "a finite non-negative number"; every sweep
+    # since (#38, #58, #63, #80, #81, #82, #87, #106, #108, #135, #168) carried
+    # the non-finite half of that sentence to the read boundaries and none
+    # carried the other half. Latency finiteness is delegated to `percentile`
+    # below; non-negativity cannot be, because `percentile` is a general helper
+    # over `Sequence[float]` whose signed answers are correct -- a guard there
+    # would reject valid input, which is worse than this gap. So the clause goes
+    # where the *domain* is known, which is here, beside the `total_usd` guard
+    # whose own comment already makes this argument about directly-constructed
+    # records.
+    #
+    # Measured on b74753c: a `CostRecord(total_latency_ms=-5000.0)` (the
+    # dataclass has no `__post_init__`, by design, so `build` is bypassed)
+    # survived `record()` -> SQLite -> `since()` and reached here. With two
+    # samples the negative *became* the reported `latency_p50_ms`; with twenty
+    # it was invisible and still moved p50/p95/p99 down by 0.50/0.05/0.01 ms,
+    # with nothing in the output naming the sample that did it.
+    #
+    # Negativity ONLY, not finiteness: `percentile` below already rejects a
+    # non-finite latency with the message `test_aggregate_with_non_finite_latency`
+    # pins (#80), and re-raising that case here with different wording would
+    # change a contract two tests quote while adding nothing. The two failure
+    # modes also want different diagnostics -- a NaN latency is a broken
+    # measurement, a negative one is a broken clock or a hand-built record -- so
+    # they read better as separate messages than as one merged sentence.
+    if any(lat < 0 for lat in latencies):
+        raise ValueError(f"total_latency_ms values must all be non-negative; got {latencies!r}")
+    # Token counts, the same clause at the same boundary (#213). `PriceTable.cost`
+    # rejects "token counts must be non-negative integers" on the way in, and the
+    # sums below had no guard, so a directly-constructed record published a
+    # NEGATIVE TOTAL: measured, two real records of 100 prompt tokens plus one
+    # `prompt_tokens=-5000` gave `total_prompt_tokens = -4800`, and
+    # `dump_aggregate_json` wrote `{"total_prompt_tokens": -4900}`.
+    #
+    # This site was not in #213's hand-written list of three. It was found by the
+    # inventory lock in `tests/test_latency_domain_boundaries.py`, which collects
+    # every "non-negative" rejection in the package from the AST -- and the member
+    # the hand list missed has the *less* arguable consequence of the four, since
+    # a negative duration can at least be read as a clock artifact and a negative
+    # token count cannot be read at all.
+    bad_tokens = [
+        (r.prompt_tokens, r.completion_tokens)
+        for r in rs
+        if r.prompt_tokens < 0 or r.completion_tokens < 0
+    ]
+    if bad_tokens:
+        raise ValueError(
+            f"token counts must all be non-negative; got (prompt, completion) pairs {bad_tokens!r}"
+        )
     return Aggregate(
         n=len(rs),
         total_prompt_tokens=sum(r.prompt_tokens for r in rs),

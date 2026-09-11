@@ -41,6 +41,7 @@ if str(_REPO_ROOT) not in sys.path:
 
 from rag_kit.streaming import _json_safe  # noqa: E402
 from rag_kit.telemetry import (  # noqa: E402
+    Aggregate,
     CostRecord,
     ModelPrice,
     PriceTable,
@@ -176,16 +177,44 @@ def _render_chart_svg(records: Sequence[CostRecord], width: int = 720, height: i
         )
     ts_min = records[0].ts
     ts_max = records[-1].ts if records[-1].ts > ts_min else ts_min + 1.0
-    lat_max = max((r.total_latency_ms for r in records), default=1.0) or 1.0
+    # `max(...) or 1.0` replaced a *falsy* maximum, which is `0.0` only: a
+    # negative maximum is truthy and went straight through as the divisor, so
+    # `1 - lat / lat_max` read inverted (#213). Floor at 0 first, then apply the
+    # zero-replacement, so an all-negative window scales against 1.0 rather than
+    # against a negative.
+    lat_max = max(max((r.total_latency_ms for r in records), default=1.0), 0.0) or 1.0
     margin_l, margin_r, margin_t, margin_b = 40, 16, 16, 28
     plot_w = width - margin_l - margin_r
     plot_h = height - margin_t - margin_b
 
+    def _clamp(value: float, lo: float, hi: float) -> float:
+        # Geometry only, and both axes, not one (#213). `CostRecord` has no
+        # `__post_init__` by design, so a directly-constructed record carrying a
+        # negative `total_latency_ms` reaches this renderer -- `aggregate()`
+        # rejects it at the metric boundary, but this chart draws the raw
+        # records, not the aggregate. Unclamped, `y` reached 9545 in a 240px
+        # viewport for one `-5000 ms` sample among real ones, and -572 for an
+        # all-negative window: the polyline was drawn outside the image.
+        #
+        # Clamped rather than dropped, and clamped *only here*: the raw value
+        # stays in the table row (`<td>{r.total_latency_ms:.1f}ms</td>`) and in
+        # the `/json` payload, so the chart staying in bounds never becomes the
+        # only account of what happened. That is #135's posture -- sanitize at
+        # the presentation boundary -- applied to the other clause of the same
+        # sentence. A NaN is not reachable here (`math.isnan` comparisons are all
+        # False, so a clamp would pass it through); #135 already maps non-finite
+        # to `null` on the `/json` side and the axis-label path below renders it
+        # as text, which is why this function guards the *range* and not the
+        # *finiteness*.
+        return lo if value < lo else hi if value > hi else value
+
     def x(ts: float) -> float:
-        return margin_l + plot_w * (ts - ts_min) / (ts_max - ts_min)
+        raw = margin_l + plot_w * (ts - ts_min) / (ts_max - ts_min)
+        return _clamp(raw, float(margin_l), float(margin_l + plot_w))
 
     def y(lat: float) -> float:
-        return margin_t + plot_h * (1 - lat / lat_max)
+        raw = margin_t + plot_h * (1 - lat / lat_max)
+        return _clamp(raw, float(margin_t), float(margin_t + plot_h))
 
     points = " ".join(f"{x(r.ts):.1f},{y(r.total_latency_ms):.1f}" for r in records)
     # Axis labels: latency max, 0; time start, time end.
@@ -208,7 +237,25 @@ def _render_chart_svg(records: Sequence[CostRecord], width: int = 720, height: i
 
 
 def _render_dashboard_html(records: Sequence[CostRecord]) -> str:
-    agg = aggregate(records)
+    # `aggregate` is a *metric* boundary and refuses to compute a summary over
+    # invalid data -- a non-finite `total_usd` (#80) or, since #213, a negative
+    # `total_latency_ms`. That is right for `dump_aggregate_json`, which must not
+    # publish a number it cannot stand behind, and wrong to propagate from here:
+    # an unhandled `ValueError` in `_handle_dashboard` becomes a bare 500 and a
+    # blank page, which is the exact failure mode #135 added `_json_safe` to
+    # prevent on the `/json` side. Surfaced by
+    # `tests/test_latency_domain_boundaries.py` while landing #213's guard.
+    #
+    # So: name the problem in place of the summary row, and still render the
+    # chart and the table, which carry the raw per-record values. The operator
+    # ends up with MORE information than before #213 (when the summary was
+    # silently computed from the bad datum) and more than a 500 would give.
+    try:
+        agg: Aggregate | None = aggregate(records)
+        agg_error = ""
+    except ValueError as e:
+        agg = None
+        agg_error = str(e)
     chart = _render_chart_svg(records)
     rows_html = "\n".join(
         f"<tr><td>{html.escape(_format_ts(r.ts))} UTC</td>"
@@ -220,6 +267,31 @@ def _render_dashboard_html(records: Sequence[CostRecord]) -> str:
         f"<td>{r.total_latency_ms:.1f}ms</td></tr>"
         for r in records[-20:][::-1]
     )
+    if agg is None:
+        stats_html = (
+            '<p style="background:#fdf0ed;border:1px solid #e7b9ae;color:#8a3322;'
+            'padding:10px 12px;border-radius:6px;font-size:12px">'
+            "<strong>Summary unavailable.</strong> "
+            + html.escape(agg_error)
+            + " &mdash; the per-request table and chart below are unaffected and show "
+            "the raw values."
+            "</p>"
+        )
+    else:
+        stats_html = (
+            '<div class="stats">'
+            f'<div class="stat"><div class="stat-label">requests</div>'
+            f'<div class="stat-value">{agg.n}</div></div>'
+            f'<div class="stat"><div class="stat-label">total USD</div>'
+            f'<div class="stat-value">${agg.total_usd:.4f}</div></div>'
+            f'<div class="stat"><div class="stat-label">p50 latency</div>'
+            f'<div class="stat-value">{agg.latency_p50_ms:.0f}ms</div></div>'
+            f'<div class="stat"><div class="stat-label">p95 latency</div>'
+            f'<div class="stat-value">{agg.latency_p95_ms:.0f}ms</div></div>'
+            f'<div class="stat"><div class="stat-label">p99 latency</div>'
+            f'<div class="stat-value">{agg.latency_p99_ms:.0f}ms</div></div>'
+            "</div>"
+        )
     return f"""<!doctype html>
 <html lang="en">
 <head>
@@ -240,13 +312,7 @@ def _render_dashboard_html(records: Sequence[CostRecord]) -> str:
 </head>
 <body>
 <h1>Cost telemetry — last 24 hours</h1>
-<div class="stats">
-  <div class="stat"><div class="stat-label">requests</div><div class="stat-value">{agg.n}</div></div>
-  <div class="stat"><div class="stat-label">total USD</div><div class="stat-value">${agg.total_usd:.4f}</div></div>
-  <div class="stat"><div class="stat-label">p50 latency</div><div class="stat-value">{agg.latency_p50_ms:.0f}ms</div></div>
-  <div class="stat"><div class="stat-label">p95 latency</div><div class="stat-value">{agg.latency_p95_ms:.0f}ms</div></div>
-  <div class="stat"><div class="stat-label">p99 latency</div><div class="stat-value">{agg.latency_p99_ms:.0f}ms</div></div>
-</div>
+{stats_html}
 <h2 style="font-size: 14px; color:#555">Per-request latency over time</h2>
 {chart}
 <h2 style="font-size: 14px; color:#555; margin-top: 24px">Most recent 20 records</h2>
