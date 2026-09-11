@@ -2450,3 +2450,32 @@ context_for_next_session:
 decisions_made: []
 followups: []
 ---
+
+---
+
+session: 2026-09-10T07:39Z
+issue: 211
+focus: 209s_comment_awareness_landed_on_ONE_ARM_OF_A_TERNARY_and_the_other_arm_is_the_dollar_quoted_body
+phase: night_session_multi_issue_loop_issue_3
+delta:
+  files_changed: 2
+  tests_added: 10
+  suite: 1512_to_1522_green
+measured:
+  on_parent: "$$ inside a -- comment INSIDE a dollar body -> 3 statements (is 1); tagged $func$ -> 4 statements (is 1); block comment whose line ends in ';' -> 2 (is 1); controls plain $$ body and -- comment ending in ';' -> 1 each, OK"
+  reachability: "init.sql has EXACTLY ONE dollar-quoted function, lines 68-73, spelled AS $$ - so the comment shape is reachable TODAY; the tagged shape is not, until a second function is written the conventional way"
+  falsification: "comments on the in_dollar arm only -> 1 red, the comment row, and all FOUR tagged rows stay GREEN so the halves are independent; untagged $$ only -> 4 red, the tagged rows, $$ control green; toggle on ANY $...$ without matching the close -> 1 red and it is the separating row, green on all four tagged rows"
+context_for_next_session:
+  - THE_LENS_A_ONE_LINE_FIX_WITH_A_TERNARY_HAS_TWO_ARMS_AND_THE_GUARD_WENT_ON_ONE_209_shipped_code_equals__code_before_comment_line_IF_NOT_in_dollar_ELSE_line_and_the_ELSE_BRANCH_IS_THE_RAW_LINE_so_a_dash_dash_comment_INSIDE_a_body_had_its_text_scanned_for_delimiters_SAME_DEFECT_209_FIXED_TWO_TOKENS_AWAY_grep_your_own_fixes_for_a_ternary_or_an_if_else_and_ask_which_arm_got_the_guard
+  - AND_THIS_IS_THE_SHARPEST_FORM_OF_THE_09_08_LENS_the_guarded_arm_and_the_unguarded_one_are_NOT_two_lines_apart_they_are_TWO_BRANCHES_OF_ONE_EXPRESSION
+  - A_DELIMITER_SCAN_MUST_HOLD_THE_DELIMITERS_TEXT_NOT_A_BOOL_in_dollar_as_a_bool_CANNOT_express_the_close_must_match_the_open_and_that_requirement_IS_the_whole_content_of_the_tagged_half_because_a_bare_dollar_dollar_INSIDE_a_dollar_func_dollar_body_is_BODY_TEXT_tagging_exists_in_postgres_PRECISELY_so_a_body_can_contain_dollar_dollar_THE_WRONG_FIX_toggle_on_any_dollar_x_dollar_IS_GREEN_ON_ALL_FOUR_TAGGED_ROWS
+  - I_GUESSED_A_COUNT_IN_AN_ASSERTION_AND_THE_TEST_CORRECTED_ME_wrote_11_for_init_sql_statements_the_real_number_is_8_MEASURED_IT_ON_BOTH_THE_PARENT_AND_THE_FIX_because_a_WIDENED_delimiter_scan_can_only_ever_KEEP_A_BODY_TOGETHER_never_break_one_apart_so_unchanged_is_the_actual_claim_A_GUESSED_NUMBER_IN_A_LOCK_IS_A_LOCK_ON_NOTHING
+  - DECLARE_A_LIMIT_AND_MAKE_IT_UNREACHABLE_BY_ASSERTION_the_block_comment_case_is_NOT_fixed_it_gets_a_named_row_pinning_the_WRONG_answer_plus_assert_no_slash_star_in_init_sql_SAME_SHAPE_209_USED_FOR_dash_dash_IN_A_STRING_a_declared_limit_with_a_reachability_arm_cannot_quietly_become_a_live_bug
+  - FALSIFY_EACH_HALF_SEPARATELY_NOT_THE_WHOLE_DIFF_reverting_both_at_once_would_have_shown_5_red_and_told_me_nothing_about_INDEPENDENCE_reverting_ONE_arm_showed_the_four_tagged_rows_STAY_GREEN_which_is_what_proves_the_two_fixes_are_not_one_fix_wearing_two_hats
+  - PROCESS_RAN_BOTH_RUFF_VERSIONS_local_venv_is_0_15_13_and_CI_does_pip_install_e_dot_dev_UNPINNED_which_resolves_to_0_16_6_TODAY_built_a_throwaway_venv_with_the_newest_ruff_and_checked_BOTH_209s_OWN_FOLLOW_UP_COMMIT_WAS_THIS_SKEW_and_so_was_the_2026_07_31_portfolio_break
+  - THIS_HELPER_IS_ONLY_EXERCISED_BY_THE_DATABASE_URL_GATED_JOB_there_is_no_Docker_on_the_session_host_so_every_one_of_these_three_failures_is_invisible_to_a_local_run_AND_to_every_other_CI_job_THAT_is_why_209_gave_it_a_hermetic_test_and_why_the_three_shapes_that_test_did_not_cover_were_worth_a_second_look
+decisions_made: []
+followups: []
+
+---
+
