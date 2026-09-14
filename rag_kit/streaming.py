@@ -159,9 +159,35 @@ class PhaseTimings:
         # `summary()` -> `to_dict()` -> `dump_summary_json` as the bare token
         # `Infinity` — invalid JSON a strict log-tailer rejects whole.
         # Read-boundary, not `__post_init__`: only this side sees an append.
+        #
+        # BOTH clauses of `record`'s rule, not only the finiteness one (#213).
+        # `record` rejects "a finite non-negative number" and the guard added
+        # here in #168 re-checked one of those two words. The reason #168 gives
+        # -- these four lists are public init fields, so a direct construction
+        # or a later `.append` never touches `record` -- is true of everything
+        # `record` checks, so scoping the read boundary to the non-finite half
+        # left the other half open for exactly the flows that docstring names.
+        # Measured on b74753c: `PhaseTimings(total=[-5.0, 1.0])` reported
+        # `p50_ms = -2.0` straight through `summary()` -> `to_dict()` ->
+        # `dump_summary_json`, and the `combined.total.extend(other.total)`
+        # merge named above produced the same. A phase list is a list of
+        # *durations* by construction, which is what makes this the right layer
+        # for the clause -- `telemetry.percentile` is a general helper over
+        # `Sequence[float]` and a signed sample is a correct input there, so it
+        # deliberately does NOT get this guard (see the passing control in
+        # `tests/test_latency_domain_boundaries.py`).
+        #
+        # Merged into one message here and kept as a SEPARATE message in
+        # `telemetry.aggregate`, deliberately: here both clauses live in one
+        # `any(...)` over one list, so one sentence matching `record`'s wording
+        # is what makes the two boundaries read as one rule. There, finiteness is
+        # delegated to `percentile` with a message two tests already quote (#80),
+        # so adding the negativity clause as a second guard changes no contract
+        # and keeps the two diagnoses distinct -- a NaN duration is a broken
+        # measurement, a negative one is a broken clock or a hand-built record.
         raw = getattr(self, phase)
-        if any(not math.isfinite(v) for v in raw):
-            raise ValueError(f"values must all be finite numbers; got {list(raw)!r}")
+        if any(not math.isfinite(v) or v < 0 for v in raw):
+            raise ValueError(f"values must all be finite non-negative numbers; got {list(raw)!r}")
         values = sorted(raw)
         if not values:
             return None

@@ -2517,3 +2517,64 @@ three failures were invisible to a local run and to every other CI job. Both
 ruff versions were checked — the local venv is 0.15.13 and CI's unpinned
 install resolves to 0.16.6 today, which is the skew that produced #209's own
 follow-up commit.
+
+## 2026-09-11 — one word of a two-word rule was never swept (#213)
+
+**What got done.** Both of this repo's latency write boundaries state the same
+rule in the same words: a value "must be a finite non-negative number". Ten issues
+then carried the *non-finite* half of that sentence to every read and egress
+boundary in the package. The *non-negative* half never left the write site.
+
+Both guards exist because the data can arrive without meeting them. `CostRecord`
+and `PhaseTimings` are public dataclasses with no `__post_init__` — deliberately,
+because `TelemetryStore.since` rebuilds records from SQLite rows — and that is the
+stated premise of the two issues that added the read-boundary guards. The premise
+covers everything the write guard checks, not the one clause that got ported.
+
+So `PhaseTimings(total=[-5.0, 1.0])` published `p50_ms = -2.0` straight through to
+`dump_summary_json`; a record carrying `total_latency_ms=-5000.0` survived the
+SQLite round-trip into the published aggregate; and the dashboard's SVG drew a
+point at y=9545 inside a 240-pixel image. With two samples the negative *becomes*
+the reported number. With twenty it is invisible and still drags every percentile
+down, which is the version that matters — a latency SLO computed from that window
+reads better than reality and nothing in the output names the sample responsible.
+
+**Three judgement calls.** The clause went where the *domain* is known, not at the
+first place it would have worked: `telemetry.percentile` is a general percentile
+helper, and `percentile([-5, 5], 0.5) == 0.0` is the right answer for a delta or a
+drift. Guarding there would reject valid input, which is worse than the gap, so
+there is now a *passing* control asserting signed samples still work — and the
+neighbour that guards in the helper instead goes red on exactly that control. The
+chart clamps geometry rather than rejecting, because the table row and `/json`
+still carry the unclamped number; a clamp that is the only account of the data
+would be its own lie. And `_render_dashboard_html` now degrades instead of
+propagating: a metric boundary that refuses is right for a file you publish and
+becomes a bare 500 and a blank page when an HTTP handler is upstream of it, which
+is the failure mode the `/json` sanitizer was added to prevent. The summary row is
+replaced by a named error; the chart and table still render.
+
+**The fourth site was found by the lock, not by me.** I filed the issue with a
+hand-written list of three boundaries. The inventory check — which collects every
+"non-negative" rejection in both modules from the AST and hard-pins the set — came
+back with a fourth on its first run: negative token counts summed straight into
+the published aggregate as `total_prompt_tokens: -4900`. The member my list missed
+has the least arguable consequence of the four. A negative duration can at least
+be read as a clock artifact; a negative token count cannot be read at all.
+
+**And one neighbour caught a gap in my own fix.** I clamped both chart axes and
+every row of my test table held the timestamps increasing, so the neighbour that
+clamps `y` and not `x` came back *zero red*. The renderer takes its time span from
+the first and last element and does not sort, so an out-of-order record drives `x`
+out of the box exactly as a negative latency drives `y` out. One operand of two,
+in the fix for a one-clause-of-two bug.
+
+**Why this was prioritized.** `rag-production-kit` has no open issues at all, so
+the work came from hunting. The splitter merged this morning was checked first and
+is genuinely closed — its population really is the one `init.sql` — so the hunt
+moved to the telemetry boundaries, which is where ten issues of sweeping had left
+a seam nobody had stated out loud.
+
+**Open questions / blockers:** none. Giving the two dataclasses a `__post_init__`
+would close this at the source, but their openness is load-bearing for the SQLite
+loader and is the premise two earlier issues reason from; that is a design change
+needing its own evidence, not a bug fix.
