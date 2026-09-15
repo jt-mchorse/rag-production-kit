@@ -2578,3 +2578,49 @@ a seam nobody had stated out loud.
 would close this at the source, but their openness is load-bearing for the SQLite
 loader and is the premise two earlier issues reason from; that is a design change
 needing its own evidence, not a bug fix.
+
+## 2026-09-15 — Issue #215: the same event reported both ends of the range
+**Duration:** ~20 min · **Branch:** `session/2026-09-15-0737-issue-215`
+
+**How it was found.** rag had zero open issues, so this was hunted. I built a
+six-row input table for `rerank_delta_ndcg` and printed the displacement column
+rather than reasoning about the code. The defect is only visible as a *pair* of
+rows: `[a,b,c] → [x,y,z]` reports `0.0` and `[] → [x,y,z]` reports `1.0`. Those
+are the same event — the reranker returned ids it was never given — at opposite
+ends of the range. Either row alone looks defensible; reading the `else 1.0` arm
+in isolation I would have called it a harmless degenerate default.
+
+**What made it a defect rather than a style point.** The module's own duplicate
+guard, four lines above, argues that `1.0` is a *meaningful ceiling*: a duplicate
+pushes the value "past its documented 1.0 ceiling (a dashboard would read
+'improved beyond the input ideal', which is impossible)". So the module already
+treats 1.0 as a real maximum, and then uses that same value to mean "undefined".
+The README says this number exists "for telemetry", so a dashboard is the
+intended reader.
+
+That comment's last sentence also named the posture the fix had missed: "fail
+loud at the seam, matching the `k`, `length_penalty`, and Cohere
+non-finite-score guards in this module (#98)". Four seam guards, all raising.
+This was the one degenerate shape that didn't — and the one that failed in the
+flattering direction.
+
+**The neighbour that taught me something.** I built two wrong variants. The
+over-broad one — guarding `not before_list` without the `and after_list` clause
+— fails four arms including the pre-existing `test_rerank_delta_handles_empty`,
+because both-empty is a legitimate production state. The other one passed
+*everything*: moving the guard to the `ideal <= 0` site, after the `n == 0`
+early return, is behaviourally identical, since the early return has already
+taken the both-empty case. I had written a test named
+`test_the_guard_is_ordered_before_the_n_zero_early_return`, and it passes for
+both placements. A neighbour that passes every arm isn't always a gap in the
+tests — sometimes it proves the test's *name* claims more than the test pins.
+Renamed it, and wrote the measured equivalence into its comment.
+
+**Shipped.** A `ValueError` at the seam alongside the other four guards, eleven
+tests including the full variant table with the two opposite-end rows sitting
+side by side, and explicit no-change arms for identity, reversed, all-foreign,
+`after`-empty and both-empty. Four arms go red against the unfixed code.
+
+**Suite:** 1575 → 1586 green (8 pg-marked skipped); ruff and `ruff format
+--check` clean. rag has no mypy gate — its CI is ruff + pytest + the demo's npm
+typecheck, and the gate sets are not uniform across the portfolio.
