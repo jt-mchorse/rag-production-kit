@@ -2580,7 +2580,7 @@ loader and is the premise two earlier issues reason from; that is a design chang
 needing its own evidence, not a bug fix.
 
 ## 2026-09-15 — Issue #215: the same event reported both ends of the range
-**Duration:** ~20 min · **Branch:** `session/2026-09-15-0737-issue-215`
+**Duration:** 6 min (measured) · **Branch:** `session/2026-09-15-0737-issue-215`
 
 **How it was found.** rag had zero open issues, so this was hunted. I built a
 six-row input table for `rerank_delta_ndcg` and printed the displacement column

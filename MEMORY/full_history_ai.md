@@ -2518,7 +2518,7 @@ followups: []
 
 ---
 session: 2026-09-15T07:37Z
-duration_min: 20
+duration_min: 6   # MEASURED plan-comment 07:37:33Z to close-comment 07:43:14Z; I first wrote 20 from ESTIMATION
 issue: 215
 focus: the_same_event_reported_the_two_OPPOSITE_ENDS_of_the_range_depending_only_on_whether_before_happened_to_be_empty
 delta:
