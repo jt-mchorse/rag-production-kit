@@ -446,7 +446,28 @@ def rerank_delta_ndcg(
             "here would read as 'the reranker kept the input order')"
         )
 
-    n = max(len(before_list), len(after_list))
+    # The relevance scale is a property of `before` alone -- **not**
+    # `max(len(before_list), len(after_list))`, which is what this was (#217).
+    #
+    # `rel[before[i]] = n - i`, so `n` sets the scale. With `max(...)`, a longer
+    # `after` inflated every relevance to `n, n-1, n-2, ...` for a large `n`,
+    # shrinking their *relative* differences -- and nDCG is a ratio of weighted
+    # sums of those relevances, so the whole score compressed toward 1.0, which
+    # this module documents as "no change". Measured on `["a","b","c"]` against
+    # a full reversal: 0.789998 unpadded, 0.961643 with 10 extra ids appended,
+    # 0.999532 with 1,000, 0.999953 with 10,000. The reversal is identical in
+    # every one; only the padding changes. Every reordering converges the same
+    # way, so a reranker could report "kept the input order" to four nines while
+    # having reversed its input.
+    #
+    # The `[0, 1]` invariant test could not see it: `ideal` and `actual` are
+    # built from the same inflated `rel`, so the ratio stayed in range for every
+    # padding. The bug moved the value *within* the range.
+    #
+    # `if n == 0` is unchanged in meaning. It used to be "both lists empty";
+    # it is now "`before` empty", and the guard above already raises when
+    # `before` is empty while `after` is not, so the two coincide.
+    n = len(before_list)
     if n == 0:
         return RerankDelta(n_input=0, top_k_overlap=0, top_k_size=0, ndcg_displacement=1.0)
 

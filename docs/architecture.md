@@ -147,6 +147,19 @@ defaults to `None` so the existing hybrid-only path stays unchanged.
   belongs in the production backend, hermetic exercise belongs in CI.
 - **D-007.** `reranker` kwarg defaults to `None` so callers opt in
   rather than discover a new step in their hot path.
+- **The relevance scale is `before` alone (#217).** `rerank_delta_ndcg`
+  grades `after` against the *input* ranking, so `rel(id)` is derived
+  from `len(before)`, not from `max(len(before), len(after))`. With the
+  `max`, a longer `after` inflated every relevance and shrank the
+  relative differences the nDCG ratio is built from, compressing the
+  score toward `1.0` — which this module documents as "no change". A
+  full reversal of a three-id input read `0.789998` unpadded and
+  `0.999532` with a thousand extra ids appended, for the same
+  reordering. The `[0, 1]` invariant test could not see it, because
+  `ideal` and `actual` share the inflated scale; the bug moved the value
+  *within* the range. Complementary to #215's guard rather than a
+  replacement: with the scale from `before`, an empty `before` gives
+  `ideal == 0`, which is exactly what that guard refuses.
 - **D-018 (#207).** Among equal scores, a reranker preserves **input
   order** — a property of the `Reranker` Protocol, tested against every
   backend by a contract test that discovers them from the module.
