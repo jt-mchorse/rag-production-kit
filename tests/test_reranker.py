@@ -444,3 +444,91 @@ class TestRerankDeltaNdcgDuplicateIds:
         # any distinct-id permutation (and the disjoint case).
         delta = rerank_delta_ndcg(before, after, k=len(before))
         assert 0.0 <= delta.ndcg_displacement <= 1.0
+
+
+# ----------------------------------------------------------------------
+# #215 — an empty `before` with a non-empty `after` reported 1.0, the top of
+# the documented range, for a reranker that returned ids it was never given.
+# The *same event* with a non-empty `before` already reported 0.0.
+# ----------------------------------------------------------------------
+
+
+class TestRerankDeltaNdcgEmptyBefore:
+    def test_rejects_empty_before_with_non_empty_after(self) -> None:
+        # Pre-fix this returned 1.0 — "the reranker kept the input order" — for
+        # a call whose output shares nothing with its input. `ideal` is zero
+        # exactly here, so the `else 1.0` arm fired precisely in this case.
+        with pytest.raises(ValueError, match=r"before is empty while after is not"):
+            rerank_delta_ndcg([], ["x", "y", "z"], k=3)
+
+    def test_rejects_it_for_a_single_invented_id_too(self) -> None:
+        # Not a size threshold: one invented id is the same contract violation.
+        with pytest.raises(ValueError, match=r"before is empty while after is not"):
+            rerank_delta_ndcg([], ["x"], k=3)
+
+    def test_the_message_says_why_one_point_zero_would_be_wrong(self) -> None:
+        # The guard exists because of what the *value* would have claimed, not
+        # merely because the input is odd. Keep that in the operator's message.
+        with pytest.raises(ValueError, match=r"before is empty while after is not") as excinfo:
+            rerank_delta_ndcg([], ["x"], k=1)
+        assert "kept the input order" in str(excinfo.value)
+
+    @pytest.mark.parametrize(
+        ("name", "before", "after", "expected"),
+        [
+            # The identity case the docstring documents as 1.0.
+            ("identity", ["a", "b", "c"], ["a", "b", "c"], 1.0),
+            # A real reordering lands strictly inside the range.
+            ("reversed", ["a", "b", "c"], ["c", "b", "a"], 0.7899980042460358),
+            # The reranker returned ids it was never given — with a non-empty
+            # `before` this already reported maximal displacement, and that is
+            # the arm the new guard must leave exactly where it is. It is also
+            # the row that makes the defect visible: the same event reported
+            # 0.0 here and 1.0 when `before` happened to be empty.
+            ("after is entirely foreign", ["a", "b", "c"], ["x", "y", "z"], 0.0),
+            # The reranker dropped everything: correct and loud already.
+            ("after empty", ["a", "b", "c"], [], 0.0),
+            # Retrieval returned nothing and the reranker returned nothing — a
+            # legitimate production state, pinned by
+            # `test_rerank_delta_handles_empty` and deliberately NOT swept into
+            # the new guard. A guard on `not before` alone would break this.
+            ("both empty", [], [], 1.0),
+        ],
+    )
+    def test_the_variant_table_is_unchanged_outside_the_guard(
+        self, name: str, before: list[str], after: list[str], expected: float
+    ) -> None:
+        delta = rerank_delta_ndcg(before, after, k=3)
+        assert delta.ndcg_displacement == pytest.approx(expected), name
+
+    def test_the_legitimate_empty_case_still_returns_the_ceiling(self) -> None:
+        # Stated on its own, not only as a table row, because it is the
+        # over-broad neighbour's failure mode: guarding `not before_list`
+        # without the `and after_list` clause turns this into a raise.
+        delta = rerank_delta_ndcg([], [], k=5)
+        assert delta.n_input == 0
+        assert delta.ndcg_displacement == 1.0
+
+    def test_the_two_empty_shapes_disagree_and_neither_silently_wins(self) -> None:
+        # The whole point of the change, in one arm: an empty `before` with a
+        # non-empty `after` raises, while both-empty keeps the ceiling. A fix
+        # that collapsed them either way would pass one of these and fail the
+        # other.
+        #
+        # Note on placement, measured rather than assumed: putting the guard at
+        # the `ideal <= 0` site instead — after the `n == 0` early return — is
+        # *behaviourally identical*, because the early return has already taken
+        # the both-empty case by then. That variant was built and run and passes
+        # every arm in this file. So the guard's position next to the duplicate/
+        # `k`/`length_penalty` seam guards is a locality choice, not a
+        # correctness one, and this test deliberately does not pretend to pin it.
+        with pytest.raises(ValueError, match=r"before is empty while after is not"):
+            rerank_delta_ndcg([], ["x"], k=1)
+        assert rerank_delta_ndcg([], [], k=1).ndcg_displacement == 1.0
+
+    def test_the_duplicate_guard_still_wins_on_a_duplicated_after(self) -> None:
+        # Both guards can match an input with an empty `before`. The duplicate
+        # check is the more specific diagnosis and runs first; the new guard
+        # must not shadow it.
+        with pytest.raises(ValueError, match=r"after contains duplicate"):
+            rerank_delta_ndcg([], ["x", "x"], k=2)

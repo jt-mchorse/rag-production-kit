@@ -418,6 +418,34 @@ def rerank_delta_ndcg(
                 "past its documented [0.0, 1.0] range)"
             )
 
+    # A reranker permutes the ids it was given. An empty `before` with a
+    # non-empty `after` means it emitted ids it never received, and the arm that
+    # handled it -- `actual / ideal if ideal > 0 else 1.0` -- reported **1.0**,
+    # the top of the documented range, i.e. "the reranker kept the input order".
+    # `ideal` is zero exactly here: for any non-empty `before`,
+    # `rel[before[i]] = n - i` and the smallest such value is
+    # `n - len(before) + 1 >= 1`.
+    #
+    # 1.0 is not a neutral sentinel on this metric. The duplicate guard above
+    # treats it as a real ceiling -- "pushing ndcg_displacement past its
+    # documented 1.0 ceiling (a dashboard would read 'improved beyond the input
+    # ideal', which is impossible)" -- so using the same value to mean
+    # "undefined" hands a dashboard the best possible reading for a call whose
+    # output shares nothing with its input. Worse, the *same event* with a
+    # non-empty `before` (`["a","b","c"] -> ["x","y","z"]`) already reports
+    # `0.0`, the opposite end of the range.
+    #
+    # Fail loud at the seam, matching the duplicate, `k`, `length_penalty`, and
+    # Cohere non-finite-score guards in this module (#98, #215). Checked before
+    # the `n == 0` early return so the two empty shapes are decided together.
+    if not before_list and after_list:
+        raise ValueError(
+            "before is empty while after is not; a reranker returns a permutation "
+            "of the ids it was given, so there is no input ordering to measure "
+            "displacement against (reporting the ndcg_displacement ceiling of 1.0 "
+            "here would read as 'the reranker kept the input order')"
+        )
+
     n = max(len(before_list), len(after_list))
     if n == 0:
         return RerankDelta(n_input=0, top_k_overlap=0, top_k_size=0, ndcg_displacement=1.0)
