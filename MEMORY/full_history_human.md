@@ -2624,3 +2624,66 @@ side by side, and explicit no-change arms for identity, reversed, all-foreign,
 **Suite:** 1575 → 1586 green (8 pg-marked skipped); ruff and `ruff format
 --check` clean. rag has no mypy gate — its CI is ruff + pytest + the demo's npm
 typecheck, and the gate sets are not uniform across the portfolio.
+
+## 2026-09-21 — Issue #217: the relevance scale read the wrong list
+**Duration:** 8 min (measured) · **Branch:** `session/2026-09-21-0742-issue-217`
+
+**How it was found.** rag had no open issues, so this was hunted, starting from
+the reranker fix this session had merged forty minutes earlier. I built the
+variant table for `rerank_delta_ndcg` and read the column. The row that caught my
+eye was `["a","b","c"] → ["a","b","c","x"]` reporting `1.0000` — a reranker
+emitting an id it was never given, reading as "kept the input order". I was about
+to file that as an observability gap.
+
+Then I ran one more row: the same reversal with a thousand ids appended. It read
+`0.9995` instead of `0.7900`. The row I had noticed was a symptom; the padding
+sweep is what exposed the mechanism.
+
+**The mechanism.** `rel[before[i]] = n - i` with
+`n = max(len(before_list), len(after_list))`. `n` is the *scale*, so a longer
+`after` inflates every relevance to `n, n-1, n-2, …`. Values that large with a
+fixed absolute gap have a shrinking *relative* gap, and nDCG is a ratio of
+weighted sums of them — so the score compresses toward `1.0`, which this module
+documents as "no change". A full reversal of a three-id input read `0.789998`
+unpadded, `0.961643` at ten, `0.999532` at a thousand, `0.999953` at ten
+thousand. The reversal is identical in every one. Every other reordering
+converges the same way.
+
+The fix is what the comment two lines above already said: relevance comes from
+the *input position*, so `n` is `len(before_list)`.
+
+**An existing invariant hid it.** `test_distinct_id_inputs_stay_within_unit_interval`
+pins the documented `[0, 1]` range and is green on every wrong value here,
+because `ideal` and `actual` are built from the same inflated `rel`. The bug
+moves the value *within* the interval. Worth asking of every range lock: which
+wrong values does this interval contain?
+
+**And the untested branch was discoverable mechanically.** Every case in the
+suite had `len(after) <= len(before)` — exactly where `max(...)` and
+`len(before_list)` agree. When a fix changes an expression, enumerate the inputs
+where the old and new expressions disagree and ask which tests live there. None
+did.
+
+**What is pinned is the property.** A fixed reordering's displacement is
+invariant to padding. A single number would only record which padding I happened
+to pick; the literal rides alongside, taken from the unpadded case that was
+already right.
+
+**Two deliberate scope-downs.** I did not make foreign ids raise: #215 left
+`["a","b","c"] → ["x","y","z"]` at `0.0` on purpose and used it as the contrast
+row that made the empty-`before` `1.0` look wrong. And I did not add a foreign-id
+count here, because it adds a field — filed as #218.
+
+**Anti-vacuity.** 13 arms red against the pre-change tree, 12 green — and the
+green ones are green by design: the `padding=0` control, the identity
+permutation, the `[0, 1]` lock that structurally cannot see this, and the
+"nothing moves where the two scales agree" table. That last one looks like dead
+weight in an anti-vacuity run and is the only thing that catches the
+`n = min(...)` neighbour, including via a pre-existing #215 case. A green arm in
+the historical run is not automatically a useless arm.
+
+Three neighbours built and run: `len(after_list)` (16 red), `min(...)` (3),
+`max(...)` left in place (13).
+
+**Suite:** 1586 → 1611 green, 8 pg-marked skipped. ruff and `ruff format --check`
+clean.
