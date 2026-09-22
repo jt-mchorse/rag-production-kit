@@ -376,6 +376,35 @@ class RerankDelta:
     top_k_size: int  # k used for the comparison
     ndcg_displacement: float  # 1.0 = no change, 0.0 = total flip
 
+    # The two set-difference counts (#218, D-019). Both default to 0 -- the
+    # honest value, because a zero here genuinely means "no such id" rather
+    # than standing in for an unmeasured one -- which is what lets the four
+    # fields above keep being constructed on their own.
+    #
+    # They are NOT the same kind of signal, and a consumer should not treat
+    # them alike:
+    #
+    #   n_foreign > 0  always violates the invariant this module states in
+    #                  the guard above -- "a reranker permutes the ids it was
+    #                  given". It is an alarm.
+    #   n_dropped > 0  is routine: a top-N reranker returns fewer ids than it
+    #                  received, by design. It is context.
+    #
+    # A count is a fact, not an accusation; what differs is what the fact
+    # means. Both exist because the other four fields can be *bit-identical*
+    # across calls that differ in either direction -- see `rerank_delta_ndcg`.
+    #
+    # `len(after)` is not a field because it is exactly recoverable:
+    #
+    #     len(after) == n_input - n_dropped + n_foreign
+    #
+    # (duplicates raise at the seam, so every list length equals its set
+    # cardinality). An `n_output` field would also have no honest default: `0`
+    # there means "the reranker returned nothing", a real and alarming value
+    # standing in for an unmeasured one.
+    n_foreign: int = 0  # ids in `after` that `before` never held
+    n_dropped: int = 0  # ids in `before` missing from `after`
+
 
 def rerank_delta_ndcg(
     before: Sequence[str],
@@ -394,6 +423,43 @@ def rerank_delta_ndcg(
     `top_k_overlap` is the cardinality of the intersection of the top-k
     before vs. top-k after — useful when nDCG hides large reordering inside
     the top set.
+
+    `n_foreign` and `n_dropped` report what the displacement score
+    structurally cannot (#218, D-019). Both directions of set difference can
+    leave the other four fields **bit-identical**, which is the whole reason
+    they are fields:
+
+    - Foreign ids appended to the tail are invisible to every other field. A
+      foreign id contributes `rel = 0.0`, `n_input` counts `before`, and
+      `top_k_size` is capped by both lists, so `["a","b","c"]` reranked to
+      `["a","b","c"]` and to `["a","b","c"]` plus 1,000 invented ids both
+      report `n_input=3, top_k_overlap=3, top_k_size=3, ndcg_displacement=1.0`
+      — a perfect telemetry row for a reranker emitting a thousand candidates
+      it was never given. (At the *head* a foreign id does move the score, so
+      the blindness is position-dependent, and the blind position is the one a
+      padding reranker uses.)
+    - Dropped ids are invisible in the same sense, which takes a larger input
+      to see. `top_k_size = min(k, n_input, len(after))` is the only field
+      that can reveal a short `after`, and it stops being able to the moment
+      `len(after) >= k`. Searched rather than argued: over every ordered
+      subset of a 7-id `before` at `k=5` there are 360 classes in which a
+      truncating and a non-truncating output agree on all four fields to the
+      last bit. The smallest is
+
+          before = a b c d e f g
+          after  = a b c d f g      (dropped `e`)
+          after  = c b a d f g e    (kept all seven, reordered the head)
+          both  -> n_input=7, top_k_overlap=4, top_k_size=5,
+                   ndcg_displacement=0.9374720354963293
+
+    Reported, never raised. #215 deliberately kept `["a","b","c"] ->
+    ["x","y","z"]` reporting `0.0` as the contrast row that made the empty-
+    `before` `1.0` look wrong, and this is telemetry: a reranker misbehaving
+    in production is exactly when a caller wants a number rather than an
+    exception. Same posture as `n_uncomparable` / `n_*_off_support` in
+    llm-eval-harness (D-017, D-023, D-024) — what a metric structurally
+    cannot see is itself a finding, and often more actionable than the metric
+    it was corrupting.
     """
     if not isinstance(k, int) or isinstance(k, bool) or k <= 0:
         raise ValueError(f"k must be a positive integer, got {k!r}")
@@ -474,6 +540,19 @@ def rerank_delta_ndcg(
     eff_k = min(k, len(before_list), len(after_list))
     overlap = len(set(before_list[:eff_k]) & set(after_list[:eff_k]))
 
+    # Set membership over the whole lists, not `len()` and not the top-k slice.
+    # A `len(after) - len(before)` difference would report 0 for the swap
+    # `["a","b","c"] -> ["a","b","x"]`, which drops one id and invents another;
+    # and both counts are about the ranking the reranker returned, not about
+    # the window a caller happens to be plotting, so slicing to `eff_k` would
+    # make them move with `k`. The duplicate guard above means each list's
+    # length equals its set cardinality, so `len(after) == n_input - n_dropped
+    # + n_foreign` holds exactly.
+    before_set = set(before_list)
+    after_set = set(after_list)
+    n_foreign = len(after_set - before_set)
+    n_dropped = len(before_set - after_set)
+
     # Use `before` ranks as relevance: the input top is the most relevant.
     # rel(id) = (n - input_position(id)) for ids in `before`, else 0.
     rel: dict[str, float] = {}
@@ -492,4 +571,6 @@ def rerank_delta_ndcg(
         top_k_overlap=overlap,
         top_k_size=eff_k,
         ndcg_displacement=displacement,
+        n_foreign=n_foreign,
+        n_dropped=n_dropped,
     )

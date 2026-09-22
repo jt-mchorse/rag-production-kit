@@ -156,10 +156,29 @@ def test_a_longer_after_does_not_change_the_other_telemetry_fields() -> None:
     """`n_input` counts inputs and `top_k_size` is capped by both lists.
 
     Pinned because they are the fields a reader might expect to reveal a longer
-    `after`, and they do not -- which is the follow-up's premise.
+    `after`, and they do not -- which is the follow-up's premise. That follow-up
+    is #218, and it landed: `n_foreign` now reveals it (D-019). The original
+    claim is *unchanged and still true* -- the four fields below are exactly as
+    blind as they were -- so this test keeps making it, over the four fields it
+    was written about rather than over the whole dataclass.
     """
     delta = rerank_delta_ndcg(BEFORE, ["a", "b", "c", "x"], k=3)
-    assert delta == RerankDelta(n_input=3, top_k_overlap=3, top_k_size=3, ndcg_displacement=1.0)
+    assert (delta.n_input, delta.top_k_overlap, delta.top_k_size) == (3, 3, 3)
+    assert delta.ndcg_displacement == 1.0
+    # Identical on those four to a run with no foreign id at all: the blindness
+    # this test exists to document.
+    clean = rerank_delta_ndcg(BEFORE, ["a", "b", "c"], k=3)
+    assert clean == RerankDelta(n_input=3, top_k_overlap=3, top_k_size=3, ndcg_displacement=1.0)
+    assert (delta.n_input, delta.top_k_overlap, delta.top_k_size, delta.ndcg_displacement) == (
+        clean.n_input,
+        clean.top_k_overlap,
+        clean.top_k_size,
+        clean.ndcg_displacement,
+    )
+    # And the field that ends the blindness. Asserted here too so the two
+    # modules cannot drift on what this call means.
+    assert delta.n_foreign == 1
+    assert clean.n_foreign == 0
 
 
 # ----------------------------------------------------------------------
