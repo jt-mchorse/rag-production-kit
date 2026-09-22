@@ -2755,3 +2755,30 @@ than you printed it.
 **Open questions:** none. Whether either count should surface in the SSE
 citation payload or the demo is a consumer-facing shape question and was
 explicitly deferred.
+
+## 2026-09-22 — Issue #218, correction: my own assertions were host-dependent
+**Branch:** `session/2026-09-22-0728-issue-218` (follow-up commit, no force-push)
+
+CI went red on the PR I had just opened, and it was my assertions rather than
+the code. Two arms failed on `unit (3.11)`: the displacement literal
+(`0.9374720354963293` locally, `...91` in CI) and the collision-class count
+(`360` locally, `346` in CI). Membership of a collision class turns on *exact*
+float equality, so the count is a property of the host — `math.log2` and float
+summation differ in the last ULP across libm builds, and my venv is CPython
+3.14 on arm64 while CI runs 3.11 on x86-64.
+
+That is the "host-environment assertions are not tests" trap, and I walked into
+it with numbers I had measured myself. A measured number is not automatically a
+portable number, and the more digits you pin the less portable it gets.
+
+The fix was to ask which part of the claim is platform-independent. That the two
+values are bit-identical *to each other* is — both come out of the same
+arithmetic on the same inputs — so `hex() == hex()` stays. The absolute value is
+not, so it became `pytest.approx(..., rel=1e-10)`. The class count is not, so it
+became a floor of 300, with the observed range (346–360) written into the
+failure message so the next reader knows a genuinely low number means the metric
+changed rather than the platform.
+
+The `reranker.py` docstring and `docs/architecture.md` were edited in place;
+`MEMORY/` is append-only, so D-019's `measured:` field still says 360 and this
+entry is the correction.

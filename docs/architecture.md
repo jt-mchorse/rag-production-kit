@@ -191,10 +191,14 @@ defaults to `None` so the existing hybrid-only path stays unchanged.
   search said so**: the drafted answer was "truncation is never
   invisible, only conflated with reordering", and over all 304 ordered
   subsets of a 5-id `before` at `k=3` that holds — zero collision
-  classes. At 7 ids and `k=5` there are **360 classes where a
-  truncating and a non-truncating output agree on all four fields to
-  the last bit** (`a b c d f g` and `c b a d f g e` against
-  `a b c d e f g` both give `ndcg_displacement=0.9374720354963293`).
+  classes. At 7 ids and `k=5` there are **several hundred classes
+  where a truncating and a non-truncating output agree on all four
+  fields to the last bit** (`a b c d f g` and `c b a d f g e` against
+  `a b c d e f g` both give `ndcg_displacement` ~ `0.93747203549`).
+  The exact count is a property of the host — 360 on CPython
+  3.14/arm64, 346 on 3.11/x86-64 — because membership turns on exact
+  float equality; the tests assert a floor rather than an equality for
+  that reason.
   `top_k_size = min(k, n_input, len(after))` is the only field that can
   reveal a short `after`, and it stops being able to the moment
   `len(after) >= k` — the ordinary operating region of a top-N

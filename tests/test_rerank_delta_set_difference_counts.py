@@ -18,8 +18,11 @@ under-emphasised:
   `before` at `k=3` every truncation lowers the displacement and an exhaustive
   walk of all 304 ordered subsets finds zero collisions — which is a true fact
   about that corpus and the wrong corpus to conclude from. At 7 ids and `k=5`
-  there are 360 classes where a truncating and a non-truncating output agree
-  on all four fields *to the last bit*. This module pins the smallest of them.
+  there are several hundred classes where a truncating and a non-truncating
+  output agree on all four fields *to the last bit* (360 on CPython
+  3.14/arm64, 346 on 3.11/x86-64 — the exact count turns on exact float
+  equality and is therefore a property of the host, so it is asserted as a
+  floor). This module pins the smallest of them.
 
 Both counts are reported, never raised. #215 deliberately kept
 `["a","b","c"] -> ["x","y","z"]` reporting `0.0` as its contrast row, and
@@ -77,8 +80,14 @@ def test_a_dropped_id_is_invisible_in_every_other_field() -> None:
     truncating = rerank_delta_ndcg(before, list("abcdfg"), k=5)  # dropped `e`
     reordering = rerank_delta_ndcg(before, list("cbadfge"), k=5)  # kept all seven
 
+    # Bit-identical *to each other* is the claim, and it is platform-independent:
+    # both values come out of the same arithmetic on the same inputs. The
+    # absolute value is NOT pinned to its last bit -- it is 0.9374720354963293
+    # on CPython 3.14/arm64 and ...91 on 3.11/x86-64, because `math.log2` and
+    # float summation differ in the final ULP across libm builds. A literal
+    # there is a host-environment assertion, not a test.
     assert truncating.ndcg_displacement.hex() == reordering.ndcg_displacement.hex()
-    assert truncating.ndcg_displacement == 0.9374720354963293
+    assert truncating.ndcg_displacement == pytest.approx(0.93747203549, rel=1e-10)
     for name in ("n_input", "top_k_overlap", "top_k_size"):
         assert getattr(truncating, name) == getattr(reordering, name), name
 
@@ -90,11 +99,20 @@ def test_a_dropped_id_is_invisible_in_every_other_field() -> None:
 def test_the_collision_class_is_not_a_lucky_pair() -> None:
     """Searched, not argued — and re-run here so the claim cannot rot.
 
-    The docstring on `rerank_delta_ndcg` says 360 classes; this walks the same
-    space and checks that the *new* fields break every one of them. A weaker
-    version of this module would pin the one hand-picked pair above and stay
-    green if the counts were computed over the top-k slice instead of the
-    whole ranking.
+    This walks the same space as the docstring on `rerank_delta_ndcg` and
+    checks that the *new* fields break every class it finds. A weaker version
+    of this module would pin the one hand-picked pair above and stay green if
+    the counts were computed over the top-k slice instead of the whole ranking.
+
+    **A floor, not an equality, and the reason is measured.** Membership of a
+    class turns on *exact* float equality, so the count is platform-dependent:
+    360 on CPython 3.14/arm64, 346 on 3.11/x86-64, because `math.log2` and
+    float summation differ in the last ULP across libm builds. An `== 360` here
+    is a host-environment assertion that passes on the machine it was written
+    on and reddens in CI -- which is exactly what it did. What is *not*
+    platform-dependent is that the phenomenon is pervasive rather than a lucky
+    pair, and that every class the search finds is separated by `n_dropped`.
+    The floor is set well below both observed counts.
     """
     ids = [chr(ord("a") + i) for i in range(7)]
     buckets: dict[tuple[int, int, int, float], list[tuple[str, ...]]] = defaultdict(list)
@@ -110,7 +128,11 @@ def test_the_collision_class_is_not_a_lucky_pair() -> None:
         for key, members in buckets.items()
         if len({len(p) for p in members}) > 1  # differing output lengths
     ]
-    assert len(spanning) == 360
+    assert len(spanning) >= 300, (
+        f"only {len(spanning)} collision classes found; the observed range is "
+        "346 (3.11/x86-64) to 360 (3.14/arm64), so a number far below this "
+        "floor means the search space or the metric changed, not the platform"
+    )
 
     # Every one of them is now separable: within a class, the outputs that
     # differ in length differ in `n_dropped`.

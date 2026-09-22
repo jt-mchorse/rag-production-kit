@@ -442,15 +442,20 @@ def rerank_delta_ndcg(
       to see. `top_k_size = min(k, n_input, len(after))` is the only field
       that can reveal a short `after`, and it stops being able to the moment
       `len(after) >= k`. Searched rather than argued: over every ordered
-      subset of a 7-id `before` at `k=5` there are 360 classes in which a
-      truncating and a non-truncating output agree on all four fields to the
-      last bit. The smallest is
+      subset of a 7-id `before` at `k=5` there are several hundred classes in
+      which a truncating and a non-truncating output agree on all four fields
+      to the last bit. The smallest is
 
           before = a b c d e f g
           after  = a b c d f g      (dropped `e`)
           after  = c b a d f g e    (kept all seven, reordered the head)
           both  -> n_input=7, top_k_overlap=4, top_k_size=5,
-                   ndcg_displacement=0.9374720354963293
+                   ndcg_displacement ~ 0.93747203549
+
+      The *number* of such classes is a property of the host, not of the
+      metric -- 360 on CPython 3.14/arm64, 346 on 3.11/x86-64, because
+      membership turns on exact float equality and `math.log2` differs in the
+      last ULP across libm builds. The tests assert a floor for that reason.
 
     Reported, never raised. #215 deliberately kept `["a","b","c"] ->
     ["x","y","z"]` reporting `0.0` as the contrast row that made the empty-
