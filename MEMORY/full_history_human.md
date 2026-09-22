@@ -2687,3 +2687,71 @@ Three neighbours built and run: `len(after_list)` (16 red), `min(...)` (3),
 
 **Suite:** 1586 → 1611 green, 8 pg-marked skipped. ruff and `ruff format --check`
 clean.
+
+## 2026-09-22 — Issue #218: the count I was about to argue out of existence
+**Duration:** see the issue's plan/close comment timestamps · **Branch:** `session/2026-09-22-0728-issue-218`
+
+`RerankDelta` now reports both set differences — `n_foreign` for ids in `after`
+that `before` never held, `n_dropped` for ids in `before` missing from `after`
+— as counts that default to zero and are reported rather than raised. The
+headline case is the one the issue opened with: `["a","b","c"]` reranked to
+itself and reranked to itself plus 1,000 invented ids are **identical on all
+four existing fields**, `n_input=3, top_k_overlap=3, top_k_size=3,
+ndcg_displacement=1.0`. A perfect telemetry row for a reranker emitting a
+thousand candidates it was never given.
+
+The interesting part of this session was AC3, which asked me to decide and
+record whether the symmetric case — a truncating reranker — gets its own count.
+I had the answer drafted before I started: *no count; truncation is never
+invisible, only conflated with reordering, because every truncation strictly
+lowers the displacement.* That sentence is a prose assertion, so I ran it
+instead of writing it. Over all 304 ordered subsets of a five-id `before` at
+`k=3`, zero collision classes span different output lengths — the draft
+confirmed. Then I asked which population that search had actually walked, and
+re-ran it at seven ids and `k=5`: **360 classes where a truncating and a
+non-truncating output agree on all four fields to the last bit.** The smallest
+is a reranker that silently lost document `e` and one that returned all seven
+reordered, both reporting `ndcg_displacement=0.9374720354963293`. The draft was
+true of the corpus I happened to pick and wrong about the general case, and
+nothing in the first search warned me — the space has a size knob, and turning
+it once is the difference between an empty result and a finding.
+
+The mechanism is worth remembering: `top_k_size = min(k, n_input, len(after))`
+is the only field that can reveal a short `after`, and it stops being able to
+the moment `len(after) >= k` — which is the ordinary operating region of a
+top-N reranker, not an edge case.
+
+The design was also settled by an unexpected question. I first wanted
+`n_output` alongside `n_foreign`, which is more primitive and makes the set
+algebra complete. Then I asked what its default would be: `n_output = 0` means
+"the reranker returned nothing", a real and alarming value standing in for an
+unmeasured one — exactly the fabricated-extreme default we ruled out twice over
+in `llm-cost-optimizer`. `n_dropped = 0` means "nothing was dropped", which is
+simply true of a hand-built delta. AC4's "verify the field's default keeps
+`RerankDelta(...)` constructible" turned out not to be a constraint on the
+design but a test of it: a field whose zero cannot be honest is the wrong field.
+Nothing was lost — `len(after)` is exactly `n_input - n_dropped + n_foreign`,
+pinned across seven shapes.
+
+One existing test had named this issue as its own follow-up, asserting
+whole-dataclass equality under the docstring "which is the follow-up's premise".
+It had to move, and it was right — so I narrowed its scope rather than deleting
+it: it makes the same claim over the four fields it was written about, and now
+also pins that `n_foreign` is what ends the blindness.
+
+Ten new arms; suite 1620 → 1621. Nine of ten go red on a plain revert, but most
+of those die on a missing attribute, which is a weak signal for a field
+addition — the real discrimination is three neighbours built and run: counts
+from a length difference (3 red, because an equal-length swap drops one id and
+invents another), counts sliced to the top-k window (6 red, because `k` is the
+caller's knob), and the single-count version omitting `n_dropped` (6 red).
+
+Worth recording as a mistake: I pasted eight expected displacement values at
+sixteen digits into the "nothing moved" arm, taken from a table I had printed at
+six. Three were wrong. The fix was to load the pre-change `reranker.py` from a
+copy and print `repr()` of each value — never retype a float at higher precision
+than you printed it.
+
+**Open questions:** none. Whether either count should surface in the SSE
+citation payload or the demo is a consumer-facing shape question and was
+explicitly deferred.
