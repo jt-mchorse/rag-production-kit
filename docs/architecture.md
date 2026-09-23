@@ -178,6 +178,30 @@ defaults to `None` so the existing hybrid-only path stays unchanged.
   fused list) and carries signal a lexicographic rule discards — RRF
   has no incoming order to inherit, which is why the two seams answer
   differently.
+- **D-020 (#221).** `evals/run_eval.py` stamps the **real** UTC start
+  time into `started_at`, with a caller override so tests can pin it,
+  and `write_runs` resolves that stamp once for all three suites. It
+  had been the literal `"2026-05-16T00:00:00Z"`, unconditionally, since
+  the file was created. The determinism defence does not survive the
+  record's own contents: `git_sha` comes from `git rev-parse HEAD` and
+  `run_id` is `sha256(suite|git_sha)`, so both move on every commit —
+  freezing only the timestamp produced a record that contradicts
+  itself, a run asserted to have started 2026-05-16 against a commit
+  created months later. The module docstring claims this shape matches
+  `eval_harness.runner.RunResult`; upstream resolves the same field as
+  `started_at or utc_now_iso()` with a caller override, so this was the
+  one field where the declared parity was false. It is not inert
+  downstream either: in the `eval-harness` commit the `[eval]` extra
+  pins, `latest_run_id_for_suite` sorts on this column with no
+  tie-break, so a constant makes every run tie and hands the ordering
+  to SQLite's scan order. The `Z` spelling is load-bearing rather than
+  cosmetic — the store compares the column as a string, so
+  `datetime.isoformat()`'s `+00:00` is a correct timestamp that sorts
+  wrongly against the existing rows. The committed `evals/baselines/`
+  and `evals/current/` keep their original stamps: those are records of
+  runs that did happen around that date. This changes the writer, not
+  the history.
+
 - **D-019 (#218).** `RerankDelta` reports **both** set differences —
   `n_foreign` (ids in `after` that `before` never held) and `n_dropped`
   (ids in `before` missing from `after`) — as defaulted counts, reported

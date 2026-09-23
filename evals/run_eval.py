@@ -41,6 +41,7 @@ import sys
 import urllib.error
 import urllib.request
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from pathlib import Path
 
 from rag_kit import (
@@ -236,12 +237,35 @@ class _SuiteRun:
     rows: list[_SuiteRow]
     git_sha: str | None
 
-    def to_run_result(self, *, dataset_version: str) -> dict:
+    def to_run_result(self, *, dataset_version: str, started_at: str | None = None) -> dict:
+        """Render this run in ``eval_harness.runner.RunResult`` shape.
+
+        ``started_at`` defaults to the real UTC time and is caller-overridable,
+        which is :func:`eval_harness.runner.run_suite`'s own signature -- "the
+        caller-overridable `started_at` and `run_id` so tests can pin them".
+        The module docstring above claims this shape matches ``RunResult``, and
+        until #221 this field was the one place that claim was false: it was the
+        literal ``"2026-05-16T00:00:00Z"``, unconditionally, for every run ever
+        written (D-020).
+
+        It was not a determinism choice, because the record was never
+        deterministic: ``git_sha`` comes from ``git rev-parse HEAD`` and
+        ``run_id`` is ``sha256(suite|git_sha)``, so both move on every commit.
+        Freezing only the timestamp produced a record that contradicts itself --
+        a run asserted to have started 2026-05-16 against a commit created
+        months later. Measured by re-running the documented command today: the
+        sha moved from ``e40188cf`` to ``f4c6e8bd`` and the timestamp did not.
+
+        The override is what makes the field testable rather than swapping one
+        untestable value for another, and it is why ``write_runs`` resolves the
+        stamp once for all three suites instead of letting each call
+        :func:`_utc_now_iso` a few milliseconds apart.
+        """
         mean = sum(r.score for r in self.rows) / len(self.rows) if self.rows else 0.0
         run_id = _new_run_id(self.suite, self.git_sha or "no-git")
         return {
             "run_id": run_id,
-            "started_at": "2026-05-16T00:00:00Z",
+            "started_at": started_at or _utc_now_iso(),
             "suite": self.suite,
             "dataset_version": dataset_version,
             "judge_model": "deterministic-stub-v1",
@@ -254,6 +278,21 @@ class _SuiteRun:
                 for r in self.rows
             ],
         }
+
+
+def _utc_now_iso() -> str:
+    """Current UTC time as ``YYYY-MM-DDTHH:MM:SSZ``.
+
+    Second resolution and a literal trailing ``Z``, matching
+    ``eval_harness.runs.utc_now_iso`` rather than ``datetime.isoformat()``'s
+    ``+00:00``: the run store sorts every listing with a *lexicographic* string
+    compare on this column, so the two spellings would not sort against each
+    other. Not imported from ``eval_harness`` because that package is the
+    ``[eval]`` extra and this module is importable without it -- the same reason
+    ``rag_kit/io_utils.py`` reimplements the harness's atomic write rather than
+    depending on it.
+    """
+    return datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 def _new_run_id(suite: str, git_sha: str) -> str:
@@ -300,13 +339,33 @@ def run_all_suites() -> list[_SuiteRun]:
     ]
 
 
-def write_runs(runs: list[_SuiteRun], out_dir: Path, *, dataset_version: str) -> dict[str, Path]:
+def write_runs(
+    runs: list[_SuiteRun],
+    out_dir: Path,
+    *,
+    dataset_version: str,
+    started_at: str | None = None,
+) -> dict[str, Path]:
+    """Write one ``RunResult`` JSON per suite.
+
+    The ``started_at`` stamp is resolved **once** here and shared by all three
+    suites (#221, D-020). One invocation of this script is one eval run; letting
+    each suite call :func:`_utc_now_iso` separately would stamp three times a
+    few milliseconds apart and, at this field's one-second resolution, usually
+    produce the same value anyway -- the failure would surface as an occasional
+    off-by-one-second split across a single run's three artifacts, which is
+    exactly the kind of intermittent difference nobody diagnoses.
+    """
+    when = started_at or _utc_now_iso()
     paths: dict[str, Path] = {}
     for run in runs:
         path = out_dir / f"{run.suite}.json"
         atomic_write_text(
             path,
-            json.dumps(run.to_run_result(dataset_version=dataset_version), indent=2) + "\n",
+            json.dumps(
+                run.to_run_result(dataset_version=dataset_version, started_at=when), indent=2
+            )
+            + "\n",
         )
         paths[run.suite] = path
     return paths
