@@ -178,6 +178,41 @@ defaults to `None` so the existing hybrid-only path stays unchanged.
   fused list) and carries signal a lexicographic rule discards — RRF
   has no incoming order to inherit, which is why the two seams answer
   differently.
+- **D-019 (#218).** `RerankDelta` reports **both** set differences —
+  `n_foreign` (ids in `after` that `before` never held) and `n_dropped`
+  (ids in `before` missing from `after`) — as defaulted counts, reported
+  and never raised. #217 made the relevance scale a property of `before`
+  alone, so `["a","b","c"] -> ["a","b","c","x"]` correctly reports
+  `1.0`; what no field revealed was that `after` held an id `before`
+  never had. A foreign id contributes `rel = 0.0`, `n_input` counts
+  `before`, and `top_k_size` is capped by both lists, so a reranker
+  emitting 1,000 invented candidates published a perfect telemetry row.
+  The symmetric case is a field rather than an omission **because a
+  search said so**: the drafted answer was "truncation is never
+  invisible, only conflated with reordering", and over all 304 ordered
+  subsets of a 5-id `before` at `k=3` that holds — zero collision
+  classes. At 7 ids and `k=5` there are **several hundred classes
+  where a truncating and a non-truncating output agree on all four
+  fields to the last bit** (`a b c d f g` and `c b a d f g e` against
+  `a b c d e f g` both give `ndcg_displacement` ~ `0.93747203549`).
+  The exact count is a property of the host — 360 on CPython
+  3.14/arm64, 346 on 3.11/x86-64 — because membership turns on exact
+  float equality; the tests assert a floor rather than an equality for
+  that reason.
+  `top_k_size = min(k, n_input, len(after))` is the only field that can
+  reveal a short `after`, and it stops being able to the moment
+  `len(after) >= k` — the ordinary operating region of a top-N
+  reranker. The two counts are *not* the same signal: `n_foreign > 0`
+  always violates the invariant #215's guard states ("a reranker
+  permutes the ids it was given") and is an alarm, while `n_dropped > 0`
+  is routine and is context. Reported rather than raised because #215
+  deliberately kept `["a","b","c"] -> ["x","y","z"]` reporting `0.0` as
+  its contrast row, and this is telemetry — the same posture as
+  `n_uncomparable` in llm-eval-harness. `len(after)` stays derived
+  (`n_input - n_dropped + n_foreign`, exact because duplicates raise at
+  the seam) rather than becoming a third field: an `n_output` field has
+  no honest default, since `0` there means "the reranker returned
+  nothing", a real and alarming value standing in for an unmeasured one.
 
 ---
 

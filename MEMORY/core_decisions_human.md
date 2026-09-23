@@ -313,3 +313,102 @@ backend.
 test is the thing that would need rewriting, and it is one file.
 
 **Related issues:** #207, #205, #180, #40
+
+---
+
+## D-019 — `RerankDelta` reports both set differences, and the symmetric one is a field because a search said so
+
+**Date:** 2026-09-22 · **Reversibility:** cheap · **Issue:** #218 (follow-up to
+#217 / #215)
+
+**Decision.** `RerankDelta` gains two defaulted counts: `n_foreign` (ids in
+`after` that `before` never held) and `n_dropped` (ids in `before` missing from
+`after`). Both are reported, never raised. `len(after)` does not become a third
+field; it is exactly derivable.
+
+**Why.** #217 made the relevance scale a property of `before` alone, so
+`["a","b","c"] → ["a","b","c","x"]` reports `1.0`. That is the *correct* answer
+to the question the metric asks — "how much did the reranker move the input
+ordering?" — and the answer is "not at all". The gap #218 reported is that
+nothing in the dataclass revealed `after` holding an id `before` never had. A
+foreign id contributes `rel = 0.0`, `n_input` counts `before`, and `top_k_size`
+is capped by both lists, so a reranker emitting a thousand invented candidates
+published a perfect telemetry row.
+
+**The part worth recording is how AC3 went.** The issue asked whether the
+symmetric case — a truncating reranker — gets its own count or is deliberately
+left out. I had the answer drafted: *no symmetric count, because truncation is
+never invisible, only conflated with reordering; every truncation strictly
+lowers the displacement.* Before writing it down I ran the search. Over all 304
+ordered subsets of a five-id `before` at `k=3` there are **zero** collision
+classes spanning different output lengths — which is a true fact about that
+corpus and the wrong corpus to conclude from. At seven ids and `k=5` there are
+**360 classes in which a truncating and a non-truncating output agree on all
+four fields to the last bit**. The smallest:
+
+```
+before = a b c d e f g                                  (k=5)
+after₁ = a b c d f g      # dropped `e`
+after₂ = c b a d f g e    # kept all seven, reordered the head
+both  -> n_input=7, top_k_overlap=4, top_k_size=5,
+         ndcg_displacement=0.9374720354963293           # d1 == d2 is True
+```
+
+So truncation is invisible in exactly the sense foreign ids are; it just needs
+a larger input to demonstrate. `top_k_size = min(k, n_input, len(after))` is the
+only field that can reveal a short `after`, and it stops being able to the
+moment `len(after) >= k` — which is the ordinary operating region of a top-N
+reranker, not an edge case.
+
+**The two counts are not the same kind of signal**, and the dataclass comment
+says so, because a dashboard author should not alarm on both. `n_foreign > 0`
+always violates the invariant this module states in #215's guard — "a reranker
+permutes the ids it was given". `n_dropped > 0` is routine: a top-N reranker
+returns fewer ids than it received, by design. A count is a fact, not an
+accusation; what differs is what the fact means.
+
+**Reported, never raised.** #215 deliberately kept `["a","b","c"] →
+["x","y","z"]` reporting `0.0` as the contrast row that made the empty-`before`
+`1.0` look wrong, and turning foreign ids into a `ValueError` would reverse that
+decision. `rerank_delta_ndcg` is telemetry: a reranker misbehaving in production
+is exactly when a caller wants a number rather than an exception. Same posture
+as `n_uncomparable` / `n_*_off_support` in llm-eval-harness (D-017, D-023,
+D-024).
+
+**No `n_output` field, and the reason is the default.** `len(after)` is exactly
+`n_input - n_dropped + n_foreign` — the duplicate guard means every list's
+length equals its set cardinality — and that identity is pinned across seven
+shapes. An `n_output` field would have no honest default: `0` there means "the
+reranker returned nothing", a real and alarming value standing in for an
+unmeasured one, which is the fabricated-extreme default `llm-cost-optimizer`
+D-018/D-019 ruled out. Both anomaly counts default to `0` truthfully, and that
+is what makes AC4 — the four original fields still constructing on their own —
+satisfiable at all.
+
+**Counted over set membership of the whole ranking**, not `len()` and not the
+top-k slice. `["a","b","c"] → ["a","b","x"]` drops one id and invents another at
+equal length, so a length difference reports `0` in both directions while two
+things went wrong; and `k` is a knob the *caller* chooses, so a sliced count
+would make one reranker's behaviour report differently to two dashboards
+watching the same stream.
+
+**An existing test had named this issue as its own follow-up.**
+`test_a_longer_after_does_not_change_the_other_telemetry_fields` asserted
+whole-dataclass equality under the docstring "they are the fields a reader might
+expect to reveal a longer `after`, and they do not — which is the follow-up's
+premise." #218 is that follow-up, so the assertion had to move. Updated, not
+deleted: it now makes the same claim over the four fields it was written about,
+and additionally pins that `n_foreign` is what ends the blindness.
+
+**Alternatives considered:**
+- Raise on foreign ids — rejected; reverses #215's contrast row, and this is
+  telemetry.
+- Only `n_foreign`, recording the symmetric case as deliberately omitted —
+  rejected; built and run, six arms red, and the 360-class search is what
+  falsified the argument I was about to write down.
+- An `n_output` field instead of `n_dropped` — rejected; no honest default, and
+  the quantity is already derivable.
+- Counts from a length difference — rejected; built and run, three arms red.
+- Counts sliced to the top-k window — rejected; built and run, six arms red.
+
+**Related issues:** #218, #217, #215
