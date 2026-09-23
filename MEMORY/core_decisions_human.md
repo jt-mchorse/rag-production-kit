@@ -412,3 +412,65 @@ and additionally pins that `n_foreign` is what ends the blindness.
 - Counts sliced to the top-k window — rejected; built and run, six arms red.
 
 **Related issues:** #218, #217, #215
+
+## D-020 — `started_at` is a measurement, not a literal
+
+**Date:** 2026-09-23 · **Issues:** #221 (#7 is where the literal was born) ·
+**Reversibility:** cheap
+
+**Decision.** `evals/run_eval.py` stamps the real UTC start time into
+`started_at`, with a caller override so tests can pin it, and `write_runs`
+resolves that stamp once and shares it across all three suites. The frozen
+`"2026-05-16T00:00:00Z"` literal is gone.
+
+**Why.** The field had been that literal, unconditionally, since the file was
+created — no parameter, no comment, no consumer inside this repo. The obvious
+defence is determinism, and it does not survive the record's own contents:
+`git_sha` is read from `git rev-parse HEAD` and `run_id` is
+`sha256(suite|git_sha)`, so both move on every commit. The file was never
+byte-stable. What freezing only the timestamp produced is a record that
+contradicts itself — a run asserted to have started 2026-05-16 against a commit
+that did not exist until months later. Running the documented command today
+moved `git_sha` from `e40188cf` to `f4c6e8bd`, moved `run_id` with it, and left
+the timestamp exactly where it was.
+
+The module's own docstring says the run shape "matches
+`eval_harness.runner.RunResult`". Upstream resolves the same field as
+`started_at or utc_now_iso()`, with `started_at` a keyword argument documented
+as "caller-overridable so tests can pin them". This was the one field where the
+declared parity was false, and it was false in the direction that matters: no
+real time by default, and no way to supply one.
+
+Downstream it is not inert. In the exact `eval-harness` commit the `[eval]`
+extra pins, `latest_run_id_for_suite` is `ORDER BY started_at DESC LIMIT 1` with
+no tie-break, over an indexed `NOT NULL` column. Ingesting this repo's artifacts
+makes every run tie on the sort key, so "the most recent run" is decided by
+SQLite's scan order rather than by the data, and that function's own docstring
+reasoning — "the ISO-8601 format is lexicographically sortable so a string
+compare suffices" — becomes a no-op.
+
+**The `Z` form is load-bearing.** `_utc_now_iso` uses
+`strftime("%Y-%m-%dT%H:%M:%SZ")` and not `datetime.isoformat()`, which renders
+`+00:00`. Because the store compares this column as a string, a `+00:00` stamp
+is a correct timestamp that sorts wrongly against the existing `Z` rows. Built
+and run as a neighbour: two arms red.
+
+**One run is one stamp.** `write_runs` resolves the stamp once. Letting each
+suite stamp itself would, at this field's one-second resolution, usually agree
+anyway — and occasionally split a single run's three artifacts across a second
+boundary. The first draft of the arm guarding this called the real clock and the
+neighbour that drops the threading *passed it*; it is rebuilt around a clock
+that advances one second per read, which separates them every time.
+
+**Alternatives considered.**
+- *Keep the literal and document it as determinism.* Rejected: the record is not
+  deterministic, so the rationale is false on its own terms.
+- *Stamp a real time with no override.* Rejected: it swaps one untestable value
+  for another, and upstream already shows the signature that does not.
+- *`datetime.isoformat()`.* Rejected, built and run: 2 arms red on the sort form.
+- *Let each suite stamp itself.* Rejected, built and run.
+- *Regenerate the committed baselines.* Rejected: `evals/baselines/` and
+  `evals/current/` are records of runs that did happen around that date, so
+  their timestamps are approximately true. This changes the writer, not the
+  history — and CI regenerates `current/` in the runner without committing it,
+  so nothing churns.
