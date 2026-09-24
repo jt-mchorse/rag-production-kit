@@ -10,14 +10,17 @@ don't fail any test — but they break the README's quoted quickstart
 (``from rag_kit import Document, HashEmbedder, Indexer, Retriever``) and
 any downstream importer that uses the top-level surface.
 
-These five tests lock that surface:
+These tests lock that surface:
 
 1. ``__version__`` is set to a semver-ish string.
 2. Every name in ``__all__`` is bound on the package and non-None.
 3. ``__all__`` agrees with the actual top-level relative ``from .X import …``
    names — guards against a future export being added to the imports
    block but not ``__all__`` (or vice versa).
-4. The README's quickstart imports succeed.
+4. The README's quickstart imports succeed — **discovered** from
+   ``README.md`` rather than transcribed beside the test (#223), in both
+   spellings the README uses (top-level and dotted-submodule), with an
+   anti-vacuity arm pinning the *corpus* it discovered.
 5. Anchor names from each re-exported submodule are reachable via
    ``rag_kit`` — guards against a submodule being split or renamed
    without updating ``__init__.py``.
@@ -38,6 +41,7 @@ pytest plugin via entry-points, so ``__init__.py`` is instrumented by
 from __future__ import annotations
 
 import ast
+import importlib
 import re
 from pathlib import Path
 
@@ -48,9 +52,82 @@ import rag_kit
 _INIT_PATH = Path(rag_kit.__file__)
 _SEMVER_PATTERN = re.compile(r"^\d+\.\d+\.\d+(?:[-+].+)?$")
 
-# README's quickstart (line 115 in README.md) quotes these four names
-# as importable directly from the top-level package.
-README_QUICKSTART_NAMES = ("Document", "HashEmbedder", "Indexer", "Retriever")
+# The document a reader copy-pastes a quickstart out of. A *document*
+# rather than a list of *names*: the names are discovered from it below.
+#
+# What this replaces was four names transcribed once, under a comment
+# pinning them to "line 115 in README.md". By the time #223 read it the
+# snippet was at line 150, the README carried **six** `from rag_kit import
+# …` snippets naming 16 distinct top-level names, and a seventh import line
+# used the dotted spelling. The tuple walked 4 of 16 names across 1 of 6
+# snippets. A check that can only fail when someone edits the check is not a
+# lock on the thing it names.
+_REPO_ROOT = _INIT_PATH.parent.parent
+QUICKSTART_DOC = "README.md"
+
+# `from rag_kit …`, in both spellings the README uses:
+#
+#   README:150  from rag_kit import Document, HashEmbedder, Indexer, Retriever
+#   README:151  from rag_kit.db import connect
+#
+# Two details of this pattern are load-bearing, and both were found by
+# running it rather than by reading it:
+#
+# * **Leading whitespace is allowed.** `README:279` is indented — it sits
+#   inside a continued example block. The sibling fix in
+#   chunking-strategies-lab#194 anchors its regex at `^from` under
+#   `re.MULTILINE`, which is correct for *that* README and silently walks 5
+#   of 6 snippets here, dropping `aggregate_telemetry` — one of the two
+#   names #223 notes is in neither the old tuple nor `SUBMODULE_ANCHORS`.
+# * **The dotted group is optional and captured.** `rag_kit.db` is in none
+#   of the nine `SUBMODULE_ANCHORS`, and `connect` is not a top-level
+#   re-export, so the second line of the quickstart is pinned by nothing at
+#   all today. A reader copy-pasting the quickstart runs both lines.
+#
+# An inline backticked mention in prose cannot match: it starts with a
+# backtick, not with `from`.
+_IMPORT_STMT = re.compile(
+    r"^[ \t]*from[ \t]+rag_kit(?P<sub>(?:\.[A-Za-z_][A-Za-z0-9_]*)+)?[ \t]+"
+    r"import[ \t]+(?P<body>\([^)]*\)|[^\n(]+?)[ \t]*$",
+    re.MULTILINE,
+)
+
+# The names the README quoted when #223 was written, as a *floor*. The
+# document is the source of truth; this set is the control on the discovery:
+# if the regex or the `ast` parse regresses to finding fewer names, this says
+# so instead of every downstream assertion passing over a shrunken set.
+# The four the old tuple transcribed are the first line of it.
+KNOWN_TOP_LEVEL_NAMES = frozenset(
+    {
+        "Document",
+        "HashEmbedder",
+        "Indexer",
+        "Retriever",
+        "GeneratedAnswer",
+        "Refusal",
+        "TemplateGenerator",
+        "TemplateRewriter",
+        "LexicalOverlapReranker",
+        "StreamingPipeline",
+        "to_sse",
+        "CostRecord",
+        "ModelPrice",
+        "PriceTable",
+        "TelemetryStore",
+        "aggregate_telemetry",
+    }
+)
+
+# Same floor for the dotted spelling. One statement, one name, and nothing
+# else in this file looks at `rag_kit.db`.
+KNOWN_DOTTED_IMPORTS = frozenset({("rag_kit.db", "connect")})
+
+# Lower bounds on the corpus, read off the README as it stood for #223: six
+# top-level statements and one dotted one. Bounds rather than equalities so
+# that *adding* a snippet to the README is not a test failure, while losing
+# one — or a discovery that has stopped discovering — is.
+MIN_TOP_LEVEL_STATEMENTS = 6
+MIN_DOTTED_STATEMENTS = 1
 
 # Anchor names that prove each re-exported submodule survived. One name
 # per submodule; if ``__init__.py`` ever drops a submodule's whole
@@ -82,6 +159,39 @@ def _parse_init_relative_imports() -> set[str]:
                 # surface, not the original name.
                 names.add(alias.asname or alias.name)
     return names
+
+
+def _discover_quickstart_imports() -> list[tuple[str, tuple[str, ...]]]:
+    """Return one entry per ``from rag_kit …`` statement in the quickstart doc.
+
+    Each entry is ``(module, names)`` — ``("rag_kit", (...))`` for the
+    top-level spelling and ``("rag_kit.db", ("connect",))`` for the dotted
+    one. A *list*, not a set union, so the caller can assert on the corpus
+    (how many statements, in which spelling) and not only on the union of
+    names. That distinction is what lets the vacuity arm below tell "found
+    one snippet" apart from "found all six" — the failure mode this change
+    is most likely to introduce.
+
+    The statement body is handed to ``ast`` rather than split on commas, so
+    a trailing comma, a parenthesised multi-line block or an ``as`` alias
+    parse the way Python parses them. This is the technique
+    ``test_all_matches_actual_top_level_imports`` already uses on
+    ``__init__.py``, pointed at the document instead.
+    """
+    text = (_REPO_ROOT / QUICKSTART_DOC).read_text(encoding="utf-8")
+    found: list[tuple[str, tuple[str, ...]]] = []
+    for match in _IMPORT_STMT.finditer(text):
+        module = "rag_kit" + (match.group("sub") or "")
+        stmt = f"from {module} import {match.group('body')}"
+        names: list[str] = []
+        for node in ast.parse(stmt).body:
+            assert isinstance(node, ast.ImportFrom)
+            for alias in node.names:
+                # The *imported* name is what has to exist on the module; an
+                # ``as`` alias renames it only in the reader's own script.
+                names.append(alias.name)
+        found.append((module, tuple(names)))
+    return found
 
 
 def test_version_is_set_to_semver_ish_string() -> None:
@@ -150,22 +260,116 @@ def test_all_matches_actual_top_level_imports() -> None:
     )
 
 
-def test_readme_quickstart_imports_resolve() -> None:
-    """README quickstart must keep working as written.
+def test_the_discovery_finds_every_quickstart_statement() -> None:
+    """Anti-vacuity: pin the corpus before anything is asserted about it.
 
-    The README literally quotes (line 115)::
+    Every other assertion in this file about the quickstart is a statement
+    over ``_discover_quickstart_imports()``. If the regex matches **zero**
+    blocks, all of them pass for free — and if it matches *most* blocks they
+    still pass, which is the subtler and likelier regression. So this arm
+    pins the corpus rather than the result: how many statements, in which
+    spelling, and a floor on the names.
 
-        from rag_kit import Document, HashEmbedder, Indexer, Retriever
+    The counts are lower bounds. Adding a snippet to the README is not a
+    test failure; losing one, or a parser that has stopped parsing, is.
 
-    If any of those four names disappears from the top-level surface,
-    every reader who copy-pastes the quickstart hits an ImportError.
+    Green against the pre-#223 tree in the sense that matters — the property
+    it pins (the README carries six top-level snippets and one dotted one)
+    was already true there. That is precisely the property the four-name
+    tuple did not walk.
     """
-    for name in README_QUICKSTART_NAMES:
-        assert hasattr(rag_kit, name), (
-            f"rag_kit.{name} is missing from the top-level surface. The "
-            f"README's quickstart imports it directly — either restore "
-            f"the export or update the README quickstart."
-        )
+    found = _discover_quickstart_imports()
+    top_level = [entry for entry in found if entry[0] == "rag_kit"]
+    dotted = [entry for entry in found if entry[0] != "rag_kit"]
+
+    assert len(top_level) >= MIN_TOP_LEVEL_STATEMENTS, (
+        f"the quickstart-import discovery found {len(top_level)} top-level "
+        f"`from rag_kit import …` statements in {QUICKSTART_DOC}, expected at "
+        f"least {MIN_TOP_LEVEL_STATEMENTS}. Either a snippet was removed from "
+        f"the README, or `_IMPORT_STMT` stopped matching a spelling it uses "
+        f"— an indented statement inside a continued example block is the one "
+        f"that has actually been missed before (#223)."
+    )
+    assert len(dotted) >= MIN_DOTTED_STATEMENTS, (
+        f"the discovery found {len(dotted)} dotted `from rag_kit.X import …` "
+        f"statements, expected at least {MIN_DOTTED_STATEMENTS}. The "
+        f"quickstart's second line is `from rag_kit.db import connect`; if it "
+        f"is gone from the README that is fine, but if the pattern stopped "
+        f"capturing the dotted spelling then `rag_kit.db` is unpinned again."
+    )
+
+    union = {name for _, names in top_level for name in names}
+    assert union >= KNOWN_TOP_LEVEL_NAMES, (
+        f"the discovery is missing top-level names it found when #223 was "
+        f"written: {sorted(KNOWN_TOP_LEVEL_NAMES - union)}. The README is the "
+        f"source of truth, but a *shrinking* result means the parser "
+        f"regressed, not that the document did."
+    )
+    dotted_pairs = {(module, name) for module, names in dotted for name in names}
+    assert dotted_pairs >= KNOWN_DOTTED_IMPORTS, (
+        f"the discovery is missing dotted imports it found when #223 was "
+        f"written: {sorted(KNOWN_DOTTED_IMPORTS - dotted_pairs)}."
+    )
+
+
+def test_quickstart_top_level_imports_resolve() -> None:
+    """Every top-level name the quickstarts import must exist on ``rag_kit``.
+
+    The names come from the README, not from a list beside this test. The
+    tuple this replaces named four of them and pointed at "line 115"; the
+    snippet was at 150 and five further snippets named twelve more names,
+    including `to_sse` and `aggregate_telemetry`, which are in neither the
+    tuple nor ``SUBMODULE_ANCHORS``. Three failures it could not see: a name
+    added to one of the five unwalked snippets, a re-export dropped from
+    ``__init__.py`` for any of those twelve, and its own drift.
+
+    If any of these names disappears from the top-level surface, every
+    reader who copy-pastes that snippet hits an ``ImportError``.
+    """
+    missing = sorted(
+        {
+            name
+            for module, names in _discover_quickstart_imports()
+            if module == "rag_kit"
+            for name in names
+            if not hasattr(rag_kit, name)
+        }
+    )
+    assert not missing, (
+        f"{QUICKSTART_DOC} imports names that are not on the top-level "
+        f"surface: {missing}. A reader copy-pasting the snippet gets an "
+        f"ImportError — either restore the exports or fix the snippet."
+    )
+
+
+def test_quickstart_dotted_imports_resolve() -> None:
+    """The dotted spelling resolves too — on its own submodule.
+
+    ``from rag_kit.db import connect`` is the second line of the quickstart,
+    and ``db`` is in none of the nine ``SUBMODULE_ANCHORS`` (it is not a
+    re-exported submodule), so nothing in this suite looked at it before
+    #223. A reader copy-pasting the quickstart runs both lines, so both
+    lines are part of the same claim.
+
+    ``importlib`` rather than ``hasattr(rag_kit, "db")``: the submodule is
+    not imported by ``__init__.py``, so the attribute does not exist on the
+    package until something imports it.
+    """
+    unresolved: list[str] = []
+    for module, names in _discover_quickstart_imports():
+        if module == "rag_kit":
+            continue
+        try:
+            imported = importlib.import_module(module)
+        except ImportError:  # pragma: no cover - fails the assert below
+            unresolved.extend(f"{module} (module missing)" for _ in names or [None])
+            continue
+        unresolved.extend(f"{module}.{name}" for name in names if not hasattr(imported, name))
+    assert not unresolved, (
+        f"{QUICKSTART_DOC} imports dotted names that do not resolve: "
+        f"{sorted(unresolved)}. A reader copy-pasting the quickstart gets an "
+        f"ImportError on the line after the top-level import."
+    )
 
 
 @pytest.mark.parametrize(
