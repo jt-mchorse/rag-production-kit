@@ -2782,3 +2782,16 @@ changed rather than the platform.
 The `reranker.py` docstring and `docs/architecture.md` were edited in place;
 `MEMORY/` is append-only, so D-019's `measured:` field still says 360 and this
 entry is the correction.
+
+## 2026-09-23 — Issue #221: `started_at` was a frozen literal
+**Duration:** ~8 min (measured) · **Branch:** session/2026-09-23-0733-issue-221
+
+- `evals/run_eval.py` wrote `"2026-05-16T00:00:00Z"` into `started_at` for every run ever produced, since the file was created. The determinism defence dies on the record's own contents: `git_sha` and `run_id` both move on every commit, so the artifact was never byte-stable — it was just self-contradicting, asserting a run in May against a commit from September.
+- The module docstring claims the shape matches `eval_harness.runner.RunResult`. The *key set* matched perfectly, which is why no shape check ever caught it; upstream populates the same field with `started_at or utc_now_iso()` and a caller override. This was the one field where the declared parity was false.
+- Fixed by stamping the real UTC time with a caller override, resolved once in `write_runs` so one invocation is one stamp. Recorded as D-020.
+
+**Why this work, this session:** running the documented command and reading *which fields moved* is the cheapest probe there is, and the field that refused to move was the one claiming to be a measurement.
+
+**Open questions / blockers:** none. The committed `evals/baselines/` and `evals/current/` keep their original stamps deliberately — they record runs that happened.
+
+**Next session:** the reranker was re-examined and is clean; the eval writer is now the freshest surface here.
