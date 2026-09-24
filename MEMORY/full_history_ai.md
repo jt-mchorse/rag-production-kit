@@ -2628,3 +2628,33 @@ context_for_next_session:
 decisions_made: [D-020]
 followups: []
 ---
+
+---
+session: 2026-09-24T07:23Z
+duration_min: 32
+issue: 223
+focus: quickstart_import_lock_discovers_the_readme_instead_of_transcribing_four_names_beside_itself
+delta:
+  files_changed: 1
+  tests_added: 3            # net +2: test_readme_quickstart_imports_resolve removed, three replace it
+  tests_removed: 1
+  suite: "1628 -> 1630 green, 8 pg-marked skips as always"
+  benchmarks: {}
+measured:
+  the_premise_re_verified_firsthand: "grep -n 'from rag_kit' README.md returns 7 lines: six top-level statements at 150/171/207/231/257/279 naming 16 distinct names, plus 'from rag_kit.db import connect' at 151. The transcribed tuple walked 4 of 16 across 1 of 6, and its comment named line 115 for a snippet at 150 - a 35-line drift. All 17 resolve in the venv, so the gap was LATENT."
+  falsifications_old_suite_GREEN_new_suite_RED: "three, each an edit the issue names as invisible - (1) dropped the to_sse re-export from __init__.py consistently (import line AND __all__): OLD 13 passed, NEW red on test_quickstart_top_level_imports_resolve; (2) README's fifth snippet gains SseHeartbeat which does not exist: OLD 13 passed, NEW red; (3) rag_kit.db.connect renamed: OLD 13 passed, NEW red on test_quickstart_dotted_imports_resolve"
+  neighbours_built_and_run: "A - csl#194's ^...$ anchored regex ported VERBATIM: RED, assert 5 >= 6, it drops the INDENTED statement at README:279 and with it aggregate_telemetry. B - dotted group emptied so only the top-level spelling is found: RED, assert 0 >= 1. C - A's regression PLUS the corpus arm deleted: 14 PASSED, ie the corpus arm is the ONLY thing that catches A. D - hasattr(rag_kit, 'db') instead of importlib: GREEN today and the reason is a side effect, see below."
+  why_importlib_and_not_hasattr_measured_not_argued: "rag_kit.db is in sys.modules after 'import rag_kit' alone because indexer.py does 'from .db import Jsonb, to_pgvector' - an INTERNAL import, not a declared re-export. So the hasattr form passes today by side effect. Ran 'del rag_kit.db' to simulate indexer dropping that import: hasattr form -> False (a SPURIOUS failure, the reader's line still works), importlib form -> True. The hasattr neighbour fails in the FALSE POSITIVE direction, which no arm can catch, so the choice is recorded here rather than claimed as tested."
+context_for_next_session:
+  - THE_UNIT_OF_A_CORPUS_ARM_IS_WHATEVER_THE_HARM_IS_COUNTED_IN_AND_A_SIBLING_FIX_CAN_HAVE_A_DIFFERENT_ONE_csl_194_pins_set_found_EQUALS_set_QUICKSTART_DOCS_which_is_RIGHT_THERE_because_its_two_snippets_live_in_two_DIFFERENT_FILES_rag_has_SIX_SNIPPETS_IN_ONE_FILE_so_that_exact_arm_is_satisfied_by_finding_ONE_OF_SIX_PORTING_A_SIBLING_FIX_MEANS_PORTING_ITS_QUESTION_NOT_ITS_ASSERTION
+  - AND_THE_REGEX_ITSELF_DID_NOT_PORT_EITHER_csl_anchors_at_caret_from_under_re_MULTILINE_and_README_279_here_is_INDENTED_inside_a_continued_example_block_so_the_verbatim_port_walks_5_of_6_and_drops_aggregate_telemetry_WHICH_IS_ONE_OF_THE_TWO_NAMES_223_SINGLED_OUT_AS_COVERED_BY_NEITHER_EXISTING_SET_i_only_found_this_by_RUNNING_the_ported_pattern_and_PRINTING_THE_SEVEN_TUPLES
+  - THE_GREEN_NEIGHBOUR_IS_THE_ONE_THAT_JUSTIFIES_THE_ARM_neighbour_C_is_A_s_regression_with_the_corpus_arm_DELETED_and_it_is_14_PASSED_so_the_corpus_arm_is_not_filler_it_is_the_only_thing_standing_between_this_repo_and_the_same_defect_in_a_new_spelling
+  - A_SECOND_SPELLING_IN_THE_SAME_SNIPPET_WAS_PINNED_BY_NOTHING_the_quickstart_is_TWO_LINES_and_line_2_is_from_rag_kit_db_import_connect_db_is_in_NONE_of_the_nine_SUBMODULE_ANCHORS_and_connect_is_not_a_top_level_re_export_so_no_test_in_the_suite_looked_at_it_ASK_OF_A_QUOTED_SNIPPET_HOW_MANY_STATEMENTS_IT_HAS_NOT_HOW_MANY_NAMES
+  - A_NEIGHBOUR_CAN_FAIL_IN_THE_FALSE_POSITIVE_DIRECTION_AND_THEN_NO_ARM_CAN_REJECT_IT_the_hasattr_form_of_the_dotted_check_is_GREEN_today_because_indexer_py_imports_db_internally_and_that_side_effect_binds_the_attribute_the_way_it_BREAKS_is_a_spurious_RED_after_an_unrelated_refactor_SAY_SO_IN_MEMORY_RATHER_THAN_PRETENDING_AN_ARM_COVERS_IT
+  - THE_FLOOR_RATHER_THAN_THE_EQUALITY_counts_are_asserted_as_GREATER_OR_EQUAL_and_the_name_set_as_A_SUPERSET_so_ADDING_a_README_snippet_is_not_a_test_failure_while_LOSING_one_or_a_parser_that_stopped_parsing_is_the_equality_form_would_have_made_every_README_edit_a_test_edit_which_is_the_maintenance_pressure_that_produced_the_stale_tuple_in_the_first_place
+  - SUBMODULE_ANCHORS_LEFT_ALONE_ON_PURPOSE_per_the_issue_AC_it_answers_did_the_submodule_survive_over_nine_names_CHOSEN_FOR_THAT_PURPOSE_it_is_not_a_weaker_version_of_this_check_and_merging_them_would_lose_both_questions
+  - NO_DECISION_RECORDED_this_is_a_test_coverage_change_with_zero_behaviour_change_so_D_020_remains_the_newest_and_test_readme_decision_range_did_not_need_touching
+  - repo_state_branch_session_2026_09_24_0717_issue_223_ONE_code_commit_plus_this_memory_commit_README_UNCHANGED_no_test_count_lock_exists_in_this_repo_so_nothing_else_moved
+decisions_made: []
+followups: []
+---

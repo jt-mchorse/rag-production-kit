@@ -2795,3 +2795,16 @@ entry is the correction.
 **Open questions / blockers:** none. The committed `evals/baselines/` and `evals/current/` keep their original stamps deliberately — they record runs that happened.
 
 **Next session:** the reranker was re-examined and is clean; the eval writer is now the freshest surface here.
+
+## 2026-09-24 — Issue #223: the quickstart import lock now reads the README
+**Duration:** ~32 min · **Branch:** `session/2026-09-24-0717-issue-223`
+
+- `test_readme_quickstart_imports_resolve` checked four names typed into a tuple beside it, under a comment pinning them to "line 115 in README.md". The README actually carries six `from rag_kit import …` snippets naming sixteen distinct top-level names, and the one the tuple walked had moved to line 150. The check could only fail if someone edited the check.
+- Replaced the tuple with a discovery over `README.md`. It handles both spellings the document uses — the top-level one and `from rag_kit.db import connect`, whose module is in none of the nine submodule anchors and so was pinned by nothing at all — hands each statement to `ast` rather than splitting on commas, and allows leading whitespace, because one of the six snippets is indented inside a continued example block.
+- Added a corpus arm that counts statements per spelling against a floor. Three simulated edits that the old suite passed cleanly all turn the new one red: dropping the `to_sse` re-export, adding a name to an unwalked snippet, and renaming `rag_kit.db.connect`.
+
+**Why this work, this session:** #223 was filed last session with the measurement already in the body and was unblocked the moment Phase A merged #222, so it was the cheapest high-quality issue in the priority tier.
+
+**Open questions / blockers:** none. All seventeen names resolve today — this closed a latent gap, not a live `ImportError`.
+
+**Next session:** nothing outstanding on this issue. Worth noting that porting the sibling fix from `chunking-strategies-lab` verbatim would have walked five of six snippets; the ported regex was only caught by running it and printing what it found.
