@@ -40,9 +40,15 @@ from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import Any, Protocol
 
+from .comparison import render_comparison
 from .retriever import RetrievalResult
 
 _DEFAULT_THRESHOLD = 0.02  # tuned against the in-repo retrieval tests; >0 by construction
+# Decimal places the refusal detail has always rendered at, and still renders
+# at whenever four is enough to tell `top` and `threshold` apart. Passed
+# explicitly rather than defaulted inside `render_comparison`, so this
+# module's width stays this module's business (#225, D-021).
+_DETAIL_PLACES = 4
 _CITE_PATTERN = re.compile(r"\[cite:([^\]]+)\]")
 # Sentence terminators. Besides ASCII `.!?`, this includes the unicode
 # terminators `…` (U+2026 ellipsis), `。` (ideographic full stop), `！`/`？`
@@ -652,9 +658,10 @@ class TemplateGenerator:
         if not retrieved:
             return _refusal("insufficient_context", "no chunks retrieved", threshold, top)
         if top < threshold:
+            top_s, thr_s = render_comparison(top, threshold, places=_DETAIL_PLACES)
             return _refusal(
                 "insufficient_context",
-                f"top_score={top:.4f} below threshold={threshold:.4f}",
+                f"top_score={top_s} below threshold={thr_s}",
                 threshold,
                 top,
             )
@@ -745,9 +752,10 @@ class AnthropicGenerator:
         if not retrieved:
             return _refusal("insufficient_context", "no chunks retrieved", threshold, top)
         if top < threshold:
+            top_s, thr_s = render_comparison(top, threshold, places=_DETAIL_PLACES)
             return _refusal(
                 "insufficient_context",
-                f"top_score={top:.4f} below threshold={threshold:.4f}",
+                f"top_score={top_s} below threshold={thr_s}",
                 threshold,
                 top,
             )
