@@ -474,3 +474,92 @@ that advances one second per read, which separates them every time.
   their timestamps are approximately true. This changes the writer, not the
   history — and CI regenerates `current/` in the runner without committing it,
   so nothing churns.
+
+---
+
+## D-021 — the refusal detail renders the pair so the ordering it asserts stays readable
+
+**Date.** 2026-09-25 · **Issue.** #225 · **Reversibility.** cheap
+
+**Decision.** `Refusal.detail` renders `top_score` and `threshold` through
+`rag_kit.comparison.render_comparison`, which widens from four decimal places
+only while the two values render identically, always returns both sides at the
+same precision, and falls back to `repr` when no width in its budget separates
+them.
+
+**Why.** The refusal gate is `top < threshold`, compared at full float
+precision. The sentence explaining that decision was two `.4f` fields, so a
+near miss published `top_score=0.8500 below threshold=0.8500` — a sentence
+that contradicts itself, on the response path of the demo product, at exactly
+the margin where a caller asking "why did this query refuse?" reads it most
+carefully. Measured through the public API before any edit: three different
+margins all rendered that same string, while the control (`0.5` against
+`0.85`) rendered correctly.
+
+Nothing in the suite could go red over this. The *verdict* is correct in every
+colliding case, so no assertion about refuse-or-answer can fire; the defect
+existed only in the prose. The data was never wrong either — `Refusal.top_score`
+and `.used_threshold` carried the full floats throughout, the same split
+`embedding-model-shootout#149` found between a correct aggregate and a
+collapsed table.
+
+**What does not transfer from the siblings.** This is the third spelling of a
+class `prompt-regression-suite` (D-012) and `llm-eval-harness` (D-026) already
+fixed, and two things about theirs are wrong here.
+
+`places` is a **required** keyword argument rather than a default. Centralising
+inline formatters onto a helper with a hardcoded width silently re-renders
+every call site that disagreed with it — the regression `llm-eval-harness#252`
+shipped — and this module renders at four places where both siblings render at
+three.
+
+More interesting: both siblings cap the widening loop at 17 places and argue
+that always separates two distinct values, because their operands live near
+magnitude 1 (a cosine in `[-1, 1]`, a threshold in `(0, 1]`). Neither bound
+holds here. `_top_score` is documented negative-capable (#69) and
+`_validate_threshold` accepts any finite float on purpose. Measured: at a
+magnitude of `1e-5` — an unremarkable fused score — `math.nextafter(1e-5, inf)`
+is a distinct double that still renders identically at 17 places and needs 25.
+So the `repr` fallback is load-bearing here rather than a subnormal-scale
+formality, and its arm pins it at `1e-5` rather than at subnormal scale. The
+argument was rewritten rather than inherited.
+
+**The same-precision half is the one that is easy to miss, and the measurement
+says why.** Built and ran the "widen only the score side" neighbour: the
+*ordering* arm goes red on 2 of 5 rows, while the *structural* same-number-of-
+decimal-places arm goes red on all 5. Three rows stay green under the ordering
+arm because `top` is the side carrying the long expansion — which it is
+whenever the threshold is a round configured number, and `_DEFAULT_THRESHOLD`
+is `0.02`.
+
+The second row that *does* catch it catches it for a reason nobody predicted.
+`negative-top-score-#69-region` goes red not because the threshold carries the
+expansion, but because rounding the *narrow* side away from zero flips the
+comparison: `-1234.567890123` is greater than the rounded `-1234.5679`. That
+is a second way the mismatch lies, and a table built only from positive scores
+would never have surfaced it. Put a negative row in every comparison-rendering
+table.
+
+**Alternatives considered.** Each of these was built and run, not reasoned
+about.
+- *A wider fixed width (`.8f`).* Rejected: 4 collapse cells still red, and it
+  breaks the ordinary-refusal byte-identity arm (2 red). `.4f` here was already
+  wider than the `.3f` that collided in `prs#175`.
+- *Widen only the side that needs it.* Rejected: 10 red on the structural arm.
+- *Round the comparison to match the display.* Rejected: it makes the gate less
+  precise to make the message consistent. Five repos have now rejected this.
+- *A defaulted `places` inside the helper.* Rejected: at 3 it republishes the
+  ordinary refusal as `0.500` (2 red) — the `leh#252` regression exactly.
+- *No `repr` fallback, just cap at 17.* Rejected: 1 red at `1e-5`.
+- *A bare `range(places, MAX + 1)`.* Rejected: 1 red — a caller width past the
+  ceiling falls straight to `repr`, silently discarding the width it asked for.
+- *Share one formatter across the three repos.* Rejected: separate
+  distributions with no dependency between them. The duplication is the honest
+  trade, and it is written down here so it does not read as accidental.
+
+**Population, discovered rather than listed.** The two backends carried
+byte-identical f-strings and a third backend is the obvious next change to
+`generator.py`, so an AST arm rejects *any* f-string in that module carrying
+two fixed-precision interpolations — cross-checked against the set of classes
+defining `generate` (minus the `Protocol`), so the rule cannot end up walking
+an empty corpus and the test module's backend list cannot drift behind it.
