@@ -2850,3 +2850,30 @@ parse as YAML, and did not before this change either: D-017's
 explicitly scoped itself there, so this file and key are uncovered. The new
 D-021 entry quotes its items and parses standalone. Worth checking the other
 eleven repos next session.
+
+## 2026-09-28 — Issue #227: frozen records sharing containers
+**Duration:** ~24 min · **Branch:** `session/2026-09-28-0734-issue-227`
+
+- All five frozen records with a container field held the caller's object.
+  `frozen=True` stops a rebind and nothing else, so each stayed editable in place.
+  They now copy at their own constructor — deeply over `dict`/`list` for the four
+  `dict[str, Any]` rows, and with a plain `dict(...)` for `CostRecord.per_phase_ms`,
+  whose declared element type is `float`.
+- The issue named two containers shared between records across internal seams.
+  There are four, and the two it did not name reach the wire: `_chunk_to_event`
+  put the retrieval result's live `metadata` and `ranks` into the `retrieved`
+  event's payload, so editing that result changed the SSE frame of an event that
+  had already been yielded.
+- The first draft ported the copy recursively from `llm-eval-harness`, and this
+  repo's own SSE totality suite went eight red — deep nesting raised and a
+  circular payload never terminated. The neighbouring function in the same file
+  had already been rewritten iteratively for exactly that reason.
+
+**Why this work, this session:** it was the repo's only open issue, and the PR it
+was blocked behind merged in this session's Phase A.
+
+**Open questions / blockers:** none. `llm-eval-harness#259` was filed — the source
+of the port is still recursive, and a cyclic `provenance` raises from `Example`'s
+own constructor.
+
+**Next session:** `llm-eval-harness#259` is unblocked once that repo's PR merges.

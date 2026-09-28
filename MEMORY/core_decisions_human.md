@@ -563,3 +563,92 @@ byte-identical f-strings and a third backend is the obvious next change to
 two fixed-precision interpolations — cross-checked against the set of classes
 defining `generate` (minus the `Protocol`), so the rule cannot end up walking
 an empty corpus and the test module's backend list cannot drift behind it.
+
+## D-022 — A frozen record copies its container field at its own constructor (2026-09-28)
+
+**Decision:** Every frozen dataclass in `rag_kit` that holds a container field
+copies it in `__post_init__`. The four `dict[str, Any]` rows — `Citation`,
+`Candidate`, `ScoredCandidate` and `StreamEvent` — copy deeply over `dict` and
+`list` through `rag_kit.io_utils.copy_json_value`. `CostRecord.per_phase_ms`
+takes a plain `dict(...)`, because its declared element type is `float`.
+
+**Why:** `frozen=True` prevents *rebinding* an attribute and says nothing about
+the object the attribute points at. All five records were editable in place
+through any reference the caller still held, with no `FrozenInstanceError`
+anywhere, because nothing was ever rebound.
+
+The issue named two containers shared *between records across internal seams*.
+There are four, and the two it did not name are the ones that reach the wire.
+`streaming._chunk_to_event` put the `RetrievalResult`'s live `metadata` and
+`ranks` dicts straight into the `retrieved` event's payload, and `to_sse`
+serializes that payload — so editing a retrieval result changed the SSE frame of
+an event that had already been yielded, with no caller-supplied dict involved
+anywhere. Fixing `StreamEvent`'s constructor closed that seam for free, because
+the deep copy reaches `payload["chunks"][i]["metadata"]`.
+
+**The repo's own suite caught the first draft, and that is the lesson worth
+keeping.** `copy_json_value` was ported recursively from `llm-eval-harness`'
+D-027, and `tests/test_sse_frame_totality.py` went eight red: a payload nested
+three thousand levels raised `RecursionError`, and a circular payload recursed
+forever. `streaming._json_safe` had already been rewritten iteratively for
+exactly that, and its docstring says why — a helper added to guarantee frame
+validity must not blow the stack before `json.dumps` is reached. The recursive
+port reintroduced it one call *earlier* than the seam `_json_safe` protects.
+Porting a helper means porting it into this repo's constraints, not its source
+repo's.
+
+A cycle is **preserved** rather than replaced with a marker. A copier is not a
+sanitizer: the result is isomorphic to the input, so `_json_safe` still sees the
+back-reference and still names it on the wire. The `id()`-keyed memo that makes
+that work also preserves the input's *sharing* structure — two keys pointing at
+one dict still point at one dict afterwards, a fresh one — which the recursive
+version silently expanded into independent copies, and which is what keeps a
+DAG-shaped payload linear rather than exponential.
+
+**The `CostRecord` asymmetry is the same question giving the opposite answer.** A
+shallow copy is complete exactly when the element type is proved immutable.
+`Mapping[str, float]` proves it; `dict[str, Any]` does not. `Mapping` is also not
+necessarily a `dict`, so `copy_json_value` would hand a non-dict mapping straight
+back. That premise lives in an annotation, so the annotation is locked: widening
+it is what would silently turn a correct shallow copy into the defect, and
+nothing else would say so. `CostRecord.build` has copied since it was written;
+the bare constructor was the unguarded half, and it is public.
+
+**Alternatives considered:**
+- *A shallow `dict(...)` at every new site* — rejected, built and run, 8 red.
+  The decisive probe: a shallow copy *is* the defect, so an arm asking only "was
+  it copied at all" is satisfied by the bug.
+- *The recursive `copy_json_value`* (the first draft) — rejected, built and run,
+  4 red in the new module and 12 across the suite.
+- *`copy.deepcopy`* — rejected, built and run, 2 red new and 7 across the suite.
+  It is recursive, so deep nesting raises, and it changes the tuple behaviour
+  this decision states.
+- *Replace a cycle with a marker inside the copy* — rejected. It moves a
+  wire-format decision into a record constructor.
+- *Patch `_chunk_to_event` directly* — rejected. The `StreamEvent` constructor
+  is the deeper boundary and covers it.
+- *Copy the five rows and leave the cross-seam sharing* — rejected. The issue
+  asked for it to be decided, and a frozen record owning its own data is what
+  `frozen` reads as.
+- *Fix the non-frozen rows too* — rejected. They make no immutability claim; it
+  would be a guard with no harm to name.
+
+**Cleared by name.** `Document.metadata`, `RetrievalResult.metadata`,
+`RetrievalResult.ranks` and the four `PhaseTimings` lists are container fields on
+non-frozen dataclasses. Pinned in an arm so the next sweep reads a result, and so
+that freezing one later trips the population arm rather than passing quietly.
+
+**A measured limitation, pinned rather than hidden.** A mutable container nested
+inside a `tuple` stays shared. Rebuilding a tuple loses a `namedtuple`'s class,
+which is the measured reason D-027 drew the same line — and it is reachable here
+rather than academic, because this package's write seam is lenient where that one
+is strict.
+
+**Filed as a cross-repo sibling:** `llm-eval-harness#259`. The source of the port
+is still recursive, and `Example(provenance=<cyclic>)` raises `RecursionError`
+from its own constructor — upstream of the iterative walk whose docstring argues
+that a `RecursionError` escapes a caller's `except ValueError`.
+
+**Reversibility:** Cheap.
+
+**Related issues:** #227, #71, llm-eval-harness#254, llm-eval-harness#259
