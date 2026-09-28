@@ -29,6 +29,8 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Any, Protocol
 
+from .io_utils import copy_json_value
+
 
 @dataclass(frozen=True)
 class Candidate:
@@ -37,6 +39,21 @@ class Candidate:
     external_id: str
     text: str
     metadata: dict[str, Any]
+
+    def __post_init__(self) -> None:
+        """Copy *metadata* so the frozen record owns it (#227, D-022).
+
+        `frozen=True` stops a caller rebinding the attribute and says nothing
+        about the object it points at, so without this the caller's dict — and
+        anything nested inside it — stays editable through the reference they
+        still hold. Deep over `dict`/`list`, because `Any` proves nothing about
+        the values and a shallow copy *is* the defect.
+
+        `StreamingPipeline.run` builds a `Candidate` from the
+        `RetrievalResult`'s dict, so this is also where the
+        retrieval -> rerank seam stops sharing one object.
+        """
+        object.__setattr__(self, "metadata", copy_json_value(self.metadata))
 
 
 @dataclass(frozen=True)
@@ -48,6 +65,21 @@ class ScoredCandidate:
     metadata: dict[str, Any]
     rerank_score: float  # backend-specific scale; higher = more relevant
     rerank_rank: int  # 1-indexed position in the reranked list
+
+    def __post_init__(self) -> None:
+        """Copy *metadata* so the frozen record owns it (#227, D-022).
+
+        `frozen=True` stops a caller rebinding the attribute and says nothing
+        about the object it points at, so without this the caller's dict — and
+        anything nested inside it — stays editable through the reference they
+        still hold. Deep over `dict`/`list`, because `Any` proves nothing about
+        the values and a shallow copy *is* the defect.
+
+        All three `ScoredCandidate` construction sites in this module pass the
+        input `Candidate`'s dict straight through, so before this a rerank
+        result and its input shared one object.
+        """
+        object.__setattr__(self, "metadata", copy_json_value(self.metadata))
 
 
 class Reranker(Protocol):

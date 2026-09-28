@@ -31,7 +31,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Literal, Protocol
 
-from .io_utils import atomic_write_text
+from .io_utils import atomic_write_text, copy_json_value
 from .reranker import Candidate, Reranker
 from .retriever import RetrievalResult
 
@@ -61,6 +61,25 @@ class StreamEvent:
     type: EventType
     payload: dict[str, Any]
     elapsed_ms: float
+
+    def __post_init__(self) -> None:
+        """Copy *payload* so the frozen record owns it (#227, D-022).
+
+        `frozen=True` stops a caller rebinding the attribute and says nothing
+        about the object it points at, so without this the caller's dict — and
+        anything nested inside it — stays editable through the reference they
+        still hold. Deep over `dict`/`list`, because `Any` proves nothing about
+        the values and a shallow copy *is* the defect.
+
+        This is the row with a published artifact: `to_sse` serializes
+        `payload`, and `_chunk_to_event` put the `RetrievalResult`'s live
+        `metadata` and `ranks` dicts into the `retrieved` event. An already
+        yielded, already frozen event's SSE frame changed when the retrieval
+        result was edited afterwards — no caller-supplied dict involved. The
+        deep copy reaches `payload["chunks"][i]["metadata"]`, which is why this
+        one `__post_init__` closes that seam too.
+        """
+        object.__setattr__(self, "payload", copy_json_value(self.payload))
 
 
 def _now_ms() -> float:
