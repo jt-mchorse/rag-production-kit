@@ -43,6 +43,18 @@ mirroring the reranker pattern: a dep-free `TemplateGenerator` for
 hermetic CI, and an `AnthropicGenerator` behind the `[rag-anthropic]`
 extra.
 
+A refusal's `detail` is prose that asserts an ordering — `top_score=…
+below threshold=…` — while the gate that produced it compares at full
+float precision. Rendering both sides at a fixed four places made that
+sentence contradict itself at a near miss: a `top_score` of
+`0.84999999` against a threshold of `0.85` published `top_score=0.8500
+below threshold=0.8500`. Nothing in the suite could go red over it,
+because the *verdict* was correct in every such case. `detail` now
+widens only while the two render identically and always shows both
+sides at the same precision (D-021); ordinary refusals are unchanged,
+and `Refusal.top_score` / `.used_threshold` carried the full values
+throughout.
+
 "Every claim sentence" is carried by a sentence splitter, and the hard part
 is abbreviations: a fragment ending in one is merged into the next so its
 lone `[cite:...]` marker still counts. When an abbreviation *also* spells
@@ -132,7 +144,7 @@ a Python backend ([#8]).
 
 ## Architecture
 
-Eight runtime layers ship today: hybrid retrieval + RRF fusion (#1), opt-in cross-encoder reranking (#2), pre-retrieval query rewriting (#3), generator + citation enforcement + structured refusal (#4), typed SSE streaming pipeline (#5), cost telemetry with a 24-hour dashboard (#6), eval-harness integration with composite PR comments (#7), and a Next.js demo speaking the same SSE protocol as the Python demo (#8). Index and query paths, the full per-layer detail, and the design decisions behind each one (D-002…D-020) live in **[docs/architecture.md](docs/architecture.md)**.
+Eight runtime layers ship today: hybrid retrieval + RRF fusion (#1), opt-in cross-encoder reranking (#2), pre-retrieval query rewriting (#3), generator + citation enforcement + structured refusal (#4), typed SSE streaming pipeline (#5), cost telemetry with a 24-hour dashboard (#6), eval-harness integration with composite PR comments (#7), and a Next.js demo speaking the same SSE protocol as the Python demo (#8). Index and query paths, the full per-layer detail, and the design decisions behind each one (D-002…D-021) live in **[docs/architecture.md](docs/architecture.md)**.
 
 ## Quickstart
 

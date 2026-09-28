@@ -2808,3 +2808,45 @@ entry is the correction.
 **Open questions / blockers:** none. All seventeen names resolve today — this closed a latent gap, not a live `ImportError`.
 
 **Next session:** nothing outstanding on this issue. Worth noting that porting the sibling fix from `chunking-strategies-lab` verbatim would have walked five of six snippets; the ported regex was only caught by running it and printing what it found.
+
+---
+
+### 2026-09-25 — #225: a refusal that told the caller two equal numbers were unequal
+
+`Refusal.detail` is prose asserting an ordering, produced by a gate that
+compares at full float precision. Rendering both sides at a fixed four places
+made the sentence contradict itself at a near miss — `top_score=0.8500 below
+threshold=0.8500`. That string is what a caller gets back when they ask why a
+query refused, so it was wrong in exactly the situation where it matters most.
+Nothing in the suite could have caught it: the verdict is correct in every
+colliding case, and the stored floats were right all along.
+
+Both generator backends now render through a local `render_comparison`, which
+widens only while the two values look the same and always shows both sides at
+the same precision.
+
+The interesting part was *not* copying the two sibling fixes this class already
+has elsewhere in the portfolio. Two of their arguments are false here. Their
+helper defaults its width; this module renders at four places where they render
+at three, so a default would have quietly narrowed every refusal — the same
+regression `llm-eval-harness#252` shipped. And both bound their widening loop at
+17 decimal places, justified by operands that live near magnitude 1. This repo's
+scores are unbounded finite floats, and at `1e-5` — an ordinary fused score —
+two adjacent doubles still collide at 17 places and need 25. The `repr` fallback
+is load-bearing here rather than a formality, so it gets its own arm.
+
+Six wrong neighbours were built and run rather than reasoned about. The most
+useful result: against the "widen only one side" neighbour, an arm checking the
+*ordering* reads correctly fires on 2 of 5 rows, while an arm checking the two
+sides have the *same number of decimal places* fires on all 5. And the second
+row that does catch it catches it for an unpredicted reason — rounding the
+narrow side away from zero flips the comparison on a negative score. A table
+built only from positive numbers would never have shown that.
+
+**Open question for JT.** This repo's `MEMORY/core_decisions_ai.md` does not
+parse as YAML, and did not before this change either: D-017's
+`related_issues: [#188, #106, #5]` is an unquoted bare-`#` flow sequence.
+`portfolio-ops` D-010 settled this for `followups` in `full_history_ai.md` and
+explicitly scoped itself there, so this file and key are uncovered. The new
+D-021 entry quotes its items and parses standalone. Worth checking the other
+eleven repos next session.

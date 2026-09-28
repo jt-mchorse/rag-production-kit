@@ -305,6 +305,58 @@ ferries to the client and the Next.js demo (#8) renders as chips.
   (low fused score, low max similarity) and post-LLM when the model
   produced a citation that doesn't match any candidate chunk. Two
   failure modes, two checks, one `Refusal` type.
+- **D-021 (#225).** The refusal detail renders `top_score` and
+  `threshold` so the ordering the sentence asserts stays readable:
+  widening from four places only while the two render identically, both
+  sides always at the same precision, and `repr` when no width in the
+  budget separates them. The gate is `top < threshold` at full float
+  precision and the explanation was two `.4f` fields, so a near miss
+  published `top_score=0.8500 below threshold=0.8500` — a
+  self-contradicting sentence on the response path, at exactly the
+  margin where a caller asking "why did this refuse?" reads it most
+  carefully. Nothing in the suite could go red over it: the *verdict*
+  is correct in every colliding case, so the defect existed only in the
+  prose. The data was never wrong — `Refusal.top_score` and
+  `.used_threshold` carried the full floats all along, the same split
+  `embedding-model-shootout#149` found between a correct aggregate and
+  a collapsed table.
+
+  Three things this decision is deliberately *not*. It is not a wider
+  fixed width: `.4f` here was already wider than the `.3f` that
+  collided in `prompt-regression-suite#175`, and `.8f` moves the margin
+  without closing the class. It is not a rounding of the comparison to
+  match the display — that makes the gate less precise to make the
+  message consistent, and this portfolio has now rejected it in five
+  repos. And it is not a shared dependency: `render_comparison` lives
+  in `rag_kit/comparison.py`, duplicated from D-012 and
+  `llm-eval-harness` D-026 rather than shared, because the three are
+  separate distributions with no dependency between them.
+
+  Two details diverge from those siblings and are the reason this is a
+  local module rather than a copy. First, `places` is a **required**
+  keyword argument: centralising inline formatters onto a helper with a
+  hardcoded width silently re-renders every call site that disagreed
+  with it, which is the regression `llm-eval-harness#252` shipped, and
+  this module renders at four places where both siblings render at
+  three. Second, both siblings cap the widening loop at 17 places and
+  argue that always separates two distinct values, because their
+  operands live near magnitude 1. Neither bound holds here —
+  `_top_score` is negative-capable by #69 and `_validate_threshold`
+  accepts any finite float — and at a magnitude of `1e-5`, an
+  unremarkable fused score, adjacent doubles still collide at 17 places
+  and need 25. So the `repr` fallback is load-bearing in this repo
+  rather than a subnormal-scale formality, and a test pins it at `1e-5`
+  against `math.nextafter` rather than at subnormal scale.
+
+  The population is discovered, not listed: `generator.py`'s two
+  backends carried byte-identical f-strings and a third backend is the
+  obvious next change to that file, so an AST arm rejects *any*
+  f-string in the module carrying two fixed-precision interpolations,
+  cross-checked against the set of classes defining `generate` so the
+  rule cannot end up walking an empty corpus. Ordinary refusals are
+  byte-identical — `top_score=0.5000 below threshold=0.8500` does not
+  move — and that arm is green against the unfixed tree on purpose: it
+  is the one that rejects a fix which widened everything.
 
 ---
 
