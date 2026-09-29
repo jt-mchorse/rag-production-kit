@@ -43,7 +43,9 @@ rows.
 from __future__ import annotations
 
 import ast
+import collections
 import dataclasses
+import json
 import sys
 from pathlib import Path
 from typing import Any
@@ -361,21 +363,259 @@ def test_shared_substructure_stays_shared_in_the_copy() -> None:
     assert copied["left"] is not inner
 
 
-def test_a_mutable_container_inside_a_tuple_stays_shared() -> None:
-    """A measured limitation, pinned so it reads as a decision rather than an oversight.
+def test_a_mutable_container_inside_a_tuple_is_copied_too() -> None:
+    """Was a pinned limitation; is now the rule (#229, D-023).
 
-    The copy recurses over `dict`/`list` only. Rebuilding a tuple would lose a
-    `namedtuple`'s class, which is the measured reason `llm-eval-harness`' D-027
-    drew the same line. It is *reachable* here rather than academic, because
-    this package's write seam is lenient: `_json_safe` coerces a tuple to a JSON
-    array instead of refusing the record.
+    The arm this replaces asserted the *sharing*, and its own failure message
+    said: "the tuple case is now covered — update this arm and D-022 rather than
+    deleting it, and say what happens to a namedtuple's class". Both halves are
+    answered here and in
+    `test_a_namedtuple_is_normalised_to_its_base_class_and_that_costs_nothing`.
+
+    D-022 priced the tuple exclusion at a `namedtuple`'s class. That price is
+    already paid by `streaming._new_container`, which flattens every tuple to a
+    list before `json.dumps` is reached, so nothing a caller observes through
+    this package was ever going to see the class.
     """
     inner: dict[str, Any] = {"k": "original"}
     record = _event({"pair": ("a", inner)})
     inner["k"] = "MUTATED"
-    assert record.payload["pair"][1]["k"] == "MUTATED", (
-        "the tuple case is now covered — update this arm and D-022 rather than "
-        "deleting it, and say what happens to a namedtuple's class"
+    assert record.payload["pair"][1]["k"] == "original"
+    assert isinstance(record.payload["pair"], tuple), (
+        "a tuple must stay a tuple — the walk builds it as a list shell and "
+        "freezes it, and forgetting the freeze would silently change the type "
+        "of a field a caller reads back"
+    )
+
+
+def test_an_already_yielded_frame_does_not_change_when_a_tuple_nested_list_is_edited() -> None:
+    """D-022's own headline harm, reproduced through the kind it skipped.
+
+    Its rationale leads with "editing a `RetrievalResult` changed the SSE frame
+    of an event that had already been yielded". At `ca0491b` that was still
+    reachable with one tuple in the path, which is what #229 measured.
+    """
+    inner = ["b"]
+    event = _event({"k": ("a", inner)})
+    before = to_sse(event)
+    inner.append("MUTATED-AFTER-YIELD")
+    assert to_sse(event) == before
+
+
+def test_a_namedtuple_is_normalised_to_its_base_class_and_that_costs_nothing() -> None:
+    """The accepted cost, pinned as a decision so nobody rediscovers it as a surprise.
+
+    The same test the docstring already applied to a `dict` subclass: equal to
+    its base, identical JSON, so nothing observable through this package changes.
+    A `namedtuple` passes it, and the wire seam had already decided the question.
+    """
+    point = collections.namedtuple("point", "x y")
+    copied = copy_json_value({"p": point(1, 2)})
+    assert copied["p"] == (1, 2)
+    assert type(copied["p"]) is tuple
+    assert json.dumps(copied) == json.dumps({"p": [1, 2]})
+    # ... and the frame is what it always was.
+    assert '"p": [1, 2]' in to_sse(_event({"p": point(1, 2)}))
+
+
+def test_a_set_is_copied_and_a_frozenset_is_not() -> None:
+    """The other diagonal of the rule, and the one the tuple reason never covered.
+
+    A `set` is mutable, so sharing it is the defect; every element is hashable,
+    so no mutable container is reachable through it and one level is the whole
+    depth. A `frozenset` answers no to both questions. `_json_safe` renders
+    either as `str(the_set)` via `default=`, so an aliased one changed an
+    already-published frame exactly as the tuple case did.
+    """
+    tags = {"a"}
+    event = _event({"tags": tags})
+    before = to_sse(event)
+    tags.add("MUTATED")
+    assert to_sse(event) == before
+    assert event.payload["tags"] == {"a"}
+    assert type(event.payload["tags"]) is set
+
+    shared = frozenset({"a"})
+    copied = copy_json_value({"f": shared})
+    assert copied["f"] is shared, (
+        "a frozenset is immutable and cannot contain a mutable container, so "
+        "copying it buys nothing; `isinstance(frozenset(), set)` is False, which "
+        "is what keeps the set branch from catching it"
+    )
+
+
+def test_no_mutable_container_can_be_inside_a_set() -> None:
+    """The reason the set branch does not walk, as a test rather than as prose.
+
+    "One level is the whole depth for a `set`" is an argument, and an argument is
+    not an arm — a neighbour that *does* walk into the set is **0 red** against
+    every other test here, because for hashable elements it computes the same
+    answer more slowly. It is redundant, not wrong, and no assertion about the
+    copy's output can separate the two.
+
+    What *is* falsifiable is the premise: Python refuses to put a mutable
+    container in a set at all. Pinned here so the claim in `copy_json_value`'s
+    table is checked rather than trusted, and so a future element kind that turns
+    out to be both hashable and mutable fails loudly on this line.
+    """
+    # A tuple *containing* a mutable is unhashable for the same reason, which is
+    # what makes the set branch safe rather than lucky: the tuple case cannot
+    # hide inside the set case.
+    for mutable in ({}, [], set(), bytearray(), ([],)):
+        with pytest.raises(TypeError, match="unhashable"):
+            set().add(mutable)
+
+
+def test_a_cycle_through_a_tuple_is_copied_isomorphically() -> None:
+    """A tuple cannot close a cycle alone, but it can sit inside one.
+
+    `a = []; t = (a,); a.append(t)` is legal: the tuple holds an object that
+    already existed, and the *list* closes the loop. That mutable link is what
+    makes the deferred freeze work — the tuple's parents are patched after it is
+    frozen, and a parent in a cycle is always mutable.
+    """
+    a: list[Any] = []
+    a.append((a,))
+    copied = copy_json_value(a)
+    assert copied is not a
+    assert isinstance(copied[0], tuple)
+    assert copied[0][0] is copied
+
+
+def test_a_tuple_directly_inside_a_tuple_is_frozen_child_first() -> None:
+    """The arm that rejects a freeze in *discovery* order, and it needed adding.
+
+    Every other tuple arm here happens to put a `dict` or `list` between the two
+    tuples, and on that shape either order works — which is why a neighbour that
+    froze parents first was **0 red** until this arm existed. Directly nested is
+    the separating case: freezing the outer shell first captures the inner one
+    while it is still a list, and patching the inner one afterwards writes into
+    the pre-freeze shell that nothing points at any more.
+
+    So the assertion is on the *type* two levels down, not on the values. The
+    values are right under both orders.
+    """
+    inner: list[Any] = ["x"]
+    copied = copy_json_value({"outer": ((inner,),)})
+    assert isinstance(copied["outer"], tuple)
+    assert isinstance(copied["outer"][0], tuple), (
+        "the inner tuple is still a list — the freeze ran parents-first, so the "
+        "outer tuple captured an unfrozen shell"
+    )
+    assert isinstance(copied["outer"][0][0], list)
+    inner.append("MUTATED")
+    assert copied["outer"][0][0] == ["x"]
+
+
+def test_the_deferred_freeze_is_not_recursive() -> None:
+    """The `RecursionError` the iterative walk exists to avoid stays avoided.
+
+    D-022's recursive first draft put `tests/test_sse_frame_totality.py` 8 red on
+    a 3000-deep payload. The freeze pass is a flat loop over a list of shells, so
+    a deeply *tuple*-nested payload is total too — and that is the shape a
+    plausible recursive freeze would fail on while every dict/list arm stayed
+    green.
+    """
+    deep: Any = [1]
+    for _ in range(3000):
+        deep = (deep,)
+        deep = {"n": deep}
+    copied = copy_json_value(deep)
+    assert isinstance(copied, dict)
+
+
+def test_a_tuple_reached_twice_is_one_tuple_in_the_copy() -> None:
+    """Sharing preservation has to survive the freeze, and the slots are why.
+
+    Two keys pointing at one tuple still point at one tuple afterwards — a fresh
+    one. A freeze that patched only the first slot it recorded would leave the
+    second holding an unfrozen list, which is a *type* error a value-only
+    assertion cannot see.
+    """
+    shared = ({"s": 1},)
+    copied = copy_json_value({"a": shared, "b": shared})
+    assert copied["a"] is copied["b"]
+    assert copied["a"] is not shared
+    assert isinstance(copied["b"], tuple)
+
+
+# --------------------------------------------------------------------------
+# The two container sets, derived from both functions rather than listed
+# --------------------------------------------------------------------------
+
+_BUILTIN_CONTAINERS = frozenset({"dict", "list", "tuple", "set", "frozenset"})
+
+
+def _isinstance_container_kinds(module: str, function: str) -> frozenset[str]:
+    """Every builtin container `function` tests for with `isinstance`.
+
+    Derived from the AST rather than from a hand-written list, because a
+    hand-written list is exactly how the one-kind difference between these two
+    functions survived a review that quoted both of them.
+    """
+    tree = ast.parse((_PACKAGE / module).read_text(encoding="utf-8"))
+    target = next(
+        n
+        for n in ast.walk(tree)
+        if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef)) and n.name == function
+    )
+    kinds: set[str] = set()
+    for node in ast.walk(target):
+        if not isinstance(node, ast.Call):
+            continue
+        func = node.func
+        name = func.attr if isinstance(func, ast.Attribute) else getattr(func, "id", "")
+        if name != "isinstance" or len(node.args) != 2:
+            continue
+        probe = node.args[1]
+        elements = probe.elts if isinstance(probe, (ast.Tuple, ast.List)) else [probe]
+        for element in elements:
+            text = ast.unparse(element)
+            if text in _BUILTIN_CONTAINERS:
+                kinds.add(text)
+    return frozenset(kinds)
+
+
+def test_the_copy_walks_at_least_every_kind_the_wire_seam_walks() -> None:
+    """The invariant #229 exists for: a copy may not be narrower than what it feeds.
+
+    `StreamEvent.__post_init__` copies the payload and `to_sse` serializes it, so
+    the immutability claim on that record is void on exactly the difference
+    between these two sets. At `ca0491b` the difference was `tuple`, and both
+    functions' docstrings quoted each other while the difference sat between
+    them.
+
+    Derived from the source of both functions. A future `_new_container` that
+    learned about another kind would trip this arm rather than opening the same
+    gap again in the other direction.
+    """
+    copy_kinds = _isinstance_container_kinds("io_utils.py", "copy_json_value")
+    wire_kinds = _isinstance_container_kinds("streaming.py", "_new_container")
+    assert wire_kinds, "the walk found no isinstance container probe in _new_container"
+    assert copy_kinds, "the walk found no isinstance container probe in copy_json_value"
+    missing = sorted(wire_kinds - copy_kinds)
+    assert not missing, (
+        f"`_new_container` treats {missing} as containers and `copy_json_value` "
+        f"does not, so a mutable object reachable through one of those kinds is "
+        f"still the caller's when it reaches the wire (#229, D-023). "
+        f"copy={sorted(copy_kinds)} wire={sorted(wire_kinds)}"
+    )
+
+
+def test_the_derivation_is_not_vacuous_and_names_the_kinds_it_found() -> None:
+    """A pass over two empty sets is not a pass.
+
+    Pins the derived sets by value as well, so a walk that silently stopped
+    finding `isinstance` calls (a rename, a refactor to a match statement) fails
+    loudly here instead of making the superset check trivially true. The
+    asymmetry that remains is deliberate and the other direction: the copy knows
+    about `set` and `frozenset`, which the wire seam hands to `default=`.
+    """
+    assert _isinstance_container_kinds("io_utils.py", "copy_json_value") == frozenset(
+        {"dict", "list", "tuple", "set"}
+    )
+    assert _isinstance_container_kinds("streaming.py", "_new_container") == frozenset(
+        {"dict", "list", "tuple"}
     )
 
 
