@@ -41,6 +41,7 @@ from dataclasses import dataclass, field
 from typing import Any, Protocol
 
 from .comparison import render_comparison
+from .io_utils import copy_json_value
 from .retriever import RetrievalResult
 
 _DEFAULT_THRESHOLD = 0.02  # tuned against the in-repo retrieval tests; >0 by construction
@@ -278,6 +279,21 @@ class Citation:
     external_id: str
     text: str
     metadata: dict[str, Any] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        """Copy *metadata* so the frozen record owns it (#227, D-022).
+
+        `frozen=True` stops a caller rebinding the attribute and says nothing
+        about the object it points at, so without this the caller's dict — and
+        anything nested inside it — stays editable through the reference they
+        still hold. Deep over `dict`/`list`, because `Any` proves nothing about
+        the values and a shallow copy *is* the defect.
+
+        `_extract_citations` builds a `Citation` from the `RetrievalResult`
+        it cites, so before this the two records shared one dict and editing a
+        citation's metadata edited the retrieval result's.
+        """
+        object.__setattr__(self, "metadata", copy_json_value(self.metadata))
 
 
 @dataclass(frozen=True)

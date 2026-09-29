@@ -608,6 +608,50 @@ end-to-end but the SSE shape was subtly different for a React consumer.
   Python demo, not a new wire format. The streaming layer's job is to
   emit one canonical event shape; each demo is a thin renderer over it.
 
+- **D-022 (#227).** Every frozen dataclass holding a container field
+  copies it at its own constructor: deeply over `dict`/`list` through
+  `rag_kit.io_utils.copy_json_value` for the four `dict[str, Any]` rows
+  (`Citation`, `Candidate`, `ScoredCandidate`, `StreamEvent`), and with
+  a plain `dict(...)` for `CostRecord.per_phase_ms`. `frozen=True`
+  prevents *rebinding* an attribute and says nothing about the object
+  the attribute points at, so all five were editable in place through
+  any reference the caller still held, and nothing raised on the way,
+  because nothing was ever rebound.
+
+  Four containers were shared between records across internal seams,
+  with no caller-supplied dict involved: `RetrievalResult.metadata` into
+  `Citation` (generator) and into `Candidate` (streaming), `Candidate`
+  into `ScoredCandidate` (reranker, three sites), and —
+  the row with a published artifact — `RetrievalResult.metadata` *and*
+  `.ranks` into the `retrieved` event's payload via `_chunk_to_event`.
+  `to_sse` serializes that payload, so editing a retrieval result
+  changed the SSE frame of an event that had already been yielded. One
+  fix at `StreamEvent.__post_init__` closes that seam too, because the
+  deep copy reaches `payload["chunks"][i]["metadata"]`.
+
+  `copy_json_value` is **iterative with an `id()`-keyed memo**, and that
+  is not a style choice. Ported recursively from `llm-eval-harness`'
+  D-027, it took `tests/test_sse_frame_totality.py` eight red: three
+  thousand levels raised `RecursionError` and a circular payload
+  recursed forever. `_json_safe` had already been rewritten iteratively
+  for exactly that; the recursive port reintroduced it one call earlier
+  than the seam `_json_safe` protects. A cycle is **preserved** rather
+  than marked — a copier is not a sanitizer, and replacing it here would
+  move a wire-format decision into a record constructor. The memo also
+  preserves the input's sharing structure, which the recursive version
+  silently expanded into independent copies.
+
+  `CostRecord.per_phase_ms` is the one shallow copy, and the asymmetry
+  is the point: a shallow copy is complete exactly when the element type
+  is proved immutable. `Mapping[str, float]` proves it, `dict[str, Any]`
+  does not, and `Mapping` is not necessarily a `dict`. That premise
+  lives in an annotation, so the annotation is locked.
+
+  Cleared by name: the seven container fields on the four **non-frozen**
+  dataclasses (`Document`, `RetrievalResult`, `PhaseTimings`) make no
+  immutability claim. Pinned in an arm so freezing one later trips the
+  population rule rather than passing quietly.
+
 ---
 
 ## Where to look next

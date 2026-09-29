@@ -154,6 +154,28 @@ class CostRecord:
     total_latency_ms: float
     per_phase_ms: Mapping[str, float] = field(default_factory=dict)
 
+    def __post_init__(self) -> None:
+        """Copy *per_phase_ms* so the frozen record owns it (#227, D-022).
+
+        `dict(...)` and deliberately **not** `copy_json_value`, which is the one
+        asymmetry in this change. The declared element type is `float`, which is
+        immutable, so one level is the whole depth — the same "check the copy's
+        depth against the declared element type" question the other four records
+        answer the other way, because `dict[str, Any]` proves nothing about its
+        values. `Mapping` is also not necessarily a `dict`, and
+        `copy_json_value` would hand any other mapping straight back.
+
+        `CostRecord.build` has done exactly this since it was written; the bare
+        constructor is the unguarded half, and it is public via `__all__`.
+        `TelemetryStore.append` serializes this field, so an alias reaches the
+        persisted row.
+
+        `tests/test_frozen_record_metadata_aliasing.py` locks the annotation:
+        widening it past `Mapping[str, float]` makes the shallow copy wrong, and
+        nothing else would say so.
+        """
+        object.__setattr__(self, "per_phase_ms", dict(self.per_phase_ms))
+
     @staticmethod
     def build(
         *,

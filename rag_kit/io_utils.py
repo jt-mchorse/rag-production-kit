@@ -1,4 +1,4 @@
-"""Atomic write helper.
+"""Atomic write helper, and the copy a frozen record needs for a free-form field.
 
 `Path.write_text` is not atomic: SIGINT/SIGTERM/disk-full/OOM between
 the implicit `open(..., "w")` truncate and `close()` flush leaves the
@@ -20,6 +20,7 @@ import contextlib
 import os
 import tempfile
 from pathlib import Path
+from typing import Any
 
 # Cap the target basename's contribution to the temp filename. The temp name
 # is `.<base>.<random>.tmp`; the affixes add ~20 bytes, so prepending a full
@@ -105,3 +106,104 @@ def atomic_write_text(path: str | Path, text: str) -> None:
         if tmp_path is not None:
             with contextlib.suppress(FileNotFoundError):
                 tmp_path.unlink()
+
+
+def copy_json_value(value: Any) -> Any:
+    """Copy a JSON value deeply over *containers*, leaving everything else alone.
+
+    The copy a frozen record needs for a free-form JSON field, and the one
+    ``dict(...)`` is not (#227).
+
+    ``frozen=True`` prevents *rebinding* an attribute. It says nothing about the
+    object the attribute points at, so a ``dict`` field on a frozen record is
+    editable in place through any reference the caller still holds, with no
+    ``FrozenInstanceError`` anywhere, because nothing is ever rebound. All five
+    of this package's frozen records with a container field were in that state:
+    ``Citation.metadata``, ``Candidate.metadata``, ``ScoredCandidate.metadata``,
+    ``StreamEvent.payload`` and ``CostRecord.per_phase_ms``.
+
+    **Not ``dict(...)``, which is the trap this function exists to avoid.** The
+    defect *is* a shallow copy relationship, so a fix that re-spells one would
+    pass any arm that only asks "was it copied at all". ``metadata`` is declared
+    ``dict[str, Any]``; ``Any`` proves nothing about the values, and a nested
+    ``dict`` under a shallow copy is still the caller's.
+
+    **Deep over containers rather than ``copy.deepcopy``**, on purpose. The
+    contract on these fields is JSON, and every non-container JSON value --
+    ``str``, ``int``, ``float``, ``bool``, ``None`` -- is already immutable, so
+    copying them buys nothing. ``deepcopy`` would additionally recurse into
+    whatever a direct constructor happened to store there, changing the failure
+    mode for out-of-contract input (a ``deepcopy`` of an open file handle
+    raises, at a boundary whose job is to copy metadata) without making any
+    in-contract case safer.
+
+    **``dict`` and ``list`` only, and that is a decision with a measured cost.**
+    A mutable container nested inside a ``tuple`` stays shared. The alternative
+    is rebuilding the tuple, which loses a ``namedtuple``'s class -- the
+    measured reason ``llm-eval-harness``' D-027 drew the same line -- and this
+    package's write seam is *lenient* where that one is strict: ``_json_safe``
+    coerces a tuple to a JSON array rather than refusing the record, so the
+    limitation is real here rather than unreachable. It is pinned by name in
+    ``tests/test_frozen_record_metadata_aliasing.py`` so it reads as a decision
+    and not as an oversight.
+
+    A ``dict`` or ``list`` **subclass** is normalised to its base type. Both
+    compare equal to their base and serialize to identical JSON, so nothing a
+    caller can observe through this package changes. Rebuilding via
+    ``type(value)(...)`` would preserve the class for the well-behaved ones and
+    raise for any subclass with a different ``__init__`` signature -- a strictly
+    worse trade at a boundary whose contract is JSON.
+
+    **Iterative, with a memo, and that is not a style choice.** The recursive
+    one-liner is what this function was first written as, and this package's own
+    ``tests/test_sse_frame_totality.py`` went **8 red** on it: a payload nested
+    3000 levels deep raised ``RecursionError``, and a *circular* payload
+    recursed forever. ``streaming._json_safe`` had already been rewritten
+    iteratively for exactly this, and its docstring says why -- a helper added
+    to guarantee frame validity must not blow the stack before ``json.dumps``
+    is reached. Putting a recursive copy at ``StreamEvent.__post_init__`` would
+    have reintroduced that on the seam ``_json_safe`` protects, one call
+    earlier.
+
+    A cycle is **preserved**, not replaced with a marker. This is a copier, not
+    a sanitizer: the result is isomorphic to the input, so ``_json_safe`` still
+    sees the back-reference and still names it ``<circular reference>`` on the
+    wire, and ``_MAX_DEPTH`` still truncates at the same boundary. Replacing it
+    here would move a wire-format decision into a record constructor.
+
+    Duplicated from ``llm-eval-harness``' ``eval_harness/io_utils.py`` rather
+    than shared, for the reason D-021 already records for ``comparison.py``:
+    the two are separate distributions with no dependency between them. Note
+    that the sibling there **is** recursive; it is fed ``json.loads`` output,
+    which cannot contain a cycle, but ``Example`` is exported and constructible
+    directly (``llm-eval-harness#259``).
+    """
+    if not isinstance(value, (dict, list)):
+        return value
+    root: Any = {} if isinstance(value, dict) else []
+    # id(src) -> its copy. Two jobs: it terminates on a cycle, and it preserves
+    # the input's *sharing* structure, so two fields pointing at one dict still
+    # point at one dict afterwards -- a fresh one.
+    memo: dict[int, Any] = {id(value): root}
+    # Every source container stays referenced while the walk runs, so CPython
+    # cannot recycle an `id` out from under `memo`.
+    keep: list[Any] = [value]
+    stack: list[tuple[Any, Any]] = [(value, root)]
+    while stack:
+        src, dst = stack.pop()
+        items = src.items() if isinstance(src, dict) else enumerate(src)
+        for key, child in items:
+            if isinstance(child, (dict, list)):
+                copied = memo.get(id(child))
+                if copied is None:
+                    copied = {} if isinstance(child, dict) else []
+                    memo[id(child)] = copied
+                    keep.append(child)
+                    stack.append((child, copied))
+            else:
+                copied = child
+            if isinstance(dst, dict):
+                dst[key] = copied
+            else:
+                dst.append(copied)
+    return root
