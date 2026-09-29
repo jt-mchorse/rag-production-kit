@@ -652,3 +652,83 @@ that a `RecursionError` escapes a caller's `except ValueError`.
 **Reversibility:** Cheap.
 
 **Related issues:** #227, #71, llm-eval-harness#254, llm-eval-harness#259
+
+---
+
+## D-023 — the copy's container set is derived, not listed (2026-09-29)
+
+**Amends D-022.** It does not supersede it: the deep-copy posture, the iterative
+walk, the memo, cycle preservation, sharing preservation and the `CostRecord`
+shallow-copy asymmetry all stand. One clause changes — which kinds count as
+containers — and the reason the old clause gave turns out to be a cost this
+package already pays.
+
+**The rule is two questions per kind, and D-022 asked only one.**
+
+| kind | mutable itself? | can reach a mutable? | action |
+|------|-----------------|----------------------|--------|
+| `dict` | yes | yes | rebuild and walk |
+| `list` | yes | yes | rebuild and walk |
+| `tuple` | **no** | **yes** | walk, then freeze |
+| `set` | yes | **no** | rebuild, do not walk |
+| `frozenset` | no | no | return unchanged |
+
+D-022 walked the two kinds that answer yes twice and missed both diagonals. **An
+immutable container can still reach a mutable one** — that is the whole of the
+`tuple` case, and a rule phrased as "copy the mutable containers" has no way to
+say it. A `set` is the mirror: mutable, so sharing it is the defect, but every
+element is hashable, so one level is the whole depth.
+
+**The reason D-022 gave for excluding `tuple` was refuted fifteen lines later in
+its own docstring.** It priced the loss of a `namedtuple`'s class, citing
+`llm-eval-harness`' D-027 — and then observed, in the same paragraph, that "this
+package's write seam is *lenient* where that one is strict: `_json_safe` coerces
+a tuple to a JSON array rather than refusing the record". Both halves are true.
+The leniency is what makes the limitation *reachable*; it is the same leniency
+that makes the price *zero*. `streaming._new_container` line 690 reads
+`# tuple -> list, matching what json.dumps does anyway`. A `namedtuple`'s class
+was gone before any consumer ever saw the payload.
+
+And the test the docstring already applies to a `dict` subclass eight lines
+above — "compare equal to their base and serialize to identical JSON, so nothing
+a caller can observe through this package changes" — is a test a `namedtuple`
+passes. Measured: `namedtuple("P", "x y")(1, 2)` reaches the wire as `[1, 2]`,
+is `== (1, 2)`, and produces byte-identical `json.dumps` output.
+
+**The harm was D-022's own headline, through the kind it skipped.** Its rationale
+leads with "editing a `RetrievalResult` changed the SSE frame of an event that had
+already been yielded". At `ca0491b` that was still reachable with one tuple in
+the path, and a `set` did the same thing through `default=_safe_fallback`. Both
+reproduced firsthand before the issue was filed.
+
+**The invariant that replaces two hand-written lists.** An arm derives each
+helper's container set from its `isinstance` probes in the AST and asserts the
+copy's set is a **superset** of the wire seam's. The immutability claim on
+`StreamEvent` is void on exactly the difference between the two sets, and a
+hand-written list is how a one-kind difference survived a review that quoted both
+functions.
+
+**A tuple is built as a list shell and frozen in reverse discovery order**,
+because a tuple cannot be filled in place the way a `dict`/`list` shell can, and
+filling in place is what lets the memo close a cycle. Children freeze first: a
+tuple nested directly inside another is always discovered later. A cycle *through*
+a tuple is reachable — `a = []; t = (a,); a.append(t)` — even though a tuple can
+never close one alone, because it cannot hold an object that did not already
+exist. That mutable link is exactly what makes the deferred patch work.
+
+**The arm I was missing, and only a neighbour probe found it.** Every other tuple
+arm puts a `dict` or `list` between the two tuples, and on that shape either
+freeze order works — so the parents-first neighbour was **0 red** until a
+directly-nested arm existed. The assertion has to be on the *type* two levels
+down; the values are right under both orders.
+
+**And one neighbour is redundant rather than wrong.** Walking into a `set` is 0
+red against every arm, because for hashable elements it computes the same answer
+more slowly, and no assertion about the copy's output can separate the two. So
+the *premise* is pinned instead: Python refuses to put a `dict`, `list`, `set`,
+`bytearray`, or a tuple containing one, into a set at all. That turns "one level
+is the whole depth" from an argument into an arm.
+
+**Reversibility:** Cheap.
+
+**Related issues:** #229, #227, #71, #254
