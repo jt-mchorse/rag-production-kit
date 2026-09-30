@@ -26,7 +26,8 @@ densely, or both — invaluable when you're tuning a corpus.
 `Retriever.search(reranker=...)`. Two backends ship: a dep-free
 `LexicalOverlapReranker` (so CI exercises the rerank flow without
 external services) and a `CohereReranker` (production binding behind
-the `[rerank-cohere]` extra). Each result carries the reranker's
+the `[rerank-cohere]` extra and `COHERE_API_KEY`; every variable the code
+reads is in [`.env.example`](.env.example)). Each result carries the reranker's
 score and the new rank alongside the original `fused_score` and
 per-method ranks; `rerank_delta_ndcg(before, after)` quantifies how
 much the reranker actually moved things, for telemetry.
