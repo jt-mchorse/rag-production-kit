@@ -2877,3 +2877,49 @@ of the port is still recursive, and a cyclic `provenance` raises from `Example`'
 own constructor.
 
 **Next session:** `llm-eval-harness#259` is unblocked once that repo's PR merges.
+
+## 2026-09-29 — #229: the copy walked two kinds and the seam it feeds walked three (~11 min)
+
+Found by reading the scope D-022 had written down for itself, forty minutes after
+it merged. `copy_json_value` recursed over `dict` and `list` only, and its
+docstring priced the exclusion of `tuple` at the loss of a `namedtuple`'s class,
+citing `llm-eval-harness`' D-027. Fifteen lines later the same paragraph observes
+that "this package's write seam is *lenient* where that one is strict:
+`_json_safe` coerces a tuple to a JSON array rather than refusing the record."
+
+Both halves are true, and they point in opposite directions. The leniency is what
+makes the limitation **reachable** — the argument the docstring makes — and it is
+the same leniency that makes the price **zero**, which nobody checked.
+`streaming._new_container` line 690 has been flattening every tuple to a list all
+along, under the comment `# tuple -> list, matching what json.dumps does anyway`.
+The class was gone before any consumer saw the payload. And the test the docstring
+already applies to a `dict` subclass eight lines above — equal to its base,
+identical JSON, nothing observable through this package changes — is a test a
+`namedtuple` passes.
+
+The harm was D-022's own headline. Its rationale leads with "editing a
+`RetrievalResult` changed the SSE frame of an event that had already been
+yielded"; a payload of `{"k": ("a", inner_list)}` still did exactly that, and so
+did a `set` through `default=_safe_fallback`. Both reproduced firsthand before
+filing.
+
+The fix replaces a list of kinds with a rule: is the container mutable, and can it
+reach a mutable one. `dict` and `list` answer yes twice; `tuple` answers **no
+then yes**, which a rule phrased as "copy the mutable containers" cannot express;
+`set` answers yes then no; `frozenset` answers no twice. And a new standing
+invariant, derived from both functions' ASTs rather than pinned by hand: **a copy
+may not walk fewer kinds than the seam it feeds.**
+
+Two process lessons. **A partial revert is not a revert** — reverting only the
+entry guard was 0 red and I nearly reported my own arms as vacuous; every harm
+case reaches its container as a *child*, so the inner branch still handled all of
+them. And **a neighbour probe found an arm I did not have**: freezing tuples in
+discovery order was 0 red, because every tuple arm I had written put a `dict` or
+`list` between the two tuples, and on that shape either order works. Directly
+nested is the separating case, and the assertion has to be on the type two levels
+down — the values are right either way.
+
+One neighbour turned out redundant rather than wrong: walking into a `set` is 0
+red and correctly so. So the premise got pinned instead — Python refuses to put a
+mutable container, or a tuple containing one, into a set at all. Recorded as D-023,
+amending D-022 rather than superseding it.

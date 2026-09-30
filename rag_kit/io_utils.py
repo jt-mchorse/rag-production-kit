@@ -137,15 +137,53 @@ def copy_json_value(value: Any) -> Any:
     raises, at a boundary whose job is to copy metadata) without making any
     in-contract case safer.
 
-    **``dict`` and ``list`` only, and that is a decision with a measured cost.**
-    A mutable container nested inside a ``tuple`` stays shared. The alternative
-    is rebuilding the tuple, which loses a ``namedtuple``'s class -- the
-    measured reason ``llm-eval-harness``' D-027 drew the same line -- and this
-    package's write seam is *lenient* where that one is strict: ``_json_safe``
-    coerces a tuple to a JSON array rather than refusing the record, so the
-    limitation is real here rather than unreachable. It is pinned by name in
-    ``tests/test_frozen_record_metadata_aliasing.py`` so it reads as a decision
-    and not as an oversight.
+    **The container set is derived, not listed, and that is the D-023 amendment
+    to D-022.** The rule is two questions per kind, and a *list* of kinds got the
+    second one wrong:
+
+    ==========  ===============  =======================  ====================
+    kind        mutable itself?  can reach a mutable?     action
+    ==========  ===============  =======================  ====================
+    ``dict``    yes              yes                      rebuild and walk
+    ``list``    yes              yes                      rebuild and walk
+    ``tuple``   **no**           **yes**                  walk, then freeze
+    ``set``     yes              **no**                   rebuild, do not walk
+    frozenset   no               no                       return unchanged
+    ==========  ===============  =======================  ====================
+
+    D-022 walked the two kinds that answer *yes* to both and missed both
+    diagonals. An **immutable container can still reach a mutable one** -- that
+    is the whole of the ``tuple`` case, and a rule phrased as "copy the mutable
+    containers" cannot express it. A ``set`` is the mirror: mutable, so sharing
+    it is the defect, but every element is hashable and therefore no mutable
+    container is reachable *through* it, so one level is the whole depth.
+    ``frozenset`` answers no twice and is returned as-is.
+
+    **The reason D-022 gave for excluding ``tuple`` was a cost this package
+    already pays.** It priced the loss of a ``namedtuple``'s class, citing
+    ``llm-eval-harness``' D-027 -- and then observed, in the same paragraph, that
+    "this package's write seam is *lenient* where that one is strict:
+    ``_json_safe`` coerces a tuple to a JSON array rather than refusing the
+    record". Both halves are true. The leniency is what makes the limitation
+    *reachable*, and it is the same leniency that makes the price *zero*:
+    ``streaming._new_container`` has been flattening every tuple to a list all
+    along, under the comment ``# tuple -> list, matching what json.dumps does
+    anyway``. A ``namedtuple``'s class is gone before any consumer sees the
+    payload. Measured: ``namedtuple("P", "x y")(1, 2)`` reaches the wire as
+    ``[1, 2]``, compares equal to ``(1, 2)``, and produces byte-identical
+    ``json.dumps`` output -- which is exactly the test the next paragraph already
+    applies to a ``dict`` subclass.
+
+    The harm was D-022's own headline, through the kind it skipped: a
+    ``StreamEvent`` built with ``payload={"k": ("a", inner_list)}`` published one
+    SSE frame, and appending to ``inner_list`` afterwards changed the frame of an
+    event that had already been yielded.
+
+    **A copy may not walk fewer kinds than the seam it feeds.** That is the
+    invariant ``tests/test_frozen_record_metadata_aliasing.py`` now derives from
+    both functions' ASTs, rather than pinning either list by hand. The
+    immutability claim is void on exactly the difference between the two sets,
+    and a hand-written list is how a one-kind difference survived.
 
     A ``dict`` or ``list`` **subclass** is normalised to its base type. Both
     compare equal to their base and serialize to identical JSON, so nothing a
@@ -171,6 +209,23 @@ def copy_json_value(value: Any) -> Any:
     wire, and ``_MAX_DEPTH`` still truncates at the same boundary. Replacing it
     here would move a wire-format decision into a record constructor.
 
+    **A tuple is built as a list and frozen at the end, and a cycle is why that
+    is the only order that works.** A ``dict`` or ``list`` copy is a shell filled
+    in place, which is what lets the memo close a cycle -- the shell exists
+    before its contents do. A tuple cannot be filled in place, so it is walked
+    into a list shell and converted afterwards, in **reverse discovery order**: a
+    tuple nested directly inside another is always discovered later, so every
+    child is already final when its parent freezes. The slots pointing at each
+    shell are recorded so its parents learn the final object.
+
+    That handles a cycle *through* a tuple, which is reachable --
+    ``a = []; t = (a,); a.append(t)`` -- even though a tuple can never close one
+    by itself, because a tuple cannot contain an object that did not already
+    exist. The mutable link in such a cycle is what makes the patch possible:
+    ``copy_json_value(a)`` returns ``r`` with ``r[0] == (r,)`` and
+    ``r[0][0] is r``. The freeze pass is a flat loop over a list, so the
+    ``RecursionError`` the iterative walk exists to avoid is not reintroduced.
+
     Duplicated from ``llm-eval-harness``' ``eval_harness/io_utils.py`` rather
     than shared, for the reason D-021 already records for ``comparison.py``:
     the two are separate distributions with no dependency between them. Note
@@ -178,7 +233,15 @@ def copy_json_value(value: Any) -> Any:
     which cannot contain a cycle, but ``Example`` is exported and constructible
     directly (``llm-eval-harness#259``).
     """
-    if not isinstance(value, (dict, list)):
+    # A `set` is mutable, so sharing it is the defect -- but every element is
+    # hashable, so no mutable container is reachable through it and one level is
+    # the whole depth. A `frozenset` answers no to both questions and falls
+    # through to the identity return below, as does any non-container.
+    # `isinstance(frozenset(), set)` is False: the two are siblings, not
+    # subclasses, so this branch does not catch it by accident.
+    if isinstance(value, set):
+        return set(value)
+    if not isinstance(value, (dict, list, tuple)):
         return value
     root: Any = {} if isinstance(value, dict) else []
     # id(src) -> its copy. Two jobs: it terminates on a cycle, and it preserves
@@ -189,21 +252,47 @@ def copy_json_value(value: Any) -> Any:
     # cannot recycle an `id` out from under `memo`.
     keep: list[Any] = [value]
     stack: list[tuple[Any, Any]] = [(value, root)]
+    # List shells standing in for tuples, in discovery order, and every
+    # `(container, key)` slot holding each one. See the docstring: a tuple cannot
+    # be filled in place, so it is frozen after the walk, children first.
+    tuple_shells: list[Any] = [root] if isinstance(value, tuple) else []
+    slots: dict[int, list[tuple[Any, Any]]] = {}
     while stack:
         src, dst = stack.pop()
         items = src.items() if isinstance(src, dict) else enumerate(src)
         for key, child in items:
-            if isinstance(child, (dict, list)):
+            copied: Any
+            if isinstance(child, set):
+                copied = set(child)
+            elif isinstance(child, (dict, list, tuple)):
                 copied = memo.get(id(child))
                 if copied is None:
                     copied = {} if isinstance(child, dict) else []
                     memo[id(child)] = copied
                     keep.append(child)
                     stack.append((child, copied))
+                    if isinstance(child, tuple):
+                        tuple_shells.append(copied)
+                if isinstance(child, tuple):
+                    # Recorded on every *reference*, not only on discovery: a
+                    # tuple reached twice has two slots to patch, and the memo
+                    # hit above is exactly the second one.
+                    slots.setdefault(id(copied), []).append((dst, key))
             else:
                 copied = child
             if isinstance(dst, dict):
                 dst[key] = copied
             else:
                 dst.append(copied)
+    for shell in reversed(tuple_shells):
+        frozen = tuple(shell)
+        for container, key in slots.get(id(shell), ()):
+            # `container` may itself be an unfrozen tuple shell; it is still a
+            # list at this point, and it freezes later with the final value in
+            # place. Subscript assignment works for both a dict key and a list
+            # index, and the index is the key because children were appended in
+            # `enumerate` order.
+            container[key] = frozen
+        if shell is root:
+            root = frozen
     return root

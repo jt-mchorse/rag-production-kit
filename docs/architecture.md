@@ -652,6 +652,47 @@ end-to-end but the SSE shape was subtly different for a React consumer.
   immutability claim. Pinned in an arm so freezing one later trips the
   population rule rather than passing quietly.
 
+- **D-023 (#229), amending D-022.** The copy's container set is now
+  *derived* rather than listed, from two questions per kind:
+
+  | kind | mutable itself? | can reach a mutable? | action |
+  |------|-----------------|----------------------|--------|
+  | `dict` | yes | yes | rebuild and walk |
+  | `list` | yes | yes | rebuild and walk |
+  | `tuple` | **no** | **yes** | walk, then freeze |
+  | `set` | yes | **no** | rebuild, do not walk |
+  | `frozenset` | no | no | return unchanged |
+
+  D-022 walked the two kinds that answer yes twice and missed both
+  diagonals. **An immutable container can still reach a mutable one** —
+  that is the whole of the `tuple` case, and a rule phrased as "copy the
+  mutable containers" cannot express it.
+
+  The reason D-022 gave for excluding `tuple` was a cost this package
+  already pays. It priced the loss of a `namedtuple`'s class, and then
+  noted in the same paragraph that "`_json_safe` coerces a tuple to a
+  JSON array rather than refusing the record". Both halves are true: the
+  leniency is what makes the limitation reachable, and the same leniency
+  makes the price zero. `streaming._new_container` has been flattening
+  every tuple to a list all along, under the comment `# tuple -> list,
+  matching what json.dumps does anyway`. The harm was D-022's own
+  headline — a payload of `{"k": ("a", inner_list)}` published one SSE
+  frame, and appending to `inner_list` changed the frame of an event
+  already yielded.
+
+  **A copy may not walk fewer kinds than the seam it feeds.** That is
+  the invariant now derived from both functions' ASTs rather than pinned
+  by hand, because the immutability claim on `StreamEvent` is void on
+  exactly the difference between the two sets.
+
+  A tuple is built as a list shell and frozen in **reverse discovery
+  order** — it cannot be filled in place the way a `dict`/`list` shell
+  can, and filling in place is what lets the memo close a cycle. A cycle
+  *through* a tuple is reachable (`a = []; t = (a,); a.append(t)`) even
+  though a tuple can never close one alone, and that mutable link is
+  what makes the deferred patch work. The freeze pass is a flat loop, so
+  the `RecursionError` D-022 measured is not reintroduced.
+
 ---
 
 ## Where to look next
