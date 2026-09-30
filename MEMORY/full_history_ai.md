@@ -2808,3 +2808,21 @@ context_for_next_session:
   - BRANCH_NOTE_STACKED_ON_235_PR_BASE_IS_235s_BRANCH_merge_order_232_then_235_then_this_github_retargets_to_main_when_235s_branch_is_deleted
 followups: []
 ---
+
+---
+session: 2026-09-30T09:16Z
+issue: 237
+focus: A_DOCUMENTED_THRESHOLD_ABOVE_THE_CEILING_OF_THE_SCORE_IT_IS_COMPARED_WITH
+phase: shipped
+duration_min: 0   # computed from the plan comment timestamp and date -u
+delta:
+  files_changed: 2
+  tests_added: 3
+  suite: "1705 -> 1708 green + 8 skipped"
+decisions_made: []
+measured: "best-case fused 2/61 = 0.0328 < 0.05 -> Refusal; default 0.02 -> GeneratedAnswer; old README 1 red"
+context_for_next_session:
+  - A_THRESHOLD_IS_ONLY_MEANINGFUL_ON_A_SCALE_ask_what_the_MAXIMUM_of_the_compared_score_is_RRF_k_60_is_2_over_61
+  - BRANCH_NOTE_FOURTH_OPEN_rag_PR_232_235_236_stacked_237_MEMORY_conflicts_only
+followups: []
+---
