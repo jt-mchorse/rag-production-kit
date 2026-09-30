@@ -2826,3 +2826,22 @@ context_for_next_session:
   - BRANCH_NOTE_FOURTH_OPEN_rag_PR_232_235_236_stacked_237_MEMORY_conflicts_only
 followups: []
 ---
+
+---
+session: 2026-09-30T09:38:50Z
+issue: 239
+focus: the_quickstart_comment_said_up_d_waits_for_the_healthcheck_and_only_wait_does
+phase: shipped
+duration_min: 1
+delta:
+  files_changed: 4
+  tests_added: 2
+  suite: "1707 passed, 8 skipped; ruff check and ruff format --check clean"
+decisions_made: []
+measured: "docker compose up --help lists --wait as 'Wait for services to be running|healthy'; up -d alone returns on start. Revert probes: README without --wait 1 red of 2; .gitignore without telemetry.db 1 red of 2."
+context_for_next_session:
+  - FOUND_BY_A_FRESH_CLONE_QUICKSTART_AUDIT_did_not_start_the_container_because_docker_compose_yml_binds_5432_on_JTs_machine_the_help_text_is_the_evidence
+  - THE_DB_PATH_ARM_FIRST_MATCHED_rag_kit_db_FROM_from_rag_kit_db_import_connect_a_bare_word_dot_db_regex_reads_a_MODULE_as_a_FILE_it_now_takes_quoted_literals_in_python_fences_and_dash_dash_db_values_in_bash
+  - git_check_ignore_NEEDS_no_index_OR_A_MISTAKENLY_COMMITTED_FILE_READS_AS_NOT_IGNORED_AND_THE_ARM_WOULD_REPORT_THE_WRONG_THING
+  - tests_test_hybrid_pg_py_docstring_ALSO_SAID_up_d_updated_in_the_same_commit
+followups: []
