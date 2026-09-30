@@ -580,6 +580,15 @@ isn't required for the PR check.
 
 ---
 
+- **D-024 (#231).** `evals/run_eval.py` refuses `--write-baselines`
+  together with `--post-comment`, at exit 2, before any suite runs. The
+  committed `evals/current/` is what the comment diffs against
+  `evals/baselines/`, so with both flags the comment compared the *last
+  committed* current run against the baseline this invocation had just
+  overwritten — regressions this run never produced, posted as the PR's eval
+  gate at exit 0. Once the baseline is the run itself there is no delta to
+  post; `eval.yml` runs the two as separate steps.
+
 ## 8. Next.js demo with inline citations
 
 **What it does.** A Next.js 15 / React 19 demo served alongside the
