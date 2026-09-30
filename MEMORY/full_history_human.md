@@ -2945,3 +2945,15 @@ amending D-022 rather than superseding it.
 **Open questions / blockers:** merge #232 first (MEMORY conflict only).
 
 **Next session:** #234, the reranker-lift benchmark.
+
+## 2026-09-30 — Issue #234: reranker lift, measured
+**Duration:** ~2 min · **Branch:** session/2026-09-30-0835-issue-234
+
+- `scripts/bench_reranker.py` measures `LexicalOverlapReranker`'s recall@k lift over the retriever's own order: on the multi-hop fixture recall@1 goes 0.438 → 0.500 and recall@3 0.625 → 0.750, with no regressions; the eval golden set is saturated at 1.000 and the table says so. It's framed as a lexical stand-in on synthetic data, not a cross-encoder number.
+- The table is locked to a live re-render, the Status row and README sentence to the rows, with identity and reverse rerankers as vacuity controls.
+
+**Why this work, this session:** it was the one genuinely unmeasured metric in the benchmarks Status table (#233).
+
+**Open questions / blockers:** stacked on #235; merge #232, then #235, then this.
+
+**Next session:** none queued.

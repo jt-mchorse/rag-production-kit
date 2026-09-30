@@ -2788,3 +2788,23 @@ context_for_next_session:
   - FILED_234_the_reranker_lift_benchmark_priority_low_hermetic_LexicalOverlapReranker_on_the_eval_and_multi_hop_fixtures
 followups: ["#234"]
 ---
+
+---
+session: 2026-09-30T08:38Z
+issue: 234
+focus: A_PENDING_BENCHMARK_ROW_BECAME_A_REAL_MEASUREMENT_AND_THE_SATURATED_FIXTURE_IS_REPORTED_NOT_DROPPED
+phase: shipped
+duration_min: 2   # computed from the plan comment timestamp and date -u
+delta:
+  files_changed: 5
+  tests_added: 9
+  suite: "1710 -> 1718 green + 8 skipped (stacked on #235, branch session/2026-09-30-0832-issue-233)"
+  benchmarks: { multi_hop_recall_at_1: "0.438 -> 0.500", multi_hop_recall_at_3: "0.625 -> 0.750", multi_hop_recall_at_5: "0.875 flat", eval_golden_set: "1.000 saturated" }
+decisions_made: []
+measured: "probe with an identity reranker in the script: 3 red (snapshot, status row, README sentence)"
+context_for_next_session:
+  - MEASURE_FEASIBILITY_BEFORE_BUILDING_A_BENCHMARK_the_retriever_and_the_lexical_reranker_both_score_token_overlap_so_zero_lift_was_plausible_a_10_line_prototype_showed_real_lift_first
+  - A_SATURATED_FIXTURE_IS_A_RESULT_the_eval_set_is_1_000_on_both_paths_and_the_table_says_it_cannot_show_lift_DERIVED_FROM_THE_NUMBERS
+  - BRANCH_NOTE_STACKED_ON_235_PR_BASE_IS_235s_BRANCH_merge_order_232_then_235_then_this_github_retargets_to_main_when_235s_branch_is_deleted
+followups: []
+---
