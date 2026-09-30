@@ -2,7 +2,7 @@
 
 Skipped automatically when ``DATABASE_URL`` is unset. CI runs these
 against the ``pgvector/pgvector:pg16`` service container; local
-developers can run ``docker compose up -d`` and
+developers can run ``docker compose up -d --wait`` and
 ``DATABASE_URL=postgresql://rag:rag@localhost:5432/rag pytest -m pg``.
 """
 

@@ -150,8 +150,9 @@ Eight runtime layers ship today: hybrid retrieval + RRF fusion (#1), opt-in cros
 
 ```bash
 # 1. Bring up Postgres + pgvector
-docker compose up -d
-# (waits for pg_isready; init.sql is mounted to /docker-entrypoint-initdb.d/)
+docker compose up -d --wait
+# (--wait blocks until the pg_isready healthcheck passes; infra/postgres/init.sql
+#  is mounted into /docker-entrypoint-initdb.d/ and runs on the first start)
 
 # 2. Install the package
 python3 -m venv .venv && source .venv/bin/activate
