@@ -184,7 +184,11 @@ from rag_kit import GeneratedAnswer, Refusal, TemplateGenerator
 
 # `retrieved` is the list returned by Retriever.search above.
 gen = TemplateGenerator()
-out = gen.generate("when do refunds expire?", retrieved, threshold=0.05)
+# The default threshold (0.02) is on the fused-score scale: without a reranker,
+# reciprocal-rank fusion with k=60 tops out at 2/61 ~= 0.033, so a threshold at
+# or above that refuses every answer (#237). With a reranker, the reranker's
+# own score is what gets compared.
+out = gen.generate("when do refunds expire?", retrieved)
 if isinstance(out, GeneratedAnswer):
     print(out.text)                           # "...[cite:doc-1]. ...[cite:doc-2]."
     for c in out.citations:
