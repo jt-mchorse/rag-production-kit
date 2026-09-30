@@ -2934,3 +2934,14 @@ amending D-022 rather than superseding it.
 **Open questions / blockers:** none.
 
 **Next session:** none queued.
+
+## 2026-09-30 — Issue #233: the benchmarks Status table says where each number lives
+**Duration:** ~3 min · **Branch:** session/2026-09-30-0832-issue-233
+
+- `docs/benchmarks.md` marked all five metrics "pending" against #2/#6/#7, all closed, while the README published the eval baselines. Each row now names its source (eval baselines; telemetry by design; the streaming bench) and the one unmeasured metric cites the new open #234. A lock ties each baseline-backed value to its JSON.
+
+**Why this work, this session:** found reading the numbers beside the claims in priority-tier repos.
+
+**Open questions / blockers:** merge #232 first (MEMORY conflict only).
+
+**Next session:** #234, the reranker-lift benchmark.

@@ -2769,3 +2769,22 @@ context_for_next_session:
   - NOTICED_NOT_FILED_the_no_baseline_branch_base_relative_to_REPO_ROOT_raises_when_BASELINES_DIR_is_redirected_TEST_ONLY_REACH
 followups: []
 ---
+
+---
+session: 2026-09-30T08:33Z
+issue: 233
+focus: A_STATUS_TABLE_SAID_PENDING_AGAINST_CLOSED_ISSUES_WHILE_THE_README_PUBLISHED_THE_NUMBERS
+phase: shipped
+duration_min: 3   # ~08:30 hunt start (issue filed 2026-09-30T08:31:52Z) -> 2026-09-30T08:33Z
+delta:
+  files_changed: 2
+  tests_added: 5
+  suite: "1705 -> 1710 green + 8 skipped"
+decisions_made: []
+measured: "revert to the old table 5 red"
+context_for_next_session:
+  - A_PENDING_ROW_IS_A_CLAIM_ABOUT_AN_ISSUE_check_the_issue_is_OPEN_all_three_cited_here_were_closed
+  - BRANCH_NOTE_session/2026-09-30-0832-issue-233_232_IS_ALSO_OPEN_IN_THIS_REPO_merge_232_first_MEMORY_append_conflict_only
+  - FILED_234_the_reranker_lift_benchmark_priority_low_hermetic_LexicalOverlapReranker_on_the_eval_and_multi_hop_fixtures
+followups: ["#234"]
+---
