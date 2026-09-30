@@ -4,25 +4,28 @@
 
 ## Status
 
-| Metric                              | Status        | Tracking issue |
-| ----------------------------------- | ------------- | -------------- |
-| Recall@5 on a held-out query set    | **pending**   | [#7]           |
-| Retrieval latency p50 / p95 / p99   | **pending**   | [#6]           |
-| Reranker quality lift over fused-only | **pending** | [#2]           |
-| End-to-end answer faithfulness      | **pending**   | [#7]           |
-| Cost per request                    | **pending**   | [#6]           |
+Where each number lives, or why there is none. This table used to mark all
+five rows **pending** against #2, #6 and #7 — all three closed — while the
+README published the eval baselines (#233).
 
-[#2]: https://github.com/jt-mchorse/rag-production-kit/issues/2
-[#6]: https://github.com/jt-mchorse/rag-production-kit/issues/6
-[#7]: https://github.com/jt-mchorse/rag-production-kit/issues/7
+| Metric                                | Where it lives                                                                 | Value |
+| ------------------------------------- | ------------------------------------------------------------------------------ | ----- |
+| Recall@5 on the eval golden set       | `evals/baselines/recall_at_5.json` (n=8, synthetic `rag-qa-v0.1`, every PR)     | 1.00  |
+| End-to-end answer faithfulness        | `evals/baselines/faithfulness.json` (n=8, synthetic `rag-qa-v0.1`, every PR)    | 1.00  |
+| Answer correctness                    | `evals/baselines/correctness.json` (n=8, synthetic `rag-qa-v0.1`, every PR)     | 0.90  |
+| Retrieval latency p50 / p95 / p99     | captured per request by the telemetry layer (#6); no headline number, by design | —     |
+| Cost per request                      | captured per request by the telemetry layer (#6); no headline number, by design | —     |
+| Pipeline overhead (streaming)         | [Streaming pipeline](#streaming-pipeline-5) below                               | < 0.15 ms p95 |
+| Reranker quality lift over fused-only | **pending** [#234] — not measured anywhere yet                                  | —     |
 
-This PR ships the hybrid-retrieval API and the SQL schema it runs on.
-The Recall@5 measurement depends on the eval-harness wiring (#7), which
-in turn imports [`llm-eval-harness`][leh] to evaluate against a real
-corpus + held-out query set. That work is filed and tracked; the number
-will appear here, with a reproducer script, when it ships.
+[#234]: https://github.com/jt-mchorse/rag-production-kit/issues/234
 
-[leh]: https://github.com/jt-mchorse/llm-eval-harness
+The three eval rows are the deterministic CI fixture — an 8-example synthetic
+golden set over a 10-chunk in-memory corpus with the dep-free
+`TemplateGenerator` — not a held-out benchmark on real data. Real-LLM,
+real-pgvector runs are operator-triggered (see the README), and the latency
+and cost rows are the operator's own telemetry store rather than a number
+this file could honestly quote.
 
 ## Streaming pipeline (#5)
 
@@ -49,5 +52,6 @@ python -m scripts.bench_streaming --n 1000 --k 3
 
 Run: 2026-05-16, Apple Silicon (arm64), Python 3.14.0. Throughput
 ~8.5 k queries/s in the same configuration. End-to-end **production**
-latency (against a real PG + Anthropic SDK) is tracked separately under
-#6 — these numbers are *only* the pipeline plumbing, by design.
+latency (against a real PG + Anthropic SDK) is captured per request by
+the telemetry layer (#6) — these numbers are *only* the pipeline plumbing,
+by design.
