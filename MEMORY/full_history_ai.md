@@ -2751,3 +2751,21 @@ context_for_next_session:
   - rag_kit_HAS_ZERO_FIXED_WIDTH_FORMAT_SPECS_LEFT_and_i_verified_it_by_sweep_so_the_D_021_D_026_D_028_D_029_RENDERING_VEIN_IS_WORKED_OUT_IN_THIS_REPO_no_render_classified_or_render_configured_is_needed_here_because_nothing_renders_a_number_inline_any_more
 followups: []
 ---
+
+---
+session: 2026-09-30T08:16Z
+issue: 231
+focus: TWO_INDEPENDENT_FLAGS_POSTED_A_STALE_COMMITTED_RUN_AGAINST_A_BASELINE_THE_SAME_INVOCATION_OVERWROTE
+phase: shipped
+duration_min: 4   # 08:11 hunt start -> 2026-09-30T08:16Z close, from date -u and the issue timestamps
+delta:
+  files_changed: 4
+  tests_added: 5
+  suite: "1705 -> 1710 green + 8 skipped"
+decisions_made: ["D-024"]
+measured: "scratch-copy repro: exit 0, comment 'current STALE-CO vs baseline ... regressed 3 flagged 3'; revert 2 red"
+context_for_next_session:
+  - A_COMMITTED_OUTPUT_DIRECTORY_IS_AN_INPUT_TO_THE_NEXT_STEP_evals_current_is_committed_so_any_flag_that_REDIRECTS_THE_WRITE_leaves_the_next_reader_on_a_stale_file_ASK_OF_EVERY_WRITE_REDIRECTING_FLAG_WHO_READS_THE_DEFAULT_PATH_AFTERWARDS
+  - NOTICED_NOT_FILED_the_no_baseline_branch_base_relative_to_REPO_ROOT_raises_when_BASELINES_DIR_is_redirected_TEST_ONLY_REACH
+followups: []
+---
