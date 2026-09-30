@@ -16,9 +16,7 @@ README published the eval baselines (#233).
 | Retrieval latency p50 / p95 / p99     | captured per request by the telemetry layer (#6); no headline number, by design | —     |
 | Cost per request                      | captured per request by the telemetry layer (#6); no headline number, by design | —     |
 | Pipeline overhead (streaming)         | [Streaming pipeline](#streaming-pipeline-5) below                               | < 0.15 ms p95 |
-| Reranker quality lift over fused-only | **pending** [#234] — not measured anywhere yet                                  | —     |
-
-[#234]: https://github.com/jt-mchorse/rag-production-kit/issues/234
+| Reranker quality lift over fused-only | [Reranker lift](#reranker-lift-234) below — lexical stand-in, synthetic fixture  | +0.125 recall@3 |
 
 The three eval rows are the deterministic CI fixture — an 8-example synthetic
 golden set over a 10-chunk in-memory corpus with the dep-free
@@ -26,6 +24,37 @@ golden set over a 10-chunk in-memory corpus with the dep-free
 real-pgvector runs are operator-triggered (see the README), and the latency
 and cost rows are the operator's own telemetry store rather than a number
 this file could honestly quote.
+
+## Reranker lift (#234)
+
+How much `LexicalOverlapReranker` — the dep-free stand-in the pipeline uses in
+CI — improves recall@k over the retriever's own order. It scores query-token
+*coverage* where the retriever scores overlap *density*, and that difference is
+all the lift can come from. **This is the lift of that stand-in on synthetic
+fixtures, not a claim about a cross-encoder**; a `CohereReranker` number needs
+an API key and is not measured here.
+
+Reproduce:
+
+```bash
+python -m scripts.bench_reranker --output md
+```
+
+<!-- bench-reranker:table:begin -->
+Over-fetch 10 candidates from the in-memory token-overlap retriever, then take the top k in the retriever's order (**fused-only**) or after `LexicalOverlapReranker` (**reranked**).
+
+| fixture | k | fused-only recall@k | reranked recall@k | Δ | improved / regressed |
+| ------- | -: | ------------------: | ----------------: | -: | -------------------- |
+| multi-hop | 1 | 0.438 | 0.500 | +0.062 | 1 / 0 |
+| multi-hop | 3 | 0.625 | 0.750 | +0.125 | 2 / 0 |
+| multi-hop | 5 | 0.875 | 0.875 | +0.000 | 0 / 0 |
+| eval golden set | 1 | 1.000 | 1.000 | +0.000 | 0 / 0 |
+| eval golden set | 3 | 1.000 | 1.000 | +0.000 | 0 / 0 |
+| eval golden set | 5 | 1.000 | 1.000 | +0.000 | 0 / 0 |
+
+- **multi-hop**: 18 chunks, 8 questions (scripts/bench_rewriter.py).
+- **eval golden set**: 10 chunks, 8 questions (evals/dataset, rag-qa-v0.1). Fused-only recall is already 1.000 at every k, so this fixture cannot show lift in either direction.
+<!-- bench-reranker:table:end -->
 
 ## Streaming pipeline (#5)
 

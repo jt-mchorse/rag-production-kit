@@ -348,6 +348,14 @@ retrieval) are operator-triggered with `ANTHROPIC_API_KEY` + `DATABASE_URL`
 locally — the CI fixture path covers regressions in the deterministic
 pipeline and keeps the workflow API-key-free.
 
+**Reranker lift over fused-only** (issue #234, `scripts/bench_reranker.py`):
+the dep-free `LexicalOverlapReranker` lifts recall@3 on the same multi-hop
+fixture from 0.625 to 0.750 and recall@1 from 0.438 to 0.500, with no
+regressions; the eval golden set is saturated at 1.000 and cannot show lift.
+A lexical stand-in on synthetic data — see
+[`docs/benchmarks.md`](docs/benchmarks.md#reranker-lift-234) — not a
+cross-encoder number.
+
 **Rewriter recall@k on a synthetic multi-hop fixture** (issue #3,
 `scripts/bench_rewriter.py`, 18-chunk corpus, 8 multi-hop questions,
 dep-free `TemplateRewriter` against the same in-memory token-overlap
