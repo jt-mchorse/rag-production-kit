@@ -579,6 +579,24 @@ def main(argv: list[str] | None = None) -> int:
         )
         return 2
 
+    # `--post-comment`'s own operator-input checks, here with the others and
+    # before `run_all_suites()` (#249). They sat after `write_runs`, so a
+    # refused invocation still rewrote the tracked `evals/current/*.json` --
+    # the "partially-succeeded run" #174's comment below set out to prevent,
+    # which moved the binary check but not past the write.
+    if args.post_comment:
+        if not args.repo or args.pr is None:
+            print("--post-comment requires --repo and --pr", file=sys.stderr)
+            return 2
+        # `_diff_markdown` shells out to `eval-harness`, which lives in the
+        # `[eval]` extra — on a base install that used to surface as a raw
+        # FileNotFoundError *after* the results were written (#174). A missing
+        # required tool is operator-environment input, the same class as
+        # `--post-comment` without `--repo`, hence 2.
+        if shutil.which("eval-harness") is None:
+            print(f"--post-comment requires {_EVAL_HARNESS_HINT}", file=sys.stderr)
+            return 2
+
     runs = run_all_suites()
     if args.suite is not None:
         # Compute is one pass over the dataset (scoring is cheap); the
@@ -607,20 +625,7 @@ def main(argv: list[str] | None = None) -> int:
             print(f"wrote {path}")
 
     if args.post_comment:
-        if not args.repo or args.pr is None:
-            print("--post-comment requires --repo and --pr", file=sys.stderr)
-            return 2
         import os
-
-        # Fail before rendering anything. `_diff_markdown` shells out to
-        # `eval-harness`, which lives in the `[eval]` extra — on a base install
-        # that used to surface as a raw FileNotFoundError *after* the results
-        # were written, so the operator saw a partially-succeeded run and a
-        # stack (#174). A missing required tool is operator-environment input,
-        # the same class as `--post-comment` without `--repo`, hence 2.
-        if shutil.which("eval-harness") is None:
-            print(f"--post-comment requires {_EVAL_HARNESS_HINT}", file=sys.stderr)
-            return 2
 
         token = os.environ.get(args.token_env)
         deltas: dict[str, str] = {}
