@@ -15,6 +15,10 @@ logs/
 .coverage.*
 htmlcov/
 *.egg-info/
+# The telemetry store's default path (TelemetryStore / scripts.telemetry_dashboard
+# --db ./telemetry.db) is the working directory, so a documented run from the
+# checkout root would otherwise leave a SQLite file for `git add -A` (#239).
+telemetry.db
 demo/nextjs/.next/
 demo/nextjs/tsconfig.tsbuildinfo
 

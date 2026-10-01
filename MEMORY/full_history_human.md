@@ -2968,3 +2968,15 @@ amending D-022 rather than superseding it.
 **Open questions / blockers:** #232, #235 and #236 are open here too (MEMORY conflicts only; #236 is stacked on #235).
 
 **Next session:** none.
+
+## 2026-09-30T09:38:50Z — #239: the Quickstart's compose step didn't wait for Postgres
+
+The Quickstart ran `docker compose up -d` under a comment saying it "waits for
+pg_isready". It doesn't: `up -d` returns as soon as the container starts, and the
+compose healthcheck only holds anything up under `--wait`. On a first start
+Postgres is still initialising and loading the schema, so the Python snippet
+right below could fail to connect. The Quickstart now uses `up -d --wait`, and
+its comment names the real schema file, `infra/postgres/init.sql`. Separately,
+the telemetry examples write `./telemetry.db` into whatever directory you run them
+from (the checkout, if you follow the README), and nothing ignored it. It is now
+gitignored. A new test pins both points.
