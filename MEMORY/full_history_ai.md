@@ -2845,3 +2845,21 @@ context_for_next_session:
   - git_check_ignore_NEEDS_no_index_OR_A_MISTAKENLY_COMMITTED_FILE_READS_AS_NOT_IGNORED_AND_THE_ARM_WOULD_REPORT_THE_WRONG_THING
   - tests_test_hybrid_pg_py_docstring_ALSO_SAID_up_d_updated_in_the_same_commit
 followups: []
+
+---
+session: 2026-09-30T10:01:05Z
+issue: 241
+focus: the_file_existed_and_listed_one_of_four
+phase: shipped
+duration_min: 1
+delta:
+  files_changed: 3
+  tests_added: 6
+  suite: "1711 passed, 8 skipped; ruff check and ruff format --check clean"
+decisions_made: []
+measured: "reads: DATABASE_URL (db.py, conftest), ANTHROPIC_API_KEY (generator, rewriter), COHERE_API_KEY (reranker), GITHUB_TOKEN (run_eval.py via the --token-env default). Probes: main's one-line file 2 red of 6; dynamic resolution removed 1 red."
+context_for_next_session:
+  - portfolio_ops_80s_SURVEY_MARKED_THIS_REPO_DONE_BECAUSE_THE_FILE_EXISTED_it_listed_1_of_4_A_PRESENCE_CHECK_IS_NOT_A_COMPLETENESS_CHECK
+  - THE_ONE_DYNAMIC_READ_os_environ_get_args_token_env_IS_RESOLVED_THROUGH_THE_PARSED_DASH_DASH_token_env_DEFAULT_and_the_resolver_asserts_the_read_is_still_spelled_that_way
+  - README_EDIT_PLACED_IN_THE_RERANKER_PARAGRAPH_NOT_THE_QUICKSTART_to_avoid_conflicting_with_240
+followups: []

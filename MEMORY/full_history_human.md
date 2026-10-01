@@ -2980,3 +2980,13 @@ its comment names the real schema file, `infra/postgres/init.sql`. Separately,
 the telemetry examples write `./telemetry.db` into whatever directory you run them
 from (the checkout, if you follow the README), and nothing ignored it. It is now
 gitignored. A new test pins both points.
+
+## 2026-09-30T10:01:05Z — #241: .env.example listed one of four variables
+
+This repo already had a `.env.example`, so the portfolio survey counted it as
+done, but it listed only the database URL. The code also reads the Anthropic key
+(generator and query rewriter), the Cohere key (reranker, mentioned nowhere in
+the docs) and a GitHub token (the eval runner's PR comment). All four are listed
+now, the README's reranker paragraph names the Cohere key, and a test derives the
+variables from source so the file can't fall behind again. Part of
+portfolio-ops#80.
