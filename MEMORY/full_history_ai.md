@@ -2863,3 +2863,21 @@ context_for_next_session:
   - THE_ONE_DYNAMIC_READ_os_environ_get_args_token_env_IS_RESOLVED_THROUGH_THE_PARSED_DASH_DASH_token_env_DEFAULT_and_the_resolver_asserts_the_read_is_still_spelled_that_way
   - README_EDIT_PLACED_IN_THE_RERANKER_PARAGRAPH_NOT_THE_QUICKSTART_to_avoid_conflicting_with_240
 followups: []
+
+---
+session: 2026-10-01T09:05Z
+issue: 251
+focus: THE_THIRD_POSITION_OF_THE_STR_COERCION_201_GUARDED_TWO
+phase: shipped
+duration_min: 4   # issue filed ~4 min before this block, from date -u
+delta:
+  files_changed: 2
+  tests_added: 3
+  suite: "1734 -> 1737 green (8 skipped)"
+decisions_made: []
+measured: "2ff3f6f: retriever raising an exception whose __str__ raises -> events ['retrieving'] then RuntimeError escapes. Revert probe: 2 failed of 1737."
+context_for_next_session:
+  - 201_NAMED_ONE_HELPER_ONE_COERCION_TWO_POSITIONS_and_the_third_position_was_the_except_block_ENUMERATE_EVERY_str_CALL_ON_ARBITRARY_CALLER_OBJECTS_IN_A_TOTAL_SEAM
+  - MERGE_LAST_AMONG_THE_RAG_PRS_FROM_THIS_RUN_all_append_MEMORY
+followups: []
+---
