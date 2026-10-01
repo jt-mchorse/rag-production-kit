@@ -2923,3 +2923,14 @@ One neighbour turned out redundant rather than wrong: walking into a `set` is 0
 red and correctly so. So the premise got pinned instead — Python refuses to put a
 mutable container, or a tuple containing one, into a set at all. Recorded as D-023,
 amending D-022 rather than superseding it.
+
+## 2026-09-30 — Issue #231: --write-baselines and --post-comment cannot share a run (D-024)
+**Duration:** ~4 min · **Branch:** session/2026-09-30-0813-issue-231
+
+- With both flags, the PR comment diffed the last committed `evals/current/` run against the baselines this invocation had just overwritten, flagging regressions the run never produced, at exit 0. The combination is now refused at exit 2 before any suite runs; each flag alone is unchanged.
+
+**Why this work, this session:** rag is priority-tier with no open work; found by hunting the eval gate's flag combinations.
+
+**Open questions / blockers:** none.
+
+**Next session:** none queued.

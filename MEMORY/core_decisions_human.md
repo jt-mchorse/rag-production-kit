@@ -732,3 +732,17 @@ is the whole depth" from an argument into an arm.
 **Reversibility:** Cheap.
 
 **Related issues:** #229, #227, #71, #254
+
+## D-024 — `--write-baselines` and `--post-comment` cannot share a run (2026-09-30)
+**Decision:** `evals/run_eval.py` refuses the two flags together at exit 2, before any suite runs.
+
+**Why:** `evals/current/*.json` are committed. `--write-baselines` sends the run to `evals/baselines/`, and `--post-comment` diffs `evals/current/` against `evals/baselines/`. Together, the PR comment compared the *last committed* current run against the baseline this invocation had just overwritten. Measured in a scratch copy with a visibly stale current: "regressed 3, flagged 3" at exit 0 — regressions the run never produced, posted as the PR's eval gate. Once the baseline is the run itself there is no delta to post.
+
+**Alternatives considered:**
+- Diff against the previous baselines, read before the overwrite — rejected: it invents a third meaning for the comment that no CI path uses.
+- Warn and continue — rejected: the stale comment is still posted.
+- Skip the post silently when writing baselines — rejected: an operator asking for a comment gets exit 0 and no comment.
+
+**Reversibility:** Cheap.
+
+**Related issues:** #231, #174, #7

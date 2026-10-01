@@ -562,6 +562,23 @@ def main(argv: list[str] | None = None) -> int:
         )
         return 2
 
+    # The two outputs cannot share a run (#231, D-024). `--write-baselines`
+    # sends this run to `evals/baselines/`, and `--post-comment` diffs
+    # `evals/current/` against `evals/baselines/` -- so together they posted
+    # the *last committed* current run against the baseline this invocation
+    # had just overwritten: regressions this run never produced, as the PR's
+    # eval gate, at exit 0. Once the baseline is the run itself there is no
+    # delta to post. Refused here, with the other operator-input checks, so
+    # nothing is written first.
+    if args.write_baselines and args.post_comment:
+        print(
+            "--write-baselines and --post-comment cannot be combined: the comment "
+            "diffs evals/current/ against evals/baselines/, and this run would be "
+            "the baseline. Refresh baselines in one invocation and post from another.",
+            file=sys.stderr,
+        )
+        return 2
+
     runs = run_all_suites()
     if args.suite is not None:
         # Compute is one pass over the dataset (scoring is cheap); the
