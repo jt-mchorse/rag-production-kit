@@ -48,8 +48,10 @@ def test_a_row_backed_by_a_committed_baseline_quotes_it(suite: str) -> None:
 
 
 def test_only_rows_without_an_artifact_are_pending_and_each_cites_an_issue() -> None:
+    # This arm used to require at least one pending row, because reranker lift
+    # was genuinely unmeasured; #234 measured it. Any row that is pending again
+    # must still cite an issue whose link the doc defines.
     pending = [r for r in _status_rows() if "pending" in r[1].lower()]
-    assert pending, "the reranker row is genuinely unmeasured; a table with no pending row lies"
     for row in pending:
         assert "evals/" not in row[1]
         ref = re.search(r"\[#(\d+)\]", row[1])
