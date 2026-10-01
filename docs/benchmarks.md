@@ -53,7 +53,7 @@ Over-fetch 10 candidates from the in-memory token-overlap retriever, then take t
 | eval golden set | 5 | 1.000 | 1.000 | +0.000 | 0 / 0 |
 
 - **multi-hop**: 18 chunks, 8 questions (scripts/bench_rewriter.py).
-- **eval golden set**: 10 chunks, 8 questions (evals/dataset, rag-qa-v0.1). Fused-only recall is already 1.000 at every k, so this fixture cannot show lift in either direction.
+- **eval golden set**: 10 chunks, 8 questions (evals/dataset, rag-qa-v0.1). Fused-only recall is already 1.000 at every k, so this fixture cannot show an improvement; a regression would still show.
 <!-- bench-reranker:table:end -->
 
 ## Streaming pipeline (#5)
