@@ -2990,3 +2990,14 @@ the docs) and a GitHub token (the eval runner's PR comment). All four are listed
 now, the README's reranker paragraph names the Cohere key, and a test derives the
 variables from source so the file can't fall behind again. Part of
 portfolio-ops#80.
+
+## 2026-10-01T08:52Z — #247: atomic writes created every file owner-only
+
+`atomic_write_text` built its temp file with `NamedTemporaryFile`, which always
+creates mode 0600 whatever the umask, and the rename carried that onto the
+target. Every file it wrote was owner-only, including the telemetry and
+phase-timing JSON written for a log-tailer to read, and overwriting an existing
+0644 file quietly demoted it to 0600. The temp file is now created with mode
+0666, so the kernel applies the umask, and on an overwrite it takes the existing
+file's mode before the rename. New tests cover two umasks and four existing modes
+through the helper and both dump methods. Part of portfolio-ops#81.
