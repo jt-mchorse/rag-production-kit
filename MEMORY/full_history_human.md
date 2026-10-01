@@ -2957,3 +2957,14 @@ amending D-022 rather than superseding it.
 **Open questions / blockers:** stacked on #235; merge #232, then #235, then this.
 
 **Next session:** none queued.
+
+## 2026-09-30 — Issue #237: the README generation snippet can answer
+**Duration:** ~0 min · **Branch:** session/2026-09-30-0916-issue-237
+
+- The snippet used `threshold=0.05` on fused retrieval scores, which top out at 2/61 ≈ 0.033 with RRF k=60, so it refused every input. It now uses the 0.02 default with a note on the scale, and locks keep both the default and the snippet's call answerable.
+
+**Why this work, this session:** found by the fresh-clone Quickstart audit.
+
+**Open questions / blockers:** #232, #235 and #236 are open here too (MEMORY conflicts only; #236 is stacked on #235).
+
+**Next session:** none.
