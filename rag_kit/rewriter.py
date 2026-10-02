@@ -59,7 +59,11 @@ class RewriteResult:
         # custom rewriter returning `sub_queries="who wrote Macbeth"` ran one
         # hybrid search per character and fused the results.
         if isinstance(self.sub_queries, (str, bytes, bytearray)):
-            fix = f"pass ({self.sub_queries!r},)" if isinstance(self.sub_queries, str) else "decode it first"
+            fix = (
+                f"pass ({self.sub_queries!r},)"
+                if isinstance(self.sub_queries, str)
+                else "decode it first"
+            )
             raise ValueError(
                 f"sub_queries must be a sequence of query strings, not a bare "
                 f"{type(self.sub_queries).__name__}: {self.sub_queries!r} would be searched "
