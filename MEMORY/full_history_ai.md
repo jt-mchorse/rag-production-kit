@@ -2902,3 +2902,23 @@ context_for_next_session:
   - MERGE_ORDER_244_THEN_246_both_append_MEMORY
 followups: []
 ---
+
+---
+session: 2026-10-01T08:52Z
+issue: 247
+focus: atomic_write_text_created_every_file_0600_and_an_overwrite_demoted_0644_to_0600
+phase: shipped
+duration_min: 5
+delta:
+  files_changed: 2
+  tests_added: 22
+  suite: "1756 passed, 8 deselected (was 1734); ruff check and ruff format --check clean"
+decisions_made: []
+measured: "umask 022 on main: new file 0o600, overwrite of 0o644 -> 0o600. After: 0o644 and 0o644. Revert probes: main's io_utils.py 15 red of 1756; fix with the chmod-on-overwrite line removed 9 red of 1756."
+context_for_next_session:
+  - NamedTemporaryFile_AND_mkstemp_ALWAYS_CREATE_0600_os_replace_CARRIES_THE_MODE_the_temp_is_now_os_open_O_EXCL_0o666_so_the_kernel_applies_the_umask
+  - NEVER_READ_THE_UMASK_VIA_os_umask_0_IT_SETS_A_PROCESS_WIDE_UMASK_OF_0_FOR_OTHER_THREADS
+  - THE_RANDOM_NAME_COMPONENT_IS_NOW_secrets_token_hex_4_with_a_bounded_retry_on_FileExistsError_the_200_byte_base_cap_is_unchanged
+  - THE_OVERWRITE_TESTS_RUN_UNDER_UMASK_027_so_a_new_file_mode_differs_from_most_existing_modes_0o640_is_the_one_that_coincides
+followups: ["portfolio-ops#81"]
+---
