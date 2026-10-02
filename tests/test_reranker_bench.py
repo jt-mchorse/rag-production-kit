@@ -103,8 +103,45 @@ def test_the_saturation_note_is_derived_from_the_numbers() -> None:
     rendered = bench.render_markdown(fx, rows, candidates=10)
     eval_line = next(line for line in rendered.splitlines() if line.startswith("- **eval"))
     multi_line = next(line for line in rendered.splitlines() if line.startswith("- **multi"))
-    assert "cannot show lift" in eval_line
-    assert "cannot show lift" not in multi_line
+    assert "cannot show an improvement" in eval_line
+    assert "cannot show an improvement" not in multi_line
+
+
+def test_the_saturation_note_does_not_deny_what_the_bench_can_measure() -> None:
+    """#243: the note said "cannot show lift in either direction" while
+    `test_a_reranker_that_reverses_the_order_measures_a_regression` measures a
+    regression on this exact fixture. Ask the bench, then read the note."""
+    (_, eval_set) = bench.fixtures()
+    (row,) = bench.measure(eval_set, _Reverse(), ks=(1,), candidates=10)
+    assert row.regressed > 0, "the premise: harm is measurable on the saturated fixture"
+    fx, rows = bench.run()
+    rendered = bench.render_markdown(fx, rows, candidates=10)
+    eval_line = next(line for line in rendered.splitlines() if line.startswith("- **eval"))
+    assert "either direction" not in eval_line
+    assert "a regression would still show" in eval_line
+    assert "either direction" not in bench.__doc__
+
+
+def test_a_repeated_k_is_refused_at_parse_time(capsys: pytest.CaptureFixture[str]) -> None:
+    """#243: `--k 1,1` reported `n_queries: 16` for an 8-question fixture."""
+    with pytest.raises(SystemExit) as excinfo:
+        bench.main(["--k", "1,1", "--output", "json"])
+    assert excinfo.value.code == 2
+    assert "each k may appear once" in capsys.readouterr().err
+
+
+@pytest.mark.parametrize("ks", [(1, 1), (3, 1, 3), (5, 5, 5)])
+def test_a_repeated_k_is_refused_by_measure(ks: tuple[int, ...]) -> None:
+    """The library seam too: a caller of `measure` would double-count as well."""
+    (multi_hop, _) = bench.fixtures()
+    with pytest.raises(ValueError, match="each k may appear once"):
+        bench.measure(multi_hop, _Identity(), ks=ks, candidates=10)
+
+
+def test_n_queries_is_each_fixtures_question_count() -> None:
+    fx, rows = bench.run()
+    for f in fx:
+        assert {r.n_queries for r in rows if r.fixture == f.name} == {len(f.queries)}
 
 
 def test_too_few_candidates_is_an_operator_error(capsys: pytest.CaptureFixture[str]) -> None:
