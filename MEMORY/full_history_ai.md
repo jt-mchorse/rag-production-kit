@@ -2882,3 +2882,23 @@ context_for_next_session:
   - FOUND_BY_A_PHASE_A_HUNT_AGENT_ON_PR_236_MERGED_THIS_RUN_reproduced_firsthand_before_filing
 followups: []
 ---
+
+---
+session: 2026-10-01T08:02Z
+issue: 245
+focus: 184S_STORE_GUARANTEES_HELD_ONLY_THROUGH_build_AND_THE_BARE_CONSTRUCTOR_IS_PUBLIC
+phase: shipped
+duration_min: 6   # 07:56 plan -> 08:02 close, from date -u
+delta:
+  files_changed: 3
+  tests_added: 19
+  suite: "1734 -> 1753 green (8 skipped)"
+decisions_made: []
+measured: "repro on 2ff3f6f with CostRecord(...) + record(): ts=nan and total_latency_ms=nan -> raw sqlite3.IntegrityError; ts=inf and ts='2026-08-24' in last_24h(now=9e9); ts=-inf absent from since(-1e300). Revert probes, control 1753: record skips ts 9 red, skips NaN loop 4, list misses a column 1, ts rule in own words 8, finite-instead-of-nan neighbour 3."
+context_for_next_session:
+  - A_TEST_NAMED_FOR_THE_STORE_THAT_EXERCISES_THE_BUILDER_is_a_scope_claim_and_its_docstring_said_THE_ONLY_WAY_A_CALLER_CAN_while_D_022_had_already_written_the_bare_constructor_is_public_READ_THE_NEIGHBOURING_DECISION_AGAINST_THE_TESTS_PREMISE
+  - WHERE_THE_HARM_HAPPENS_DECIDES_THE_BOUNDARY_latency_and_tokens_are_guarded_at_aggregate_because_python_reads_them_ts_cannot_be_because_SQL_filters_on_it_so_the_write_seam_is_the_only_option
+  - THE_NAN_LIST_IS_DERIVED_FROM_THE_SCHEMA_TEXT_BY_A_TEST_with_a_non_zero_control_and_the_finite_instead_of_nan_neighbour_is_rejected_by_an_existing_aggregate_test
+  - MERGE_ORDER_244_THEN_246_both_append_MEMORY
+followups: []
+---

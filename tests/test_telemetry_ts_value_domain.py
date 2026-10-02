@@ -134,8 +134,11 @@ def test_no_sqlite_integrity_error_can_escape_record() -> None:
     (SQLite stores NaN as NULL) — an exception type outside this module's
     contract, naming a column rather than the caller's mistake.
 
-    Asserted by constructing the row the only way a caller can, and confirming
-    the failure happens at `build` instead.
+    Asserted here through `build`. That is *not* the only way a caller can
+    construct a row -- the bare `CostRecord(...)` is public in `rag_kit.__all__`
+    and validates nothing -- so since #245 `TelemetryStore.record` refuses the
+    same values through the same rule; `tests/test_telemetry_record_seam.py`
+    asserts all three properties in this section through the bare constructor.
     """
     with pytest.raises(ValueError, match="ts must be a finite number of seconds"):
         _build(float("nan"))

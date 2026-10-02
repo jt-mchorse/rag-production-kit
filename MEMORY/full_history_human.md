@@ -3002,3 +3002,15 @@ portfolio-ops#80.
 **Open questions / blockers:** none.
 
 **Next session:** the `CostRecord` bare-constructor `ts` finding from the same hunt.
+
+## 2026-10-01 — Issue #245: the store holds a bare `CostRecord` to `build`'s `ts` rule
+**Duration:** ~6 min · **Branch:** session/2026-10-01-0758-issue-245
+
+- #184 guarded `ts` in `CostRecord.build`, but the public bare constructor skips `build`. As a result, `TelemetryStore.record` stored `ts=inf` in every `last_24h` window and `-inf` in none, and a NaN raised a raw `sqlite3.IntegrityError`. `record` now applies the same `_checked_ts` rule (same message) and refuses a NaN in every `REAL NOT NULL` column; a test reads that column list from the schema.
+- The check lives in `record`, not `__post_init__`, because `since()` rebuilds stored rows through the constructor and must still read old rows. 19 new arms; five revert probes all red.
+
+**Why this work, this session:** found by this run's hunt; the #184 test docstring's premise ("the only way a caller can") was contradicted by D-022.
+
+**Open questions / blockers:** none. Merge #244 first, then this one (both append to MEMORY).
+
+**Next session:** none queued in this repo.
