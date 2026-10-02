@@ -2960,3 +2960,19 @@ context_for_next_session:
   - MERGE_LAST_AMONG_THE_RAG_PRS_FROM_THIS_RUN_all_append_MEMORY
 followups: []
 ---
+
+---
+session: 2026-10-02T14:20Z
+issue: 260
+focus: RewriteResult_ACCEPTED_A_BARE_STRING_sub_queries_ONE_HYBRID_SEARCH_PER_CHARACTER_SIBLING_OF_254
+phase: shipped
+delta:
+  files_changed: 2
+  tests_added: 8
+  suite: "1787 -> 1795 green (8 skips)"
+decisions_made: []
+measured: "hunt agent: a custom rewriter returning 'who wrote Macbeth' -> 17 searches over single characters. Revert: 5 of 8 red, including an arm through Retriever.search with _hybrid_search counted (0 calls)."
+context_for_next_session:
+  - THE_GUARD_IS_ON_THE_RESULT_TYPE_EVERY_REWRITER_RETURNS_NOT_ON_THE_RETRIEVER_LOOP_so_a_custom_backend_cannot_route_around_it
+followups: []
+---
