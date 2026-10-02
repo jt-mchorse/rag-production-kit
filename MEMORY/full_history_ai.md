@@ -2865,6 +2865,25 @@ context_for_next_session:
 followups: []
 
 ---
+session: 2026-10-01T07:53Z
+issue: 243
+focus: A_REPEATED_K_DOUBLE_COUNTED_AND_A_NOTE_DENIED_WHAT_ITS_OWN_TEST_MEASURES
+phase: shipped
+duration_min: 3   # 07:50 plan -> 07:53 close, from date -u
+delta:
+  files_changed: 3
+  tests_added: 6
+  suite: "1734 -> 1740 green (8 skipped)"
+decisions_made: []
+measured: "repro: --k 1,1 -> multi-hop n_queries 16 of 8, improved 2 at k=1 vs 1. Revert probes, control 1740: no parse check 1 red, no measure check 3, old note wording 3, silent dedupe in parse 1. docs/benchmarks.md regenerated with the documented command, one line moved."
+context_for_next_session:
+  - A_NOTE_BESIDE_A_ROW_IS_A_CLAIM_ABOUT_THE_ROW_and_the_bench_had_a_TEST_ASSERTING_THE_OPPOSITE_saturation_bounds_lift_not_harm_READ_THE_TEST_FILE_FOR_SENTENCES_THAT_CONTRADICT_RENDERED_PROSE
+  - A_DICT_COMPREHENSION_KEYED_ON_A_SEQUENCE_MERGES_DUPLICATES_WHILE_A_LOOP_OVER_THE_SEQUENCE_DOES_NOT_grep_for_k_COLON_list_for_k_in_ks
+  - FOUND_BY_A_PHASE_A_HUNT_AGENT_ON_PR_236_MERGED_THIS_RUN_reproduced_firsthand_before_filing
+followups: []
+---
+
+---
 session: 2026-10-01T08:02Z
 issue: 245
 focus: 184S_STORE_GUARANTEES_HELD_ONLY_THROUGH_build_AND_THE_BARE_CONSTRUCTOR_IS_PUBLIC
