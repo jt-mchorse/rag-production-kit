@@ -2990,3 +2990,15 @@ the docs) and a GitHub token (the eval runner's PR comment). All four are listed
 now, the README's reranker paragraph names the Cohere key, and a test derives the
 variables from source so the file can't fall behind again. Part of
 portfolio-ops#80.
+
+## 2026-10-01 — Issue #243: bench_reranker refuses a repeated k; the saturation note stops denying a measurable regression
+**Duration:** ~3 min · **Branch:** session/2026-10-01-0752-issue-243
+
+- `--k 1,1` counted every query twice (`n_queries` 16 for an 8-question fixture), because `per_k` merged the repeat while the loop appended once per occurrence. Both `_parse_ks` and `measure` now refuse a repeated k.
+- The note under the saturated fixture said it "cannot show lift in either direction", but the bench's own test measures a regression on that fixture. It now says it cannot show an *improvement*, and that a regression would still show. `docs/benchmarks.md` was regenerated and only that line changed. 6 new arms; four revert probes are all red.
+
+**Why this work, this session:** PR #236 was merged in this run's Phase A, and the hunt over it found both.
+
+**Open questions / blockers:** none.
+
+**Next session:** the `CostRecord` bare-constructor `ts` finding from the same hunt.
