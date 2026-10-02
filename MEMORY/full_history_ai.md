@@ -2922,3 +2922,23 @@ context_for_next_session:
   - THE_OVERWRITE_TESTS_RUN_UNDER_UMASK_027_so_a_new_file_mode_differs_from_most_existing_modes_0o640_is_the_one_that_coincides
 followups: ["portfolio-ops#81"]
 ---
+
+---
+session: 2026-10-01T08:56Z
+issue: 249
+focus: A_REFUSED_POST_COMMENT_RUN_STILL_REWROTE_THE_COMMITTED_EVALS_CURRENT
+phase: shipped
+duration_min: 3   # 08:53 issue -> 08:56 close, from date -u
+delta:
+  files_changed: 2
+  tests_added: 3
+  suite: "1734 -> 1737 green (8 skipped)"
+decisions_made: []
+measured: "hunt agent: run_eval --post-comment (no --repo/--pr) -> exit 2 AFTER 'wrote evals/current/*.json', git status M on all three; same with eval-harness off PATH. Revert probe (old run_eval.py): 4 failed of 1737."
+context_for_next_session:
+  - A_TEST_NAMED_FOR_A_PROPERTY_exits_2_before_writing_anything_ASSERTED_ONLY_THE_EXIT_CODE_read_the_test_name_as_the_spec_and_check_the_body_covers_it
+  - 174S_COMMENT_SAID_FAIL_BEFORE_RENDERING_ANYTHING_AND_ITS_FIX_MOVED_THE_CHECK_ONLY_PAST_THE_RENDER_NOT_PAST_THE_WRITE
+  - MERGE_ORDER_244_246_248_THEN_THIS_all_append_MEMORY
+  - rag_streaming_except_block_str_e_can_raise_and_end_the_stream_without_its_error_event_FROM_THE_SAME_HUNT_NOT_FILED_YET
+followups: []
+---

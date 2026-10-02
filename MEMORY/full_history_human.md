@@ -3025,3 +3025,14 @@ phase-timing JSON written for a log-tailer to read, and overwriting an existing
 0666, so the kernel applies the umask, and on an overwrite it takes the existing
 file's mode before the rename. New tests cover two umasks and four existing modes
 through the helper and both dump methods. Part of portfolio-ops#81.
+
+## 2026-10-01 — Issue #249: --post-comment refuses bad input before rewriting evals/current/
+**Duration:** ~3 min · **Branch:** session/2026-10-01-0900-issue-evalorder
+
+- `run_eval --post-comment` without `--repo`/`--pr`, or without `eval-harness` installed, exited 2 only after rewriting the committed `evals/current/*.json`. Both refusals now run with the other input checks, before anything is computed or written. The test named "exits 2 before writing anything" now actually checks that, and a twin covers the missing `--repo`/`--pr` case. The revert probe is red (4 failed).
+
+**Why this work, this session:** found by this run's second hunt wave.
+
+**Open questions / blockers:** none. This branch appends to MEMORY like the other rag PRs from this run, so merge it after them.
+
+**Next session:** the streaming pipeline's `except` block can still end a stream without its `error` event when `str(e)` raises.

@@ -194,6 +194,24 @@ def test_missing_eval_harness_exits_2_before_writing_anything(
     err = capsys.readouterr().err
     assert "pip install -e '.[eval]'" in err
     assert "Traceback" not in err
+    # What the name promises (#249): the refusal used to come after
+    # `write_runs`, so the results directory was filled anyway.
+    assert not (tmp_path / "current").exists()
+
+
+@pytest.mark.parametrize(
+    "argv",
+    [["--post-comment"], ["--post-comment", "--repo", "o/r"], ["--post-comment", "--pr", "1"]],
+    ids=["neither", "no-pr", "no-repo"],
+)
+def test_post_comment_without_repo_and_pr_exits_2_before_writing_anything(
+    tmp_path, monkeypatch: pytest.MonkeyPatch, capsys, argv
+):
+    """#249: run as documented, this rewrote the committed evals/current/."""
+    monkeypatch.setattr(run_eval, "CURRENT_DIR", tmp_path / "current")
+    assert run_eval.main(argv) == 2
+    assert "--post-comment requires --repo and --pr" in capsys.readouterr().err
+    assert not (tmp_path / "current").exists()
 
 
 def test_diff_markdown_reports_a_missing_binary_instead_of_raising(tmp_path):
