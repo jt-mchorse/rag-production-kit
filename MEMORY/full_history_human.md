@@ -3036,3 +3036,14 @@ through the helper and both dump methods. Part of portfolio-ops#81.
 **Open questions / blockers:** none. This branch appends to MEMORY like the other rag PRs from this run, so merge it after them.
 
 **Next session:** the streaming pipeline's `except` block can still end a stream without its `error` event when `str(e)` raises.
+
+## 2026-10-01 — Issue #251: the stream's terminal error event survives an unstringable exception
+**Duration:** ~4 min · **Branch:** session/2026-10-01-0920-issue-strerr
+
+- If an exception's `__str__` itself raised, `StreamingPipeline.run` escaped after `retrieving` and sent no terminal event. The error message now goes through `_safe_fallback`, the helper #201 wrote for this exact failure at two other positions. 3 tests; revert probe red.
+
+**Why this work, this session:** found by this run's second hunt wave; it's in scope under D-017.
+
+**Open questions / blockers:** none.
+
+**Next session:** none queued.

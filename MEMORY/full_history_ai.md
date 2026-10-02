@@ -2942,3 +2942,21 @@ context_for_next_session:
   - rag_streaming_except_block_str_e_can_raise_and_end_the_stream_without_its_error_event_FROM_THE_SAME_HUNT_NOT_FILED_YET
 followups: []
 ---
+
+---
+session: 2026-10-01T09:05Z
+issue: 251
+focus: THE_THIRD_POSITION_OF_THE_STR_COERCION_201_GUARDED_TWO
+phase: shipped
+duration_min: 4   # issue filed ~4 min before this block, from date -u
+delta:
+  files_changed: 2
+  tests_added: 3
+  suite: "1734 -> 1737 green (8 skipped)"
+decisions_made: []
+measured: "2ff3f6f: retriever raising an exception whose __str__ raises -> events ['retrieving'] then RuntimeError escapes. Revert probe: 2 failed of 1737."
+context_for_next_session:
+  - 201_NAMED_ONE_HELPER_ONE_COERCION_TWO_POSITIONS_and_the_third_position_was_the_except_block_ENUMERATE_EVERY_str_CALL_ON_ARBITRARY_CALLER_OBJECTS_IN_A_TOTAL_SEAM
+  - MERGE_LAST_AMONG_THE_RAG_PRS_FROM_THIS_RUN_all_append_MEMORY
+followups: []
+---

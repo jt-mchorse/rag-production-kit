@@ -396,9 +396,14 @@ class StreamingPipeline:
             yield StreamEvent("done", {"total_ms": total_ms}, total_ms)
 
         except Exception as e:
+            # `_safe_fallback`, not `str(e)` (#251): the exception is arbitrary
+            # caller code, and a `__str__` that raises here escaped the generator
+            # after `retrieving` -- no `error`, no `done`, the one frame this class
+            # promises an SSE client always sees. #201 routed the payload-value
+            # and key positions through the helper; this is the third position.
             yield StreamEvent(
                 "error",
-                {"message": str(e), "exception": type(e).__name__},
+                {"message": _safe_fallback(e), "exception": type(e).__name__},
                 _now_ms() - t0,
             )
             return
