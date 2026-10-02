@@ -3047,3 +3047,14 @@ through the helper and both dump methods. Part of portfolio-ops#81.
 **Open questions / blockers:** none.
 
 **Next session:** none queued.
+
+## 2026-10-02 — quoted or bracketed endings no longer get a grounded answer refused (#258)
+
+The template generator removed a sentence's final punctuation and appended the
+citation marker. A sentence ending in punctuation plus a closing quote or
+bracket, such as `... "restart the server."`, kept both, so the marker landed
+after them. The sentence splitter then separated the claim from its marker and
+refused a fully grounded answer, on a code path marked as unreachable. Such
+sentences now get the marker before the closing tail. Every other sentence
+renders exactly as before, including all ten in the committed eval corpus.
+7 new tests.

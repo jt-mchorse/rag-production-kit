@@ -483,6 +483,31 @@ def split_sentences(text: str) -> list[str]:
     return [p for p in merged if any(ch.isalnum() for ch in p)]
 
 
+_TERMINATORS = ".!?…。！？؟"
+# A terminator followed by closing punctuation -- the boundary `_SENTENCE_SPLIT`'s
+# second lookbehind splits on (#161).
+_TERMINATOR_THEN_CLOSERS = re.compile(r"[.!?…。！？؟][\"”’')\]]+$")
+
+
+def _template_sentence(sentence: str, external_id: str) -> str:
+    """One cited template sentence for one source sentence (#258).
+
+    Normally the trailing terminators are stripped and `[cite:...]` plus a full
+    stop is appended -- unchanged. But a sentence ending in a terminator and a
+    closing quote or bracket (`... "restart the server."`) cannot be handled
+    that way: the strip leaves `."` in place, the appended marker lands after
+    it, and `split_sentences` -- which treats terminator+closer as a boundary --
+    cut the claim from its own marker, so `enforce_citations` refused a fully
+    grounded chunk. The marker goes *before* that tail instead, which keeps the
+    quote balanced and the sentence and its marker in one piece.
+    """
+    s = sentence.strip()
+    tail = _TERMINATOR_THEN_CLOSERS.search(s)
+    if tail is not None:
+        return f"Per the retrieved context, {s[: tail.start()]} [cite:{external_id}]{s[tail.start() :]}"
+    return f"Per the retrieved context, {s.rstrip(_TERMINATORS)} [cite:{external_id}]."
+
+
 def _marker_readback(external_id: str) -> str | None:
     """What a `[cite:<external_id>]` marker actually resolves to, or `None`.
 
@@ -691,15 +716,15 @@ class TemplateGenerator:
         # uncited — a false "unparseable_output" refusal. Each chunk still
         # yields exactly one deduped Citation.
         sentences = [
-            f"Per the retrieved context, {s.strip().rstrip('.!?…。！？؟')} [cite:{c.external_id}]."
-            for c in chosen
-            for s in split_sentences(c.text)
+            _template_sentence(s, c.external_id) for c in chosen for s in split_sentences(c.text)
         ]
         text = " ".join(sentences)
         try:
             citations = enforce_citations(text, retrieved)
         # pragma: no cover - defensive: only reachable if every chosen chunk is
-        # empty / punctuation-only, which yields no cited sentences.
+        # empty / punctuation-only, which yields no cited sentences. (Until #258
+        # a sentence ending in a terminator plus a closing quote/bracket reached
+        # it too: `_template_sentence` now keeps such a sentence with its marker.)
         except CitationError as e:  # pragma: no cover
             return _refusal(e.reason, e.detail, threshold, top)
         return GeneratedAnswer(
