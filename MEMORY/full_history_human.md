@@ -3047,3 +3047,10 @@ through the helper and both dump methods. Part of portfolio-ops#81.
 **Open questions / blockers:** none.
 
 **Next session:** none queued.
+
+## 2026-10-02 — a rewriter can't return a bare string as its sub-queries (#260)
+
+A custom query rewriter that returned one query as a plain string, rather than a
+tuple, made the retriever run one search per character and fuse the results.
+`RewriteResult`, which every rewriter returns, now refuses that shape. 8 new
+tests, including one through the retriever showing no search runs.
