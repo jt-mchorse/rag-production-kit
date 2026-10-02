@@ -128,6 +128,27 @@ class PriceTable:
 # ----------------------------------------------------------------------
 
 
+def _checked_ts(ts_value: Any) -> float:
+    """``ts`` as ``build`` and ``TelemetryStore.record`` both require it (#184, #245)."""
+    if isinstance(ts_value, bool) or not isinstance(ts_value, (int, float)):
+        raise ValueError(
+            f"ts must be a finite number of seconds since the Unix epoch (UTC); got {ts_value!r}"
+        )
+    if not math.isfinite(ts_value):
+        raise ValueError(
+            f"ts must be a finite number of seconds since the Unix epoch (UTC); got {ts_value}"
+        )
+    return ts_value
+
+
+#: The `REAL NOT NULL` columns other than `ts`, which `record` checks for NaN
+#: (#245). SQLite stores a NaN as NULL, so one of these reached the NOT NULL
+#: constraint and escaped `record` as a raw `sqlite3.IntegrityError` naming a
+#: column. `tests/test_telemetry_record_seam.py` derives the REAL columns from
+#: `_SCHEMA_SQL` and fails if this list misses one.
+_NAN_CHECKED_REAL_FIELDS = ("prompt_usd", "completion_usd", "total_usd", "total_latency_ms")
+
+
 @dataclass(frozen=True)
 class CostRecord:
     """One per-request telemetry blob.
@@ -241,16 +262,11 @@ class CostRecord:
         # Negative values are allowed: a pre-1970 timestamp is unusual but
         # well-defined, and this module has no business deciding an operator's
         # backfill window is wrong.
-        ts_value = ts if ts is not None else time.time()
-        if isinstance(ts_value, bool) or not isinstance(ts_value, (int, float)):
-            raise ValueError(
-                f"ts must be a finite number of seconds since the Unix epoch (UTC); "
-                f"got {ts_value!r}"
-            )
-        if not math.isfinite(ts_value):
-            raise ValueError(
-                f"ts must be a finite number of seconds since the Unix epoch (UTC); got {ts_value}"
-            )
+        #
+        # One definition, shared with `TelemetryStore.record` (#245): the bare
+        # constructor skips this method, and `ts`'s harm happens inside SQL, so
+        # the store's write seam is the only other place it can be closed.
+        ts_value = _checked_ts(ts if ts is not None else time.time())
         # Finiteness guard (#38): NaN latency propagates through percentile()
         # which sorts a list with NaN — Python's sort is stable but NaN
         # comparisons are all false, so the returned percentile is implementation-
@@ -346,7 +362,26 @@ class TelemetryStore:
         self.close()
 
     def record(self, rec: CostRecord) -> int:
-        """Insert one record; return its assigned id."""
+        """Insert one record; return its assigned id.
+
+        Raises ``ValueError`` for a ``ts`` outside ``CostRecord.build``'s rule
+        or a NaN in any other ``REAL`` column (#245). ``build`` already refuses
+        both; the bare constructor is public (`rag_kit.__all__`) and validates
+        neither, and ``ts`` cannot be guarded at a read boundary the way
+        ``aggregate`` guards latency: ``since()`` filters and orders on it in
+        SQL, so an ``inf`` was in every ``last_24h()`` window and a ``-inf`` in
+        none before any Python saw the row. Not in ``__post_init__``, because
+        ``since()`` rebuilds stored rows through the constructor and must keep
+        reading rows already written.
+        """
+        _checked_ts(rec.ts)
+        for name in _NAN_CHECKED_REAL_FIELDS:
+            value = getattr(rec, name)
+            if isinstance(value, float) and math.isnan(value):
+                raise ValueError(
+                    f"{name} must not be NaN; SQLite stores NaN as NULL, which the "
+                    f"NOT NULL column {name} refuses"
+                )
         cur = self._conn.execute(
             """
             INSERT INTO cost_records (

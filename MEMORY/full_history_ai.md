@@ -2865,6 +2865,85 @@ context_for_next_session:
 followups: []
 
 ---
+session: 2026-10-01T07:53Z
+issue: 243
+focus: A_REPEATED_K_DOUBLE_COUNTED_AND_A_NOTE_DENIED_WHAT_ITS_OWN_TEST_MEASURES
+phase: shipped
+duration_min: 3   # 07:50 plan -> 07:53 close, from date -u
+delta:
+  files_changed: 3
+  tests_added: 6
+  suite: "1734 -> 1740 green (8 skipped)"
+decisions_made: []
+measured: "repro: --k 1,1 -> multi-hop n_queries 16 of 8, improved 2 at k=1 vs 1. Revert probes, control 1740: no parse check 1 red, no measure check 3, old note wording 3, silent dedupe in parse 1. docs/benchmarks.md regenerated with the documented command, one line moved."
+context_for_next_session:
+  - A_NOTE_BESIDE_A_ROW_IS_A_CLAIM_ABOUT_THE_ROW_and_the_bench_had_a_TEST_ASSERTING_THE_OPPOSITE_saturation_bounds_lift_not_harm_READ_THE_TEST_FILE_FOR_SENTENCES_THAT_CONTRADICT_RENDERED_PROSE
+  - A_DICT_COMPREHENSION_KEYED_ON_A_SEQUENCE_MERGES_DUPLICATES_WHILE_A_LOOP_OVER_THE_SEQUENCE_DOES_NOT_grep_for_k_COLON_list_for_k_in_ks
+  - FOUND_BY_A_PHASE_A_HUNT_AGENT_ON_PR_236_MERGED_THIS_RUN_reproduced_firsthand_before_filing
+followups: []
+---
+
+---
+session: 2026-10-01T08:02Z
+issue: 245
+focus: 184S_STORE_GUARANTEES_HELD_ONLY_THROUGH_build_AND_THE_BARE_CONSTRUCTOR_IS_PUBLIC
+phase: shipped
+duration_min: 6   # 07:56 plan -> 08:02 close, from date -u
+delta:
+  files_changed: 3
+  tests_added: 19
+  suite: "1734 -> 1753 green (8 skipped)"
+decisions_made: []
+measured: "repro on 2ff3f6f with CostRecord(...) + record(): ts=nan and total_latency_ms=nan -> raw sqlite3.IntegrityError; ts=inf and ts='2026-08-24' in last_24h(now=9e9); ts=-inf absent from since(-1e300). Revert probes, control 1753: record skips ts 9 red, skips NaN loop 4, list misses a column 1, ts rule in own words 8, finite-instead-of-nan neighbour 3."
+context_for_next_session:
+  - A_TEST_NAMED_FOR_THE_STORE_THAT_EXERCISES_THE_BUILDER_is_a_scope_claim_and_its_docstring_said_THE_ONLY_WAY_A_CALLER_CAN_while_D_022_had_already_written_the_bare_constructor_is_public_READ_THE_NEIGHBOURING_DECISION_AGAINST_THE_TESTS_PREMISE
+  - WHERE_THE_HARM_HAPPENS_DECIDES_THE_BOUNDARY_latency_and_tokens_are_guarded_at_aggregate_because_python_reads_them_ts_cannot_be_because_SQL_filters_on_it_so_the_write_seam_is_the_only_option
+  - THE_NAN_LIST_IS_DERIVED_FROM_THE_SCHEMA_TEXT_BY_A_TEST_with_a_non_zero_control_and_the_finite_instead_of_nan_neighbour_is_rejected_by_an_existing_aggregate_test
+  - MERGE_ORDER_244_THEN_246_both_append_MEMORY
+followups: []
+---
+
+---
+session: 2026-10-01T08:52Z
+issue: 247
+focus: atomic_write_text_created_every_file_0600_and_an_overwrite_demoted_0644_to_0600
+phase: shipped
+duration_min: 5
+delta:
+  files_changed: 2
+  tests_added: 22
+  suite: "1756 passed, 8 deselected (was 1734); ruff check and ruff format --check clean"
+decisions_made: []
+measured: "umask 022 on main: new file 0o600, overwrite of 0o644 -> 0o600. After: 0o644 and 0o644. Revert probes: main's io_utils.py 15 red of 1756; fix with the chmod-on-overwrite line removed 9 red of 1756."
+context_for_next_session:
+  - NamedTemporaryFile_AND_mkstemp_ALWAYS_CREATE_0600_os_replace_CARRIES_THE_MODE_the_temp_is_now_os_open_O_EXCL_0o666_so_the_kernel_applies_the_umask
+  - NEVER_READ_THE_UMASK_VIA_os_umask_0_IT_SETS_A_PROCESS_WIDE_UMASK_OF_0_FOR_OTHER_THREADS
+  - THE_RANDOM_NAME_COMPONENT_IS_NOW_secrets_token_hex_4_with_a_bounded_retry_on_FileExistsError_the_200_byte_base_cap_is_unchanged
+  - THE_OVERWRITE_TESTS_RUN_UNDER_UMASK_027_so_a_new_file_mode_differs_from_most_existing_modes_0o640_is_the_one_that_coincides
+followups: ["portfolio-ops#81"]
+---
+
+---
+session: 2026-10-01T08:56Z
+issue: 249
+focus: A_REFUSED_POST_COMMENT_RUN_STILL_REWROTE_THE_COMMITTED_EVALS_CURRENT
+phase: shipped
+duration_min: 3   # 08:53 issue -> 08:56 close, from date -u
+delta:
+  files_changed: 2
+  tests_added: 3
+  suite: "1734 -> 1737 green (8 skipped)"
+decisions_made: []
+measured: "hunt agent: run_eval --post-comment (no --repo/--pr) -> exit 2 AFTER 'wrote evals/current/*.json', git status M on all three; same with eval-harness off PATH. Revert probe (old run_eval.py): 4 failed of 1737."
+context_for_next_session:
+  - A_TEST_NAMED_FOR_A_PROPERTY_exits_2_before_writing_anything_ASSERTED_ONLY_THE_EXIT_CODE_read_the_test_name_as_the_spec_and_check_the_body_covers_it
+  - 174S_COMMENT_SAID_FAIL_BEFORE_RENDERING_ANYTHING_AND_ITS_FIX_MOVED_THE_CHECK_ONLY_PAST_THE_RENDER_NOT_PAST_THE_WRITE
+  - MERGE_ORDER_244_246_248_THEN_THIS_all_append_MEMORY
+  - rag_streaming_except_block_str_e_can_raise_and_end_the_stream_without_its_error_event_FROM_THE_SAME_HUNT_NOT_FILED_YET
+followups: []
+---
+
+---
 session: 2026-10-01T09:05Z
 issue: 251
 focus: THE_THIRD_POSITION_OF_THE_STR_COERCION_201_GUARDED_TWO
