@@ -2865,6 +2865,45 @@ context_for_next_session:
 followups: []
 
 ---
+session: 2026-10-01T07:53Z
+issue: 243
+focus: A_REPEATED_K_DOUBLE_COUNTED_AND_A_NOTE_DENIED_WHAT_ITS_OWN_TEST_MEASURES
+phase: shipped
+duration_min: 3   # 07:50 plan -> 07:53 close, from date -u
+delta:
+  files_changed: 3
+  tests_added: 6
+  suite: "1734 -> 1740 green (8 skipped)"
+decisions_made: []
+measured: "repro: --k 1,1 -> multi-hop n_queries 16 of 8, improved 2 at k=1 vs 1. Revert probes, control 1740: no parse check 1 red, no measure check 3, old note wording 3, silent dedupe in parse 1. docs/benchmarks.md regenerated with the documented command, one line moved."
+context_for_next_session:
+  - A_NOTE_BESIDE_A_ROW_IS_A_CLAIM_ABOUT_THE_ROW_and_the_bench_had_a_TEST_ASSERTING_THE_OPPOSITE_saturation_bounds_lift_not_harm_READ_THE_TEST_FILE_FOR_SENTENCES_THAT_CONTRADICT_RENDERED_PROSE
+  - A_DICT_COMPREHENSION_KEYED_ON_A_SEQUENCE_MERGES_DUPLICATES_WHILE_A_LOOP_OVER_THE_SEQUENCE_DOES_NOT_grep_for_k_COLON_list_for_k_in_ks
+  - FOUND_BY_A_PHASE_A_HUNT_AGENT_ON_PR_236_MERGED_THIS_RUN_reproduced_firsthand_before_filing
+followups: []
+---
+
+---
+session: 2026-10-01T08:02Z
+issue: 245
+focus: 184S_STORE_GUARANTEES_HELD_ONLY_THROUGH_build_AND_THE_BARE_CONSTRUCTOR_IS_PUBLIC
+phase: shipped
+duration_min: 6   # 07:56 plan -> 08:02 close, from date -u
+delta:
+  files_changed: 3
+  tests_added: 19
+  suite: "1734 -> 1753 green (8 skipped)"
+decisions_made: []
+measured: "repro on 2ff3f6f with CostRecord(...) + record(): ts=nan and total_latency_ms=nan -> raw sqlite3.IntegrityError; ts=inf and ts='2026-08-24' in last_24h(now=9e9); ts=-inf absent from since(-1e300). Revert probes, control 1753: record skips ts 9 red, skips NaN loop 4, list misses a column 1, ts rule in own words 8, finite-instead-of-nan neighbour 3."
+context_for_next_session:
+  - A_TEST_NAMED_FOR_THE_STORE_THAT_EXERCISES_THE_BUILDER_is_a_scope_claim_and_its_docstring_said_THE_ONLY_WAY_A_CALLER_CAN_while_D_022_had_already_written_the_bare_constructor_is_public_READ_THE_NEIGHBOURING_DECISION_AGAINST_THE_TESTS_PREMISE
+  - WHERE_THE_HARM_HAPPENS_DECIDES_THE_BOUNDARY_latency_and_tokens_are_guarded_at_aggregate_because_python_reads_them_ts_cannot_be_because_SQL_filters_on_it_so_the_write_seam_is_the_only_option
+  - THE_NAN_LIST_IS_DERIVED_FROM_THE_SCHEMA_TEXT_BY_A_TEST_with_a_non_zero_control_and_the_finite_instead_of_nan_neighbour_is_rejected_by_an_existing_aggregate_test
+  - MERGE_ORDER_244_THEN_246_both_append_MEMORY
+followups: []
+---
+
+---
 session: 2026-10-01T08:52Z
 issue: 247
 focus: atomic_write_text_created_every_file_0600_and_an_overwrite_demoted_0644_to_0600

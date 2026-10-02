@@ -2991,6 +2991,30 @@ now, the README's reranker paragraph names the Cohere key, and a test derives th
 variables from source so the file can't fall behind again. Part of
 portfolio-ops#80.
 
+## 2026-10-01 — Issue #243: bench_reranker refuses a repeated k; the saturation note stops denying a measurable regression
+**Duration:** ~3 min · **Branch:** session/2026-10-01-0752-issue-243
+
+- `--k 1,1` counted every query twice (`n_queries` 16 for an 8-question fixture), because `per_k` merged the repeat while the loop appended once per occurrence. Both `_parse_ks` and `measure` now refuse a repeated k.
+- The note under the saturated fixture said it "cannot show lift in either direction", but the bench's own test measures a regression on that fixture. It now says it cannot show an *improvement*, and that a regression would still show. `docs/benchmarks.md` was regenerated and only that line changed. 6 new arms; four revert probes are all red.
+
+**Why this work, this session:** PR #236 was merged in this run's Phase A, and the hunt over it found both.
+
+**Open questions / blockers:** none.
+
+**Next session:** the `CostRecord` bare-constructor `ts` finding from the same hunt.
+
+## 2026-10-01 — Issue #245: the store holds a bare `CostRecord` to `build`'s `ts` rule
+**Duration:** ~6 min · **Branch:** session/2026-10-01-0758-issue-245
+
+- #184 guarded `ts` in `CostRecord.build`, but the public bare constructor skips `build`. As a result, `TelemetryStore.record` stored `ts=inf` in every `last_24h` window and `-inf` in none, and a NaN raised a raw `sqlite3.IntegrityError`. `record` now applies the same `_checked_ts` rule (same message) and refuses a NaN in every `REAL NOT NULL` column; a test reads that column list from the schema.
+- The check lives in `record`, not `__post_init__`, because `since()` rebuilds stored rows through the constructor and must still read old rows. 19 new arms; five revert probes all red.
+
+**Why this work, this session:** found by this run's hunt; the #184 test docstring's premise ("the only way a caller can") was contradicted by D-022.
+
+**Open questions / blockers:** none. Merge #244 first, then this one (both append to MEMORY).
+
+**Next session:** none queued in this repo.
+
 ## 2026-10-01T08:52Z — #247: atomic writes created every file owner-only
 
 `atomic_write_text` built its temp file with `NamedTemporaryFile`, which always

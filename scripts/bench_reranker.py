@@ -21,8 +21,9 @@ stand-in the pipeline uses in CI; it scores query-token *coverage* where the
 retriever scores overlap *density*, and that difference is all the lift can come
 from. This is the lift of that stand-in on two synthetic fixtures, not a claim
 about a cross-encoder. The eval golden set is saturated -- fused-only recall is
-already 1.000 at every k -- so it cannot show lift in either direction, and the
-rendered table says so from the numbers rather than dropping the row.
+already 1.000 at every k -- so it cannot show an improvement, and the rendered
+table says so from the numbers rather than dropping the row. It can still show a
+regression (saturation bounds lift, not harm), which is what its `0 / 0` measures.
 
 Usage:
     python -m scripts.bench_reranker
@@ -112,6 +113,11 @@ class Row:
 def measure(
     fixture: Fixture, reranker: Reranker, *, ks: Sequence[int], candidates: int
 ) -> list[Row]:
+    # A repeated k collapsed into one `per_k` bucket and was then appended to
+    # once per occurrence, so every query counted twice at that k (#243).
+    repeated = sorted({k for k in ks if list(ks).count(k) > 1})
+    if repeated:
+        raise ValueError(f"each k may appear once; got {list(ks)} (repeated: {repeated})")
     if candidates < max(ks):
         raise ValueError(f"--candidates ({candidates}) must be >= the largest k ({max(ks)})")
     per_k: dict[int, list[tuple[float, float]]] = {k: [] for k in ks}
@@ -172,8 +178,12 @@ def render_markdown(fx: Sequence[Fixture], rows: Sequence[Row], *, candidates: i
         note = f"- **{f.name}**: {f.description}."
         if _saturated(rows, f.name):
             note += (
+                # Improvement only (#243): a reranker that demotes the gold
+                # chunk still drops recall below 1.000 here, and the tests
+                # measure exactly that, so this row's `0 / 0` is a real
+                # "did no harm", not an empty cell.
                 " Fused-only recall is already 1.000 at every k, so this fixture "
-                "cannot show lift in either direction."
+                "cannot show an improvement; a regression would still show."
             )
         lines.append(note)
     return "\n".join(lines) + "\n"
@@ -188,6 +198,8 @@ def _parse_ks(raw: str) -> tuple[int, ...]:
         ) from None
     if not ks or any(k < 1 for k in ks):
         raise argparse.ArgumentTypeError(f"every k must be >= 1; got {raw!r}")
+    if len(set(ks)) != len(ks):
+        raise argparse.ArgumentTypeError(f"each k may appear once; got {raw!r}")
     return ks
 
 
