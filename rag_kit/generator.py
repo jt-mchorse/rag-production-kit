@@ -529,7 +529,10 @@ _TERMINATORS = ".!?…。！？؟"
 # A terminator followed by closing punctuation -- a boundary `_SENTENCE_SPLIT`
 # splits after (#161). The same `_CLOSERS` as the splitter, so the writer cannot
 # emit a tail the reader cuts at a different place (#262).
-_TERMINATOR_THEN_CLOSERS = re.compile(rf"[.!?…。！？؟][{re.escape(_CLOSERS)}]+$")
+# A terminator RUN, as the splitter reads it: `?!”` or `...”` with one
+# terminator here left `?` / `..` in front of the marker, where the splitter
+# cut it off -- a fully grounded chunk refused (#262).
+_TERMINATOR_THEN_CLOSERS = re.compile(rf"[.!?…。！？؟]+[{re.escape(_CLOSERS)}]+$")
 
 
 def _template_sentence(sentence: str, external_id: str) -> str:

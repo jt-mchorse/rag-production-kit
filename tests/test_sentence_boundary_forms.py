@@ -116,6 +116,12 @@ def test_where_the_text_is_cut(text: str, sentences: list[str]) -> None:
         "彼は「返金は14日です。」",
         "退款期为14天。专业版退款期为30天。",
         "Run `make test.`",
+        # A terminator RUN before the closer: the writer took one terminator
+        # and left `?` / `..` in front of the marker, where the reader cut.
+        'He said “Really?!”',
+        "Wait...”",
+        'She asked "why?!"',
+        "Is it done?!)",
     ],
 )
 def test_the_template_writer_emits_what_the_reader_accepts(source: str) -> None:
