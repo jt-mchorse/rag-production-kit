@@ -322,3 +322,20 @@ def copy_json_value(value: Any) -> Any:
         if shell is root:
             root = frozen
     return root
+
+
+def refuse_bare_string(name: str, value: Any) -> None:
+    """Raise `ValueError` if `value` is a bare `str`/`bytes` (#253).
+
+    For a parameter that takes a collection of ids. A `str` *is* a
+    `Sequence[str]` and an `Iterable[str]`, so the annotation admits it, mypy
+    accepts it, and `list("doc-7")` is five well-formed ids -- nothing after the
+    coercion can tell. Only the bare-string shape is refused; every other
+    collection behaves exactly as before.
+    """
+    if isinstance(value, (str, bytes, bytearray)):
+        fix = f"pass [{value!r}]" if isinstance(value, str) else "decode it to str ids first"
+        raise ValueError(
+            f"{name} must be a sequence of ids, not a bare {type(value).__name__}: "
+            f"{value!r} would be split into its characters -- {fix}"
+        )

@@ -473,7 +473,24 @@ def split_sentences(text: str) -> list[str]:
     claim per sentence ending in `.`/`!`/`?`, and we don't need a full NLP
     tokenizer for that contract.
     """
-    parts = _SENTENCE_SPLIT.split(text.strip())
+    # Never split INSIDE a citation marker (#256). `Document` accepts an id like
+    # `faq.md#Q3. refunds` and `_CITE_PATTERN` reads it back, but the split
+    # fires on terminal-punctuation-then-whitespace wherever it occurs, so
+    # `[cite:faq.md#Q3. refunds]` became `[cite:faq.md#Q3.` + `refunds].` and a
+    # fully grounded answer was refused as having an uncited sentence. Split
+    # points inside a marker's span are skipped -- by position, not by masking
+    # the markers with placeholders, which would corrupt any text that already
+    # contained the placeholder characters.
+    stripped = text.strip()
+    marker_spans = [m.span() for m in _CITE_PATTERN.finditer(stripped)]
+    parts: list[str] = []
+    start = 0
+    for gap in _SENTENCE_SPLIT.finditer(stripped):
+        if any(lo < gap.start() < hi for lo, hi in marker_spans):
+            continue
+        parts.append(stripped[start : gap.start()])
+        start = gap.end()
+    parts.append(stripped[start:])
     merged: list[str] = []
     for part in parts:
         if merged and _ends_with_abbreviation(merged[-1], following=part):
@@ -722,9 +739,11 @@ class TemplateGenerator:
         try:
             citations = enforce_citations(text, retrieved)
         # pragma: no cover - defensive: only reachable if every chosen chunk is
-        # empty / punctuation-only, which yields no cited sentences. (Until #258
-        # a sentence ending in a terminator plus a closing quote/bracket reached
-        # it too: `_template_sentence` now keeps such a sentence with its marker.)
+        # empty / punctuation-only, which yields no cited sentences. (Until #256
+        # it was also reached by any id containing a terminator and a space,
+        # which `split_sentences` split inside its own marker; until #258 by a
+        # sentence ending in a terminator plus a closing quote/bracket, which
+        # `_template_sentence` now keeps with its marker.)
         except CitationError as e:  # pragma: no cover
             return _refusal(e.reason, e.detail, threshold, top)
         return GeneratedAnswer(
