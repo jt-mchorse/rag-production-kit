@@ -3048,3 +3048,22 @@ context_for_next_session:
   - THE_GUARD_IS_ON_THE_RESULT_TYPE_EVERY_REWRITER_RETURNS_NOT_ON_THE_RETRIEVER_LOOP_so_a_custom_backend_cannot_route_around_it
 followups: []
 ---
+
+---
+session: 2026-10-05T09:09Z
+duration_min: 2   # computed: started 09:07Z -> 09:09Z
+issue: 266
+branch: session/2026-10-05-0908-issue-266
+focus: STREAMING_DEMO_SENT_KEEP_ALIVE_WITH_NO_LENGTH_AND_NEVER_CLOSED_one_query_per_page_load
+phase: shipped
+delta:
+  files_changed: 2
+  tests_added: 1
+  suite: "1846 -> 1847 green (8 postgres skips); ruff clean"
+decisions_made: []
+measured: "read-to-EOF of the real handler: timed out on main (revert 1 failed), completes for two consecutive queries after"
+context_for_next_session:
+  - BaseHTTPRequestHandler_send_header_Connection_keep_alive_SETS_close_connection_False_an_unframed_body_then_never_ends
+  - THE_TEST_HELPER_HAD_DOCUMENTED_THE_SYMPTOM_AND_WORKED_AROUND_IT_a_workaround_in_a_test_is_a_bug_report_nobody_filed
+followups: []
+---

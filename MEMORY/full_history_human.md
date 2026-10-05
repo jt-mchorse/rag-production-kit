@@ -3102,3 +3102,13 @@ A custom query rewriter that returned one query as a plain string, rather than a
 tuple, made the retriever run one search per character and fuse the results.
 `RewriteResult`, which every rewriter returns, now refuses that shape. 8 new
 tests, including one through the retriever showing no search runs.
+
+## 2026-10-05 — the streaming demo can run more than one query (#266)
+
+The streaming demo's server told the browser to keep the connection open but
+never said how long the response was, so the browser could never tell the
+stream had ended. The page's Go button only re-enables when a stream ends, so
+the demo allowed one query per page load. The server now closes the
+connection at the end of each stream. A test reads a full response twice in a
+row, which hung before the fix. The existing test helper had worked around the
+hang without anyone filing it.
