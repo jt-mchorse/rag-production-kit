@@ -3102,3 +3102,15 @@ A custom query rewriter that returned one query as a plain string, rather than a
 tuple, made the retriever run one search per character and fuse the results.
 `RewriteResult`, which every rewriter returns, now refuses that shape. 8 new
 tests, including one through the retriever showing no search runs.
+
+## 2026-10-05 — three sentence endings the citation check couldn't see (#262)
+
+The citation check splits an answer into sentences and requires a `[cite:...]`
+marker on each one. It missed three ways a model ends a sentence, and in each
+an uncited claim was glued onto the next, cited sentence and passed:
+Chinese and Japanese text with no space after `。`; endings like `.**`
+(markdown bold) or `.")`; and a marker placed right after the full stop
+(`days.[cite:doc1] Next claim.`). The splitter now recognises all three. A
+full stop still needs a following space, so decimals are safe, and Japanese
+`「…。」と言った` stays one sentence. One list of closing characters now feeds
+both the splitter and the template writer, so they can't disagree again.
