@@ -3014,3 +3014,21 @@ context_for_next_session:
   - MY_FIRST_FIX_MASKED_MARKERS_WITH_PRIVATE_USE_PLACEHOLDERS_AND_MY_OWN_EDGE_ARM_CAUGHT_IT_REWRITING_TEXT_THAT_ALREADY_CONTAINED_THEM_the_shipped_fix_skips_split_points_by_POSITION
 followups: []
 ---
+
+---
+session: 2026-10-02T13:25Z
+issue: 258
+focus: TemplateGenerator_REFUSED_A_GROUNDED_CHUNK_ENDING_IN_A_TERMINATOR_PLUS_CLOSING_QUOTE_THE_NO_COVER_BRANCH_WAS_REACHABLE
+phase: shipped
+delta:
+  files_changed: 2
+  tests_added: 7
+  suite: "1787 -> 1794 green (8 skips); ruff clean"
+decisions_made: []
+measured: "main: 'The manual says \"restart the server.\"' and 'Restart the server (see section 4.)' -> Refusal. Call-site revert: 4 of 7 red, controls green. All 10 committed corpus sentences render byte-identically (pinned)."
+context_for_next_session:
+  - A_FULL_FILE_REVERT_THAT_REMOVES_AN_IMPORTED_HELPER_IS_AN_IMPORT_ERROR_NOT_A_PER_ARM_PROBE_revert_the_CALL_SITE_instead
+  - 257_ALSO_EDITS_THE_PRAGMA_COMMENT_NEXT_TO_THIS_ONE_merge_one_then_rebase_the_other_THE_RESOLVER_WILL_STOP_ON_IT
+  - LITERAL_cite_TEXT_INSIDE_A_CHUNK_IS_STILL_REFUSED_AS_A_DANGLING_CITATION_noted_in_258_not_filed
+followups: []
+---

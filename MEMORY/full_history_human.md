@@ -3084,3 +3084,14 @@ refused as having an uncited sentence. Splits that fall inside a marker are now
 skipped. My first fix swapped the markers out for placeholder characters, and
 one of my own tests showed that would corrupt text already containing those
 characters. The shipped fix works on positions instead. 15 new tests.
+
+## 2026-10-02 — quoted or bracketed endings no longer get a grounded answer refused (#258)
+
+The template generator removed a sentence's final punctuation and appended the
+citation marker. A sentence ending in punctuation plus a closing quote or
+bracket, such as `... "restart the server."`, kept both, so the marker landed
+after them. The sentence splitter then separated the claim from its marker and
+refused a fully grounded answer, on a code path marked as unreachable. Such
+sentences now get the marker before the closing tail. Every other sentence
+renders exactly as before, including all ten in the committed eval corpus.
+7 new tests.
