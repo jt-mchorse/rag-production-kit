@@ -2962,6 +2962,25 @@ followups: []
 ---
 
 ---
+session: 2026-10-02T07:41Z
+issue: 253
+focus: A_BARE_STRING_IS_A_Sequence_str_SO_rerank_delta_ndcg_AND_reciprocal_rank_fusion_MEASURED_AND_FUSED_ITS_CHARACTERS
+phase: shipped
+duration_min: 2   # plan comment 07:39:00Z -> date -u 07:41Z
+delta:
+  files_changed: 4
+  tests_added: 23
+  suite: "1787 -> 1810 green (8 Postgres-gated skips unchanged); ruff check and format clean"
+decisions_made: []
+measured: "main: reciprocal_rank_fusion({'bm25': 'doc-7', 'vec': ['doc-7']}) -> d, doc-7, o, c, -, 7. Revert probe ONE SUBPROCESS PER ID, 23 ids counted: baseline 0, reranker guards removed 9 red, fusion guard removed 4 red, guard on before only 3 red."
+context_for_next_session:
+  - reciprocal_rank_fusion_WAS_THE_UNFILED_SIBLING_Mapping_str_Iterable_str_and_EXPORTED_FROM_rag_kit_FOUND_BY_GREPPING_THE_PACKAGE_FOR_Sequence_Iterable_Collection_str_ANNOTATIONS_those_were_the_only_two_public_sites
+  - ONE_HELPER_io_utils_refuse_bare_string_THE_FUSION_CHECK_WALKS_EVERY_METHOD_VALUE_IN_A_FIRST_LOOP_BEFORE_THE_SCORING_LOOP_and_never_iterates_so_a_generator_value_is_not_consumed
+  - THE_BARE_STRING_CHECK_RUNS_BEFORE_THE_DUPLICATE_ID_CHECK_so_doc_77_no_longer_reports_duplicates_that_do_not_exist
+followups: []
+---
+
+---
 session: 2026-10-02T07:55Z
 issue: "portfolio-ops#79"
 focus: PORT_THE_TESTS_MAY_NOT_REWRITE_A_COMMITTED_FILE_SESSION_GUARD_WIDENED_FROM_docs_TO_EVERY_GIT_TRACKED_FILE

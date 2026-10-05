@@ -29,7 +29,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Any, Protocol
 
-from .io_utils import copy_json_value
+from .io_utils import copy_json_value, refuse_bare_string
 
 
 @dataclass(frozen=True)
@@ -501,6 +501,12 @@ def rerank_delta_ndcg(
     if not isinstance(k, int) or isinstance(k, bool) or k <= 0:
         raise ValueError(f"k must be a positive integer, got {k!r}")
 
+    # Before the copies: `list("doc-7")` is five well-formed ids, so nothing
+    # after this line can tell a bare string from a ranking. It reported
+    # `n_input=5` and a perfect 1.0 for a one-document call, and told the caller
+    # `"doc-77"` held duplicate ids (#253).
+    refuse_bare_string("before", before)
+    refuse_bare_string("after", after)
     before_list = list(before)
     after_list = list(after)
 
