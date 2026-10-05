@@ -3095,3 +3095,10 @@ refused a fully grounded answer, on a code path marked as unreachable. Such
 sentences now get the marker before the closing tail. Every other sentence
 renders exactly as before, including all ten in the committed eval corpus.
 7 new tests.
+
+## 2026-10-02 — a rewriter can't return a bare string as its sub-queries (#260)
+
+A custom query rewriter that returned one query as a plain string, rather than a
+tuple, made the retriever run one search per character and fuse the results.
+`RewriteResult`, which every rewriter returns, now refuses that shape. 8 new
+tests, including one through the retriever showing no search runs.

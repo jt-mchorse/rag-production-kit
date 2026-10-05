@@ -53,6 +53,23 @@ class RewriteResult:
     sub_queries: tuple[str, ...]
     reasoning: str
 
+    def __post_init__(self) -> None:
+        # The one value every rewriter returns, so the one place to refuse a
+        # bare string (#260). `Retriever.search` iterates `sub_queries`, and a
+        # custom rewriter returning `sub_queries="who wrote Macbeth"` ran one
+        # hybrid search per character and fused the results.
+        if isinstance(self.sub_queries, (str, bytes, bytearray)):
+            fix = (
+                f"pass ({self.sub_queries!r},)"
+                if isinstance(self.sub_queries, str)
+                else "decode it first"
+            )
+            raise ValueError(
+                f"sub_queries must be a sequence of query strings, not a bare "
+                f"{type(self.sub_queries).__name__}: {self.sub_queries!r} would be searched "
+                f"one character at a time -- {fix}"
+            )
+
 
 class Rewriter(Protocol):
     """Single-method seam for swapping rewriter backends."""
