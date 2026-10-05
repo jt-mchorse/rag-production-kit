@@ -3074,3 +3074,13 @@ using the same guard file. A test that writes a tracked file fails that
 session, a test that deletes one fails it, and a test that writes only under
 `tmp_path` passes. Checked here by running a throwaway test that appended to
 `README.md`: the session failed and named the file.
+
+## 2026-10-02 — a citation id with ". " no longer breaks its own marker (#256)
+
+A document id such as `faq.md#Q3. refunds` is accepted, and the citation reader
+recognises `[cite:faq.md#Q3. refunds]`. But the sentence splitter ran first and
+split at the ". " inside the marker, so every answer citing that chunk was
+refused as having an uncited sentence. Splits that fall inside a marker are now
+skipped. My first fix swapped the markers out for placeholder characters, and
+one of my own tests showed that would corrupt text already containing those
+characters. The shipped fix works on positions instead. 15 new tests.

@@ -2997,3 +2997,20 @@ context_for_next_session:
   - THE_CORPUS_ARM_test_this_checkout_is_what_the_guard_snapshots_FAILS_UNTIL_THE_FILE_IS_COMMITTED_that_is_by_design
 followups: []
 ---
+
+---
+session: 2026-10-02T11:35Z
+issue: 256
+focus: split_sentences_SPLIT_INSIDE_A_CITE_MARKER_WHOSE_ID_CONTAINS_A_TERMINATOR_AND_A_SPACE_A_GROUNDED_ANSWER_REFUSED
+phase: shipped
+delta:
+  files_changed: 2
+  tests_added: 15
+  suite: "1787 -> 1802 green (8 Postgres skips); ruff clean"
+decisions_made: []
+measured: "main: Document('faq.md#Q3. refunds') accepted; TemplateGenerator refused 'no [cite:...] marker'. Revert: 9 of 15 red."
+context_for_next_session:
+  - 197S_READBACK_RUNS_THE_REGEX_NOT_THE_SPLITTER_A_READBACK_MUST_RUN_THE_WHOLE_READER_PIPELINE_ITS_WRITER_FEEDS
+  - MY_FIRST_FIX_MASKED_MARKERS_WITH_PRIVATE_USE_PLACEHOLDERS_AND_MY_OWN_EDGE_ARM_CAUGHT_IT_REWRITING_TEXT_THAT_ALREADY_CONTAINED_THEM_the_shipped_fix_skips_split_points_by_POSITION
+followups: []
+---
