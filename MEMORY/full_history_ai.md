@@ -2979,3 +2979,21 @@ context_for_next_session:
   - THE_BARE_STRING_CHECK_RUNS_BEFORE_THE_DUPLICATE_ID_CHECK_so_doc_77_no_longer_reports_duplicates_that_do_not_exist
 followups: []
 ---
+
+---
+session: 2026-10-02T07:55Z
+issue: "portfolio-ops#79"
+focus: PORT_THE_TESTS_MAY_NOT_REWRITE_A_COMMITTED_FILE_SESSION_GUARD_WIDENED_FROM_docs_TO_EVERY_GIT_TRACKED_FILE
+phase: shipped
+delta:
+  files_changed: 3
+  tests_added: 6
+  suite: "1793 green under the guard; ruff check and format clean"
+decisions_made: []
+measured: "full suite under the guard = 0 tracked files changed; a throwaway test appending to README.md fails the session with 'rewrote committed files: [README.md]' (README restored from a cp copy, tree clean after); unwiring the conftest import turns the wiring arm red."
+context_for_next_session:
+  - tests_committed_files_guard_py_IS_SELF_CONTAINED_AND_IDENTICAL_ACROSS_7_REPOS_its_self_test_COPIES_IT_VERBATIM_AS_AN_INNER_SESSIONS_CONFTEST_in_a_throwaway_git_repo_writer_FAILS_deleter_FAILS_tmp_path_writer_PASSES
+  - EVERY_TRACKED_FILE_NOT_A_DIRECTORY_LIST_the_2026_10_01_probe_found_ZERO_tracked_files_modified_by_any_suite_so_the_wider_rule_costs_nothing_A_NEW_TEST_THAT_REGENERATES_A_COMMITTED_ARTIFACT_MUST_WRITE_TO_tmp_path_AND_COMPARE
+  - THE_CORPUS_ARM_test_this_checkout_is_what_the_guard_snapshots_FAILS_UNTIL_THE_FILE_IS_COMMITTED_that_is_by_design
+followups: []
+---
