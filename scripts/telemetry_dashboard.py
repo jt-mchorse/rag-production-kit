@@ -441,7 +441,10 @@ def main(argv: Sequence[str] | None = None) -> int:
     # and wrapping only `serve_forever` would leak the listener.
     try:
         print(
-            f"serving http://{args.host}:{args.port}/ from {args.db} (Ctrl-C to stop)",
+            # The BOUND port: `--port 0` asks the OS to pick one, and printing
+            # `args.port` advertised `:0`, where nothing listens (#268).
+            f"serving http://{args.host}:{server.server_address[1]}/ from {args.db} "
+            "(Ctrl-C to stop)",
             file=sys.stderr,
         )
         server.serve_forever()
