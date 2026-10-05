@@ -3047,3 +3047,16 @@ through the helper and both dump methods. Part of portfolio-ops#81.
 **Open questions / blockers:** none.
 
 **Next session:** none queued.
+
+## 2026-10-02 — a bare string is refused where a collection of ids is expected (#253)
+
+`rerank_delta_ndcg("doc-7", "doc-7")` measured five one-character ids and
+reported a perfect 1.0. Mixing it with `["doc-7"]` set off D-019's foreign and
+dropped alarms, and `"doc-77"` was told it held duplicate ids. The issue named
+that function. Grepping the package for the same annotation found a second
+exported one: `reciprocal_rank_fusion({"bm25": "doc-7"})` fused `d`, `o`, `c`,
+`-` and `7` as five documents. Both now raise `ValueError` through one helper.
+The message names the parameter (and the method, for fusion), shows the value,
+and gives the working spelling. Every other collection behaves as before.
+23 new tests; reverting the reranker guards turns 9 red and reverting the
+fusion guard turns 4 red.
