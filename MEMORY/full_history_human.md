@@ -3102,3 +3102,13 @@ A custom query rewriter that returned one query as a plain string, rather than a
 tuple, made the retriever run one search per character and fuse the results.
 `RewriteResult`, which every rewriter returns, now refuses that shape. 8 new
 tests, including one through the retriever showing no search runs.
+
+## 2026-10-05 — running the tests can't wipe another project's table (#270)
+
+If `DATABASE_URL` was set in your shell, say for another project, a plain
+`pytest` ran this repo's database tests against it, and their setup dropped a
+table called `documents`. Another app's data in that table was destroyed. Plain
+`pytest` now skips the database tests unless you ask for them with `-m pg`,
+which is what CI and the README already do. The test setup also refuses to
+drop a `documents` table that doesn't look like this project's. Two of my own
+checks were initially testing nothing, and I caught and fixed both.
