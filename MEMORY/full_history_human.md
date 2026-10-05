@@ -3102,3 +3102,10 @@ A custom query rewriter that returned one query as a plain string, rather than a
 tuple, made the retriever run one search per character and fuse the results.
 `RewriteResult`, which every rewriter returns, now refuses that shape. 8 new
 tests, including one through the retriever showing no search runs.
+
+## 2026-10-05 — the dashboard says which port it's on (#268)
+
+With `--port 0` the dashboard lets the operating system pick a free port, but
+its startup message printed port 0, where nothing listens. It now prints the
+port it actually bound. The test that had accepted ":0" now follows the
+printed address and checks that the page loads.
