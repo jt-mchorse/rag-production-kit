@@ -12,6 +12,8 @@ from __future__ import annotations
 import math
 from collections.abc import Iterable, Mapping
 
+from .io_utils import refuse_bare_string
+
 DEFAULT_K = 60
 """The k constant in 1 / (k + rank). 60 is the original paper's choice."""
 
@@ -53,6 +55,11 @@ def reciprocal_rank_fusion(
     terms: dict[str, list[float]] = {}
     ranks: dict[str, dict[str, int]] = {}
 
+    for method, ids in rankings.items():
+        # `{"bm25": "doc-7"}` fused `d`, `o`, `c`, `-`, `7` as five documents
+        # (#253). Checked per method before any of them is iterated, so a bad
+        # value cannot leave a partial fusion behind.
+        refuse_bare_string(f"rankings[{method!r}]", ids)
     for method, ids in rankings.items():
         # RRF contributes exactly one 1/(k+rank) term per (method, doc)
         # (Cormack et al. 2009). A method may still emit the same doc twice —

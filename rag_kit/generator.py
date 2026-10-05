@@ -473,7 +473,24 @@ def split_sentences(text: str) -> list[str]:
     claim per sentence ending in `.`/`!`/`?`, and we don't need a full NLP
     tokenizer for that contract.
     """
-    parts = _SENTENCE_SPLIT.split(text.strip())
+    # Never split INSIDE a citation marker (#256). `Document` accepts an id like
+    # `faq.md#Q3. refunds` and `_CITE_PATTERN` reads it back, but the split
+    # fires on terminal-punctuation-then-whitespace wherever it occurs, so
+    # `[cite:faq.md#Q3. refunds]` became `[cite:faq.md#Q3.` + `refunds].` and a
+    # fully grounded answer was refused as having an uncited sentence. Split
+    # points inside a marker's span are skipped -- by position, not by masking
+    # the markers with placeholders, which would corrupt any text that already
+    # contained the placeholder characters.
+    stripped = text.strip()
+    marker_spans = [m.span() for m in _CITE_PATTERN.finditer(stripped)]
+    parts: list[str] = []
+    start = 0
+    for gap in _SENTENCE_SPLIT.finditer(stripped):
+        if any(lo < gap.start() < hi for lo, hi in marker_spans):
+            continue
+        parts.append(stripped[start : gap.start()])
+        start = gap.end()
+    parts.append(stripped[start:])
     merged: list[str] = []
     for part in parts:
         if merged and _ends_with_abbreviation(merged[-1], following=part):
@@ -481,6 +498,31 @@ def split_sentences(text: str) -> list[str]:
         else:
             merged.append(part)
     return [p for p in merged if any(ch.isalnum() for ch in p)]
+
+
+_TERMINATORS = ".!?…。！？؟"
+# A terminator followed by closing punctuation -- the boundary `_SENTENCE_SPLIT`'s
+# second lookbehind splits on (#161).
+_TERMINATOR_THEN_CLOSERS = re.compile(r"[.!?…。！？؟][\"”’')\]]+$")
+
+
+def _template_sentence(sentence: str, external_id: str) -> str:
+    """One cited template sentence for one source sentence (#258).
+
+    Normally the trailing terminators are stripped and `[cite:...]` plus a full
+    stop is appended -- unchanged. But a sentence ending in a terminator and a
+    closing quote or bracket (`... "restart the server."`) cannot be handled
+    that way: the strip leaves `."` in place, the appended marker lands after
+    it, and `split_sentences` -- which treats terminator+closer as a boundary --
+    cut the claim from its own marker, so `enforce_citations` refused a fully
+    grounded chunk. The marker goes *before* that tail instead, which keeps the
+    quote balanced and the sentence and its marker in one piece.
+    """
+    s = sentence.strip()
+    tail = _TERMINATOR_THEN_CLOSERS.search(s)
+    if tail is not None:
+        return f"Per the retrieved context, {s[: tail.start()]} [cite:{external_id}]{s[tail.start() :]}"
+    return f"Per the retrieved context, {s.rstrip(_TERMINATORS)} [cite:{external_id}]."
 
 
 def _marker_readback(external_id: str) -> str | None:
@@ -691,15 +733,17 @@ class TemplateGenerator:
         # uncited — a false "unparseable_output" refusal. Each chunk still
         # yields exactly one deduped Citation.
         sentences = [
-            f"Per the retrieved context, {s.strip().rstrip('.!?…。！？؟')} [cite:{c.external_id}]."
-            for c in chosen
-            for s in split_sentences(c.text)
+            _template_sentence(s, c.external_id) for c in chosen for s in split_sentences(c.text)
         ]
         text = " ".join(sentences)
         try:
             citations = enforce_citations(text, retrieved)
         # pragma: no cover - defensive: only reachable if every chosen chunk is
-        # empty / punctuation-only, which yields no cited sentences.
+        # empty / punctuation-only, which yields no cited sentences. (Until #256
+        # it was also reached by any id containing a terminator and a space,
+        # which `split_sentences` split inside its own marker; until #258 by a
+        # sentence ending in a terminator plus a closing quote/bracket, which
+        # `_template_sentence` now keeps with its marker.)
         except CitationError as e:  # pragma: no cover
             return _refusal(e.reason, e.detail, threshold, top)
         return GeneratedAnswer(

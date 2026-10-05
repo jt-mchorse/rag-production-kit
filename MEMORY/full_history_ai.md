@@ -2962,6 +2962,78 @@ followups: []
 ---
 
 ---
+session: 2026-10-02T07:41Z
+issue: 253
+focus: A_BARE_STRING_IS_A_Sequence_str_SO_rerank_delta_ndcg_AND_reciprocal_rank_fusion_MEASURED_AND_FUSED_ITS_CHARACTERS
+phase: shipped
+duration_min: 2   # plan comment 07:39:00Z -> date -u 07:41Z
+delta:
+  files_changed: 4
+  tests_added: 23
+  suite: "1787 -> 1810 green (8 Postgres-gated skips unchanged); ruff check and format clean"
+decisions_made: []
+measured: "main: reciprocal_rank_fusion({'bm25': 'doc-7', 'vec': ['doc-7']}) -> d, doc-7, o, c, -, 7. Revert probe ONE SUBPROCESS PER ID, 23 ids counted: baseline 0, reranker guards removed 9 red, fusion guard removed 4 red, guard on before only 3 red."
+context_for_next_session:
+  - reciprocal_rank_fusion_WAS_THE_UNFILED_SIBLING_Mapping_str_Iterable_str_and_EXPORTED_FROM_rag_kit_FOUND_BY_GREPPING_THE_PACKAGE_FOR_Sequence_Iterable_Collection_str_ANNOTATIONS_those_were_the_only_two_public_sites
+  - ONE_HELPER_io_utils_refuse_bare_string_THE_FUSION_CHECK_WALKS_EVERY_METHOD_VALUE_IN_A_FIRST_LOOP_BEFORE_THE_SCORING_LOOP_and_never_iterates_so_a_generator_value_is_not_consumed
+  - THE_BARE_STRING_CHECK_RUNS_BEFORE_THE_DUPLICATE_ID_CHECK_so_doc_77_no_longer_reports_duplicates_that_do_not_exist
+followups: []
+---
+
+---
+session: 2026-10-02T07:55Z
+issue: "portfolio-ops#79"
+focus: PORT_THE_TESTS_MAY_NOT_REWRITE_A_COMMITTED_FILE_SESSION_GUARD_WIDENED_FROM_docs_TO_EVERY_GIT_TRACKED_FILE
+phase: shipped
+delta:
+  files_changed: 3
+  tests_added: 6
+  suite: "1793 green under the guard; ruff check and format clean"
+decisions_made: []
+measured: "full suite under the guard = 0 tracked files changed; a throwaway test appending to README.md fails the session with 'rewrote committed files: [README.md]' (README restored from a cp copy, tree clean after); unwiring the conftest import turns the wiring arm red."
+context_for_next_session:
+  - tests_committed_files_guard_py_IS_SELF_CONTAINED_AND_IDENTICAL_ACROSS_7_REPOS_its_self_test_COPIES_IT_VERBATIM_AS_AN_INNER_SESSIONS_CONFTEST_in_a_throwaway_git_repo_writer_FAILS_deleter_FAILS_tmp_path_writer_PASSES
+  - EVERY_TRACKED_FILE_NOT_A_DIRECTORY_LIST_the_2026_10_01_probe_found_ZERO_tracked_files_modified_by_any_suite_so_the_wider_rule_costs_nothing_A_NEW_TEST_THAT_REGENERATES_A_COMMITTED_ARTIFACT_MUST_WRITE_TO_tmp_path_AND_COMPARE
+  - THE_CORPUS_ARM_test_this_checkout_is_what_the_guard_snapshots_FAILS_UNTIL_THE_FILE_IS_COMMITTED_that_is_by_design
+followups: []
+---
+
+---
+session: 2026-10-02T11:35Z
+issue: 256
+focus: split_sentences_SPLIT_INSIDE_A_CITE_MARKER_WHOSE_ID_CONTAINS_A_TERMINATOR_AND_A_SPACE_A_GROUNDED_ANSWER_REFUSED
+phase: shipped
+delta:
+  files_changed: 2
+  tests_added: 15
+  suite: "1787 -> 1802 green (8 Postgres skips); ruff clean"
+decisions_made: []
+measured: "main: Document('faq.md#Q3. refunds') accepted; TemplateGenerator refused 'no [cite:...] marker'. Revert: 9 of 15 red."
+context_for_next_session:
+  - 197S_READBACK_RUNS_THE_REGEX_NOT_THE_SPLITTER_A_READBACK_MUST_RUN_THE_WHOLE_READER_PIPELINE_ITS_WRITER_FEEDS
+  - MY_FIRST_FIX_MASKED_MARKERS_WITH_PRIVATE_USE_PLACEHOLDERS_AND_MY_OWN_EDGE_ARM_CAUGHT_IT_REWRITING_TEXT_THAT_ALREADY_CONTAINED_THEM_the_shipped_fix_skips_split_points_by_POSITION
+followups: []
+---
+
+---
+session: 2026-10-02T13:25Z
+issue: 258
+focus: TemplateGenerator_REFUSED_A_GROUNDED_CHUNK_ENDING_IN_A_TERMINATOR_PLUS_CLOSING_QUOTE_THE_NO_COVER_BRANCH_WAS_REACHABLE
+phase: shipped
+delta:
+  files_changed: 2
+  tests_added: 7
+  suite: "1787 -> 1794 green (8 skips); ruff clean"
+decisions_made: []
+measured: "main: 'The manual says \"restart the server.\"' and 'Restart the server (see section 4.)' -> Refusal. Call-site revert: 4 of 7 red, controls green. All 10 committed corpus sentences render byte-identically (pinned)."
+context_for_next_session:
+  - A_FULL_FILE_REVERT_THAT_REMOVES_AN_IMPORTED_HELPER_IS_AN_IMPORT_ERROR_NOT_A_PER_ARM_PROBE_revert_the_CALL_SITE_instead
+  - 257_ALSO_EDITS_THE_PRAGMA_COMMENT_NEXT_TO_THIS_ONE_merge_one_then_rebase_the_other_THE_RESOLVER_WILL_STOP_ON_IT
+  - LITERAL_cite_TEXT_INSIDE_A_CHUNK_IS_STILL_REFUSED_AS_A_DANGLING_CITATION_noted_in_258_not_filed
+followups: []
+---
+
+---
 session: 2026-10-02T14:20Z
 issue: 260
 focus: RewriteResult_ACCEPTED_A_BARE_STRING_sub_queries_ONE_HYBRID_SEARCH_PER_CHARACTER_SIBLING_OF_254
