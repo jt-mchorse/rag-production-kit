@@ -118,7 +118,7 @@ def test_where_the_text_is_cut(text: str, sentences: list[str]) -> None:
         "Run `make test.`",
         # A terminator RUN before the closer: the writer took one terminator
         # and left `?` / `..` in front of the marker, where the reader cut.
-        'He said “Really?!”',
+        "He said “Really?!”",
         "Wait...”",
         'She asked "why?!"',
         "Is it done?!)",
