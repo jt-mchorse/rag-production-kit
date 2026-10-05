@@ -3102,3 +3102,10 @@ A custom query rewriter that returned one query as a plain string, rather than a
 tuple, made the retriever run one search per character and fuse the results.
 `RewriteResult`, which every rewriter returns, now refuses that shape. 8 new
 tests, including one through the retriever showing no search runs.
+
+## 2026-10-05 — the eval runner's dry run survives the env template (#272)
+
+Without a GitHub token, `run_eval --post-comment` prints the comment instead of
+posting it. The env template shipped a fake token, so loading the template
+made the runner try to post with it and fail. The token now ships empty, and
+the test that required a placeholder there requires it to be blank.

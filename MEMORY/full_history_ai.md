@@ -3048,3 +3048,21 @@ context_for_next_session:
   - THE_GUARD_IS_ON_THE_RESULT_TYPE_EVERY_REWRITER_RETURNS_NOT_ON_THE_RETRIEVER_LOOP_so_a_custom_backend_cannot_route_around_it
 followups: []
 ---
+
+---
+session: 2026-10-05T09:30Z
+duration_min: 2   # computed
+issue: 272
+branch: session/2026-10-05-0929-issue-272
+focus: ENV_TEMPLATE_PLACEHOLDER_GITHUB_TOKEN_DEFEATED_RUN_EVALS_DRY_RUN
+phase: shipped
+delta:
+  files_changed: 2
+  tests_added: 0
+  suite: "green; ruff clean"
+decisions_made: []
+measured: "placeholder pin test re-pinned blank; red against main's template"
+context_for_next_session:
+  - THIRD_REPO_OF_THE_PLACEHOLDER_ON_A_VAR_WITH_A_NO_VALUE_BEHAVIOUR_CLASS_leh_297_mcp_221_rag_272
+followups: []
+---
