@@ -66,7 +66,10 @@ allow-direct-references = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts   = "-ra -q"
+# `-m "not pg"`: a bare `pytest` is hermetic, as `.env.example` promises. The
+# pg tests reset a `documents` table in whatever database DATABASE_URL names,
+# so they run only when asked for; a command-line `-m pg` overrides this (#270).
+addopts   = '-ra -q -m "not pg"'
 markers = [
     "pg: integration test that requires a running Postgres+pgvector (set DATABASE_URL).",
 ]
