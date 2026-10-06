@@ -3126,3 +3126,23 @@ context_for_next_session:
   - A_TEST_COMMENT_EXPLAINING_WHY_THE_WRONG_OUTPUT_IS_FINE_IS_A_BUG_REPORT_found_by_the_test_workaround_sweep
 followups: []
 ---
+
+---
+session: 2026-10-05T09:26Z
+duration_min: 4   # computed: started 09:22Z -> 09:26Z
+issue: 270
+branch: session/2026-10-05-0923-issue-270
+focus: A_BARE_PYTEST_DROPPED_THE_DOCUMENTS_TABLE_OF_WHATEVER_DATABASE_THE_AMBIENT_DATABASE_URL_NAMED
+phase: shipped
+delta:
+  files_changed: 3
+  tests_added: 6
+  suite: "1852 passed, 8 pg deselected; ruff clean"
+decisions_made: []
+measured: "hunt agent on a scratch pg17+pgvector: another app's documents rows replaced by rag's schema. -m pg on the CLI overrides addopts (7 collected). Probes: addopts revert 1 red, guard-always-allows 2 red."
+context_for_next_session:
+  - AMBIENT_STATE_GATE_LENS_DATABASE_URL_IS_SET_ON_DEV_MACHINES_FOR_OTHER_PROJECTS
+  - GOTCHA_THIS_PYTEST_COLLECT_ONLY_Q_PRINTS_PATH_COUNT_AND_MINUS_V_CANCELS_AGAINST_ADDOPTS_MINUS_Q_READ_THE_SUMMARY_LINE_N_TESTS_COLLECTED
+  - GOTCHA_A_PROBE_REPLACEMENT_STRING_WRITTEN_BEFORE_RUFF_FORMAT_NO_LONGER_MATCHED_ASSERT_THE_OLD_STRING_IS_PRESENT_IN_EVERY_PROBE
+followups: []
+---

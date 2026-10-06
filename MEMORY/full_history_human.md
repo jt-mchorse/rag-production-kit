@@ -3138,3 +3138,13 @@ With `--port 0` the dashboard lets the operating system pick a free port, but
 its startup message printed port 0, where nothing listens. It now prints the
 port it actually bound. The test that had accepted ":0" now follows the
 printed address and checks that the page loads.
+
+## 2026-10-05 — running the tests can't wipe another project's table (#270)
+
+If `DATABASE_URL` was set in your shell, say for another project, a plain
+`pytest` ran this repo's database tests against it, and their setup dropped a
+table called `documents`. Another app's data in that table was destroyed. Plain
+`pytest` now skips the database tests unless you ask for them with `-m pg`,
+which is what CI and the README already do. The test setup also refuses to
+drop a `documents` table that doesn't look like this project's. Two of my own
+checks were initially testing nothing, and I caught and fixed both.

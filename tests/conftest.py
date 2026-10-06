@@ -149,6 +149,31 @@ def _maybe_connect() -> Any | None:
         return None
 
 
+#: Columns only rag's own `documents` table has. The fixture below DROPs a
+#: `documents` table before every pg test; DATABASE_URL is ambient, so that
+#: table can belong to another app (#270).
+_RAG_DOCUMENTS_COLUMNS = frozenset({"external_id", "embedding", "tsv"})
+
+
+def _refuse_foreign_documents_table(cur: Any) -> str | None:
+    """A refusal message if `documents` exists and is not rag's, else None."""
+    cur.execute(
+        "SELECT column_name FROM information_schema.columns "
+        "WHERE table_schema = current_schema() AND table_name = 'documents'"
+    )
+    columns = {row[0] for row in cur.fetchall()}
+    if not columns or columns >= _RAG_DOCUMENTS_COLUMNS:
+        return None
+    cur.execute("SELECT current_database()")
+    database = cur.fetchone()[0]
+    return (
+        f"refusing to DROP the `documents` table in database {database!r}: it has "
+        f"columns {sorted(columns)}, not rag-production-kit's "
+        f"{sorted(_RAG_DOCUMENTS_COLUMNS)}. DATABASE_URL points at another app's "
+        f"database; point it at a scratch one."
+    )
+
+
 @pytest.fixture(scope="session")
 def _maybe_pg_conn():
     """Session-scoped probe: opens once, skips downstream if unavailable."""
@@ -171,6 +196,9 @@ def pg_conn(_maybe_pg_conn):
         pytest.skip(f"missing schema file: {INIT_SQL}")
     sql = INIT_SQL.read_text(encoding="utf-8")
     with _maybe_pg_conn.cursor() as cur:
+        refusal = _refuse_foreign_documents_table(cur)
+        if refusal:
+            pytest.fail(refusal)
         cur.execute("DROP TABLE IF EXISTS documents CASCADE")
         for stmt in _split_sql_statements(sql):
             cur.execute(stmt)
