@@ -39,6 +39,7 @@ import statistics
 import sys
 from collections.abc import Callable, Sequence
 from dataclasses import asdict, dataclass
+from fractions import Fraction
 from pathlib import Path
 
 _REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -168,10 +169,15 @@ def render_markdown(fx: Sequence[Fixture], rows: Sequence[Row], *, candidates: i
         "| ------- | -: | ------------------: | ----------------: | -: | -------------------- |",
     ]
     for r in rows:
-        delta = r.recall_reranked - r.recall_fused
+        fused, reranked = f"{r.recall_fused:.3f}", f"{r.recall_reranked:.3f}"
+        # The difference of the two numbers printed beside it (#264). Taken
+        # from the unrounded recalls it was 0.6875 - 0.625 = 0.0625 -> "+0.062"
+        # beside "0.688" and "0.625", a column that does not subtract; the
+        # default k=1,3,5 happened to agree.
+        delta = Fraction(reranked) - Fraction(fused)
         lines.append(
-            f"| {r.fixture} | {r.k} | {r.recall_fused:.3f} | {r.recall_reranked:.3f} | "
-            f"{delta:+.3f} | {r.improved} / {r.regressed} |"
+            f"| {r.fixture} | {r.k} | {fused} | {reranked} | "
+            f"{float(delta):+.3f} | {r.improved} / {r.regressed} |"
         )
     lines.append("")
     for f in fx:
