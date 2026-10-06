@@ -3164,3 +3164,22 @@ context_for_next_session:
   - THIRD_REPO_OF_THE_PLACEHOLDER_ON_A_VAR_WITH_A_NO_VALUE_BEHAVIOUR_CLASS_leh_297_mcp_221_rag_272
 followups: []
 ---
+
+---
+session: 2026-10-06T09:29Z
+duration_min: 3   # computed: plan comment 09:26:45Z -> 09:29Z (date -u)
+issue: 278
+branch: session/2026-10-06-0926-issue-278
+focus: telemetry_dashboard_SEED_RAN_BEFORE_THE_BIND_a_second_instance_on_a_busy_port_DUPLICATED_THE_SEED_INTO_THE_RUNNING_DASHBOARDS_DB_then_exited_2
+phase: shipped
+delta:
+  files_changed: 3
+  tests_added: 2
+  suite: "1892 -> 1894 passed; ruff, format clean"
+decisions_made: []
+measured: "busy port: fixed exit 2 with 0 rows; revert probe: the busy-port arm red, the unusable-db control green. An existing test pinned the old order via a bind-failure shortcut and was rewritten to read the seed message from a serving run."
+context_for_next_session:
+  - A_TEST_THAT_USES_A_FAILURE_AS_A_SHORTCUT_TO_MAKE_A_PROCESS_EXIT_CAN_PIN_THE_BUG_rewrite_it_to_the_intent_it_states
+  - MERGE_ORDER_rag_275_277_279_independent_files_except_MEMORY
+followups: []
+---
