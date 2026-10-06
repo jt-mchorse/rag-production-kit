@@ -94,9 +94,10 @@ def _url(server: _Captured, path: str) -> str:
 def _get(server: _Captured, path: str, timeout: float = 10.0) -> tuple[int, bytes]:
     """GET `path`, reading a streamed body until its terminal frame.
 
-    The SSE response carries `Connection: keep-alive` and no `Content-Length`,
-    so a plain `resp.read()` blocks until the peer closes — which it does not.
-    Read incrementally and stop at the `done` frame (or EOF for a finite body).
+    The SSE response has no `Content-Length`. It used to carry `Connection:
+    keep-alive` and never close, so a plain `resp.read()` blocked; since #266
+    it closes, but stopping at the `done` frame keeps these tests independent
+    of that (the EOF arm below is what pins it).
     """
     try:
         with urllib.request.urlopen(_url(server, path), timeout=timeout) as resp:
@@ -243,3 +244,20 @@ def test_no_socket_left_listening_after_shutdown() -> None:
     srv.server_close()
     with contextlib.closing(socket.socket()) as s:
         s.bind(("127.0.0.1", port))  # free again — raises OSError if not
+
+
+def _read_to_eof(server: _Captured, path: str, timeout: float = 10.0) -> bytes:
+    with urllib.request.urlopen(_url(server, path), timeout=timeout) as resp:
+        return resp.read()  # to EOF: no Content-Length, so only a close ends it
+
+
+def test_the_stream_ends_the_response_so_a_browser_can_run_a_second_query(
+    server: _Captured,
+) -> None:
+    """#266: app.js re-enables Go only when `reader.read()` reports done, which
+    needs the response to END. With `keep-alive` and no length the server held
+    the socket open after `event: done` and this read timed out."""
+    for query in ("refund policy", "shipping"):
+        body = _read_to_eof(server, f"/stream?q={query.replace(' ', '+')}&k=2")
+        assert body.rstrip().endswith(b"}"), body[-200:]
+        assert b"event: done" in body

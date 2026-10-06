@@ -3050,6 +3050,84 @@ followups: []
 ---
 
 ---
+session: 2026-10-05T07:42Z
+duration_min: 11   # first repro on the combined tree ~07:31Z -> 2026-10-05T07:42Z; plan comment 2026-10-05T07:39:48Z
+issue: 262
+focus: split_sentences_MISSED_THREE_SENTENCE_ENDINGS_CJK_WITH_NO_SPACE_A_CLOSER_RUN_AND_A_MARKER_RIGHT_AFTER_THE_TERMINATOR_each_let_an_uncited_claim_ride_its_neighbours_marker
+phase: shipped
+delta:
+  files_changed: 2
+  tests_added: 33
+  suite: "1846 -> 1879 green (8 postgres skips); ruff clean"
+decisions_made: []
+measured: "main acab504: 10 bypass rows ACCEPTED by enforce_citations, now refused; 10 fully cited controls stay accepted. Probes: closer set back to six 5 red, one closer no run 6 red, no marker-after-terminator 3 red, no CJK zero-width 6 red, writer keeps old six 4 red, neighbour zero-width after ASCII 16 red, neighbour CJK zero-width after a closer 2 red."
+context_for_next_session:
+  - FOUND_BY_A_HUNT_AGENT_READING_160S_SCOPE_one_optional_closing_quote_or_bracket_AND_144S_TEST_SHAPE_which_put_a_SPACE_after_the_ideographic_stop
+  - THE_MARKER_AFTER_TERMINATOR_SHAPE_WAS_MINE_found_while_checking_that_the_CJK_split_must_not_cut_before_a_marker_ASK_WHERE_THE_BOUNDARY_IS_WHEN_A_FORM_IS_ACCEPTED
+  - ONE__CLOSERS_SET_FEEDS_THE_SPLITTER_AND__TERMINATOR_THEN_CLOSERS_writer_reader_parity_pinned_by_template_round_trips
+  - A_DOT_NEVER_SPLITS_WITHOUT_WHITESPACE_AND_A_CLOSER_AFTER_A_CJK_TERMINATOR_STILL_NEEDS_WHITESPACE_japanese_quote_then_to_itta_continues_the_sentence
+  - NOT_DONE_A_DOT_SPACE_MARKER_IS_STILL_REFUSED_contract_change_AND_TERMINATORLESS_BULLETS_ARE_OFF_CONTRACT
+  - ADDENDUM_SAME_RUN_HUNTING_MY_OWN_DIFF_THE_WRITER_TOOK_ONE_TERMINATOR_BEFORE_CLOSERS_WHILE_THE_READER_TAKES_A_RUN_Really_bang_close_quote_and_Wait_ellipsis_close_quote_were_refused_fixed_on_the_same_PR_4_rows_red_against_single_terminator
+  - GOTCHA_ruff_format_check_PIPED_TO_tail_INSIDE_AND_CHAIN_COMMITTED_AN_UNFORMATTED_FILE_fixed_by_a_style_commit
+followups: []
+---
+
+---
+session: 2026-10-05T08:39Z
+duration_min: 2   # computed: started 08:37Z -> 08:39Z
+issue: 264
+branch: session/2026-10-05-0837-issue-264
+focus: bench_reranker_DELTA_FROM_UNROUNDED_RECALLS_BESIDE_SEPARATELY_ROUNDED_OPERANDS_0_688_minus_0_625_printed_plus_0_062
+phase: shipped
+delta:
+  files_changed: 2
+  tests_added: 2
+  suite: "1846 -> 1848 green (8 postgres skips); ruff clean; committed table unchanged"
+decisions_made: []
+measured: "k=1..10: 1 of 20 rows did not subtract on main (multi-hop k=2), 0 after. Revert 2 red."
+context_for_next_session:
+  - SAME_RULE_AS_lco_255_A_PUBLISHED_DIFFERENCE_IS_COMPUTED_FROM_THE_PUBLISHED_OPERANDS_found_by_a_sweep_running_documented_commands_with_other_args
+followups: []
+---
+
+---
+session: 2026-10-05T09:09Z
+duration_min: 2   # computed: started 09:07Z -> 09:09Z
+issue: 266
+branch: session/2026-10-05-0908-issue-266
+focus: STREAMING_DEMO_SENT_KEEP_ALIVE_WITH_NO_LENGTH_AND_NEVER_CLOSED_one_query_per_page_load
+phase: shipped
+delta:
+  files_changed: 2
+  tests_added: 1
+  suite: "1846 -> 1847 green (8 postgres skips); ruff clean"
+decisions_made: []
+measured: "read-to-EOF of the real handler: timed out on main (revert 1 failed), completes for two consecutive queries after"
+context_for_next_session:
+  - BaseHTTPRequestHandler_send_header_Connection_keep_alive_SETS_close_connection_False_an_unframed_body_then_never_ends
+  - THE_TEST_HELPER_HAD_DOCUMENTED_THE_SYMPTOM_AND_WORKED_AROUND_IT_a_workaround_in_a_test_is_a_bug_report_nobody_filed
+followups: []
+---
+
+---
+session: 2026-10-05T09:21Z
+duration_min: 2   # computed: started 09:20Z -> 09:21Z
+issue: 268
+branch: session/2026-10-05-0920-issue-268
+focus: DASHBOARD_BANNER_ADVERTISED_PORT_0_UNDER_PORT_0_AND_A_TEST_PINNED_IT
+phase: shipped
+delta:
+  files_changed: 2
+  tests_added: 0
+  suite: "green; ruff clean"
+decisions_made: []
+measured: "banner :0 vs lsof :59373 on main; the test follows the banner to a 200; red against main"
+context_for_next_session:
+  - A_TEST_COMMENT_EXPLAINING_WHY_THE_WRONG_OUTPUT_IS_FINE_IS_A_BUG_REPORT_found_by_the_test_workaround_sweep
+followups: []
+---
+
+---
 session: 2026-10-05T09:26Z
 duration_min: 4   # computed: started 09:22Z -> 09:26Z
 issue: 270

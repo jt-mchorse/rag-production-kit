@@ -31,9 +31,11 @@ operator sees.
 
 from __future__ import annotations
 
+import re
 import socket
 import subprocess
 import sys
+import urllib.request
 from pathlib import Path
 
 import pytest
@@ -158,9 +160,9 @@ def test_the_port_range_guard_still_uses_parser_error(tmp_path: Path) -> None:
 
 
 def test_a_successful_bind_still_serves_and_the_banner_is_unchanged(tmp_path: Path) -> None:
-    # The success path must be untouched. `--port 0` binds to an OS-assigned
-    # port, so the banner reports `:0` — the point is that it is printed and the
-    # process is serving, i.e. it did not exit.
+    # `--port 0` binds to an OS-assigned port, and the banner must name THAT
+    # port: it used to print `:0`, where nothing listens, and this test pinned it
+    # (#268). Follow the banner while the process is serving.
     db = tmp_path / "t.db"
     proc = subprocess.Popen(
         [sys.executable, str(_SCRIPT), "--host", "127.0.0.1", "--port", "0", "--db", str(db)],
@@ -170,14 +172,18 @@ def test_a_successful_bind_still_serves_and_the_banner_is_unchanged(tmp_path: Pa
         cwd=_REPO_ROOT,
     )
     try:
-        # The banner is written before `serve_forever`, so it arrives promptly;
-        # a `communicate` timeout is the signal that the process is still alive.
-        with pytest.raises(subprocess.TimeoutExpired):
-            proc.communicate(timeout=6)
+        assert proc.stderr is not None
+        line = proc.stderr.readline()  # the banner precedes `serve_forever`
+        m = re.search(r"serving (http://127\.0\.0\.1:(\d+)/) from (\S+) \(Ctrl-C to stop\)", line)
+        assert m, line
+        url, port, served = m.group(1), int(m.group(2)), m.group(3)
+        assert port != 0, line
+        assert served == str(db)
+        with urllib.request.urlopen(url, timeout=10) as resp:
+            assert resp.status == 200
     finally:
         proc.terminate()
         _out, err = proc.communicate(timeout=15)
-    assert f"serving http://127.0.0.1:0/ from {db} (Ctrl-C to stop)" in err
     assert "::error::" not in err
 
 
