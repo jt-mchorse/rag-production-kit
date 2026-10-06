@@ -3071,3 +3071,21 @@ context_for_next_session:
   - GOTCHA_ruff_format_check_PIPED_TO_tail_INSIDE_AND_CHAIN_COMMITTED_AN_UNFORMATTED_FILE_fixed_by_a_style_commit
 followups: []
 ---
+
+---
+session: 2026-10-05T08:39Z
+duration_min: 2   # computed: started 08:37Z -> 08:39Z
+issue: 264
+branch: session/2026-10-05-0837-issue-264
+focus: bench_reranker_DELTA_FROM_UNROUNDED_RECALLS_BESIDE_SEPARATELY_ROUNDED_OPERANDS_0_688_minus_0_625_printed_plus_0_062
+phase: shipped
+delta:
+  files_changed: 2
+  tests_added: 2
+  suite: "1846 -> 1848 green (8 postgres skips); ruff clean; committed table unchanged"
+decisions_made: []
+measured: "k=1..10: 1 of 20 rows did not subtract on main (multi-hop k=2), 0 after. Revert 2 red."
+context_for_next_session:
+  - SAME_RULE_AS_lco_255_A_PUBLISHED_DIFFERENCE_IS_COMPUTED_FROM_THE_PUBLISHED_OPERANDS_found_by_a_sweep_running_documented_commands_with_other_args
+followups: []
+---

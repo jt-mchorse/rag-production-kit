@@ -3114,3 +3114,10 @@ Chinese and Japanese text with no space after `。`; endings like `.**`
 full stop still needs a following space, so decimals are safe, and Japanese
 `「…。」と言った` stays one sentence. One list of closing characters now feeds
 both the splitter and the template writer, so they can't disagree again.
+
+## 2026-10-05 — the reranker bench's Δ column adds up (#264)
+
+The reranker benchmark printed each recall to three decimals and a Δ computed
+from the unrounded values. At k=2 that gave `0.625 → 0.688` with `Δ +0.062`.
+The Δ is now the difference of the two printed numbers. The committed table
+uses k=1,3,5, where the numbers already agreed, so it doesn't change.
