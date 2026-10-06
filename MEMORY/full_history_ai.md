@@ -3108,3 +3108,21 @@ context_for_next_session:
   - THE_TEST_HELPER_HAD_DOCUMENTED_THE_SYMPTOM_AND_WORKED_AROUND_IT_a_workaround_in_a_test_is_a_bug_report_nobody_filed
 followups: []
 ---
+
+---
+session: 2026-10-05T09:21Z
+duration_min: 2   # computed: started 09:20Z -> 09:21Z
+issue: 268
+branch: session/2026-10-05-0920-issue-268
+focus: DASHBOARD_BANNER_ADVERTISED_PORT_0_UNDER_PORT_0_AND_A_TEST_PINNED_IT
+phase: shipped
+delta:
+  files_changed: 2
+  tests_added: 0
+  suite: "green; ruff clean"
+decisions_made: []
+measured: "banner :0 vs lsof :59373 on main; the test follows the banner to a 200; red against main"
+context_for_next_session:
+  - A_TEST_COMMENT_EXPLAINING_WHY_THE_WRONG_OUTPUT_IS_FINE_IS_A_BUG_REPORT_found_by_the_test_workaround_sweep
+followups: []
+---

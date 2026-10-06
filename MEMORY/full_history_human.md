@@ -3131,3 +3131,10 @@ the demo allowed one query per page load. The server now closes the
 connection at the end of each stream. A test reads a full response twice in a
 row, which hung before the fix. The existing test helper had worked around the
 hang without anyone filing it.
+
+## 2026-10-05 — the dashboard says which port it's on (#268)
+
+With `--port 0` the dashboard lets the operating system pick a free port, but
+its startup message printed port 0, where nothing listens. It now prints the
+port it actually bound. The test that had accepted ":0" now follows the
+printed address and checks that the page loads.
