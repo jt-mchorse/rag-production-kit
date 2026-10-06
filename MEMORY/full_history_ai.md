@@ -3089,3 +3089,22 @@ context_for_next_session:
   - SAME_RULE_AS_lco_255_A_PUBLISHED_DIFFERENCE_IS_COMPUTED_FROM_THE_PUBLISHED_OPERANDS_found_by_a_sweep_running_documented_commands_with_other_args
 followups: []
 ---
+
+---
+session: 2026-10-05T09:09Z
+duration_min: 2   # computed: started 09:07Z -> 09:09Z
+issue: 266
+branch: session/2026-10-05-0908-issue-266
+focus: STREAMING_DEMO_SENT_KEEP_ALIVE_WITH_NO_LENGTH_AND_NEVER_CLOSED_one_query_per_page_load
+phase: shipped
+delta:
+  files_changed: 2
+  tests_added: 1
+  suite: "1846 -> 1847 green (8 postgres skips); ruff clean"
+decisions_made: []
+measured: "read-to-EOF of the real handler: timed out on main (revert 1 failed), completes for two consecutive queries after"
+context_for_next_session:
+  - BaseHTTPRequestHandler_send_header_Connection_keep_alive_SETS_close_connection_False_an_unframed_body_then_never_ends
+  - THE_TEST_HELPER_HAD_DOCUMENTED_THE_SYMPTOM_AND_WORKED_AROUND_IT_a_workaround_in_a_test_is_a_bug_report_nobody_filed
+followups: []
+---

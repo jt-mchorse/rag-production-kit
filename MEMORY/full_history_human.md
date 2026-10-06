@@ -3121,3 +3121,13 @@ The reranker benchmark printed each recall to three decimals and a Δ computed
 from the unrounded values. At k=2 that gave `0.625 → 0.688` with `Δ +0.062`.
 The Δ is now the difference of the two printed numbers. The committed table
 uses k=1,3,5, where the numbers already agreed, so it doesn't change.
+
+## 2026-10-05 — the streaming demo can run more than one query (#266)
+
+The streaming demo's server told the browser to keep the connection open but
+never said how long the response was, so the browser could never tell the
+stream had ended. The page's Go button only re-enables when a stream ends, so
+the demo allowed one query per page load. The server now closes the
+connection at the end of each stream. A test reads a full response twice in a
+row, which hung before the fix. The existing test helper had worked around the
+hang without anyone filing it.
