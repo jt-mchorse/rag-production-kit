@@ -371,6 +371,12 @@ def write_runs(
     return paths
 
 
+# Both GitHub calls had no timeout, so a connection that was accepted and never
+# answered blocked until the CI job's own cap (#276). Thirty seconds matches
+# llm-eval-harness's poster (`comment._do_request`).
+_GITHUB_TIMEOUT_S = 30
+
+
 def _post_composite_comment(repo: str, pr: int, deltas: dict[str, str], token: str | None) -> bool:
     """Composite sticky comment with all three suite deltas.
 
@@ -412,7 +418,7 @@ def _post_composite_comment(repo: str, pr: int, deltas: dict[str, str], token: s
     )
     existing_id: int | None = None
     try:
-        with urllib.request.urlopen(req) as resp:
+        with urllib.request.urlopen(req, timeout=_GITHUB_TIMEOUT_S) as resp:
             comments = json.loads(resp.read().decode())
             for c in comments:
                 if marker in (c.get("body") or ""):
@@ -426,7 +432,12 @@ def _post_composite_comment(repo: str, pr: int, deltas: dict[str, str], token: s
     # exists for, and it was the one condition it did not cover. Failing to
     # *list* is still non-fatal: the worst case is posting a second sticky
     # comment instead of editing the first.
-    except urllib.error.URLError as e:
+    #
+    # `OSError` rather than `URLError` (its parent), and `ValueError` too
+    # (#276): a timeout raised while reading the body is a `TimeoutError`, not
+    # a `URLError`, and a 200 whose body is a proxy's HTML page is a
+    # `JSONDecodeError`. Both escaped this "non-fatal" guard as tracebacks.
+    except (OSError, ValueError) as e:
         print(f"warning: failed to list PR comments: {e}", file=sys.stderr)
 
     payload = json.dumps({"body": body}).encode()
@@ -472,7 +483,7 @@ def _post_composite_comment(repo: str, pr: int, deltas: dict[str, str], token: s
     # sitting next to the live gap. Reading `resp.status` on the success path
     # instead keeps a real assertion that the API accepted the write.
     try:
-        with urllib.request.urlopen(req) as resp:
+        with urllib.request.urlopen(req, timeout=_GITHUB_TIMEOUT_S) as resp:
             if resp.status not in (200, 201):
                 print(
                     f"::error::comment post returned unexpected status {resp.status}",
@@ -487,8 +498,11 @@ def _post_composite_comment(repo: str, pr: int, deltas: dict[str, str], token: s
             file=sys.stderr,
         )
         return False
-    except urllib.error.URLError as e:
-        print(f"::error::failed to post PR comment: {e.reason}", file=sys.stderr)
+    except OSError as e:
+        # `URLError` and everything else the socket can raise: a `TimeoutError`
+        # from reading the response is not a `URLError` (#276).
+        reason = e.reason if isinstance(e, urllib.error.URLError) else e
+        print(f"::error::failed to post PR comment: {reason}", file=sys.stderr)
         return False
     return True
 
