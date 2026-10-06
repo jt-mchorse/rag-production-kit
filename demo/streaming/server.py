@@ -184,7 +184,12 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Content-Type", "text/event-stream; charset=utf-8")
         # Disable proxy / browser buffering so events arrive frame-by-frame.
         self.send_header("Cache-Control", "no-cache")
-        self.send_header("Connection", "keep-alive")
+        # `close`, not `keep-alive` (#266). With no Content-Length the end of
+        # the stream has to be the end of the connection; `keep-alive` made
+        # BaseHTTPRequestHandler hold the socket open after `event: done`, so
+        # the browser's `reader.read()` never finished and app.js left the Go
+        # button disabled -- one query per page load.
+        self.send_header("Connection", "close")
         self.send_header("X-Accel-Buffering", "no")
         self.end_headers()
 

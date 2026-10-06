@@ -3103,6 +3103,35 @@ tuple, made the retriever run one search per character and fuse the results.
 `RewriteResult`, which every rewriter returns, now refuses that shape. 8 new
 tests, including one through the retriever showing no search runs.
 
+## 2026-10-05 — three sentence endings the citation check couldn't see (#262)
+
+The citation check splits an answer into sentences and requires a `[cite:...]`
+marker on each one. It missed three ways a model ends a sentence, and in each
+an uncited claim was glued onto the next, cited sentence and passed:
+Chinese and Japanese text with no space after `。`; endings like `.**`
+(markdown bold) or `.")`; and a marker placed right after the full stop
+(`days.[cite:doc1] Next claim.`). The splitter now recognises all three. A
+full stop still needs a following space, so decimals are safe, and Japanese
+`「…。」と言った` stays one sentence. One list of closing characters now feeds
+both the splitter and the template writer, so they can't disagree again.
+
+## 2026-10-05 — the reranker bench's Δ column adds up (#264)
+
+The reranker benchmark printed each recall to three decimals and a Δ computed
+from the unrounded values. At k=2 that gave `0.625 → 0.688` with `Δ +0.062`.
+The Δ is now the difference of the two printed numbers. The committed table
+uses k=1,3,5, where the numbers already agreed, so it doesn't change.
+
+## 2026-10-05 — the streaming demo can run more than one query (#266)
+
+The streaming demo's server told the browser to keep the connection open but
+never said how long the response was, so the browser could never tell the
+stream had ended. The page's Go button only re-enables when a stream ends, so
+the demo allowed one query per page load. The server now closes the
+connection at the end of each stream. A test reads a full response twice in a
+row, which hung before the fix. The existing test helper had worked around the
+hang without anyone filing it.
+
 ## 2026-10-05 — the dashboard says which port it's on (#268)
 
 With `--port 0` the dashboard lets the operating system pick a free port, but
