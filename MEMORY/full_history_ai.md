@@ -3164,3 +3164,22 @@ context_for_next_session:
   - THIRD_REPO_OF_THE_PLACEHOLDER_ON_A_VAR_WITH_A_NO_VALUE_BEHAVIOUR_CLASS_leh_297_mcp_221_rag_272
 followups: []
 ---
+
+---
+session: 2026-10-06T09:35Z
+duration_min: 2   # computed: plan comment 09:33:04Z -> 09:35Z (date -u)
+issue: 280
+branch: session/2026-10-06-0933-issue-280
+focus: rag_kit_db_connect_HAD_NO_connect_timeout_a_silent_postgres_host_hung_the_indexer_and_retriever_libpq_waits_forever
+phase: shipped
+delta:
+  files_changed: 3
+  tests_added: 5
+  suite: "1892 -> 1897 passed; ruff, format, mypy clean"
+decisions_made: []
+measured: "silent loopback: main still blocked at a 10 s alarm; fixed OperationalError < 4 s at connect_timeout=1. Revert probe: 3 arms red, the 2 'left to libpq' arms green by design. The env-read lock forced PGCONNECT_TIMEOUT into .env.example."
+context_for_next_session:
+  - THIRD_PG_CLIENT_TODAY_aop_175_mcp_229_rag_280_vsas_pgvector_backend_is_the_last_unswept_one_bench_only
+  - THE_ENV_READ_LOCK_FIRES_ON_A_NEW_os_environ_get_list_the_var_blank_in_env_example
+followups: []
+---

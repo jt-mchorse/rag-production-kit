@@ -3155,3 +3155,11 @@ Without a GitHub token, `run_eval --post-comment` prints the comment instead of
 posting it. The env template shipped a fake token, so loading the template
 made the runner try to post with it and fail. The token now ships empty, and
 the test that required a placeholder there requires it to be blank.
+
+## 2026-10-06 — connecting to Postgres gives up after ten seconds (#280)
+
+`rag_kit.db.connect` waited forever for Postgres, so a database host that
+accepted the connection but never answered hung the indexer and the pgvector
+retriever. It now gives up after 10 seconds unless the connection string or
+`PGCONNECT_TIMEOUT` sets a different limit, and callers can pass their own.
+`.env.example` lists the new variable.
