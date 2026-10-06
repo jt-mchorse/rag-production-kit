@@ -107,5 +107,9 @@ def test_every_variable_listed_is_read() -> None:
 
 def test_the_secrets_are_placeholders() -> None:
     listed = _names_listed()
-    for name in ("ANTHROPIC_API_KEY", "COHERE_API_KEY", "GITHUB_TOKEN"):
+    for name in ("ANTHROPIC_API_KEY", "COHERE_API_KEY"):
         assert "your-" in listed[name], f"{name}={listed[name]!r} does not look like a placeholder"
+    # A variable whose ABSENCE has a behaviour ships blank: run_eval's
+    # --post-comment dry-runs without a token, and a placeholder defeated that
+    # once the file was loaded (#272).
+    assert listed["GITHUB_TOKEN"] == "", "GITHUB_TOKEN has a no-token dry run; ship it blank"

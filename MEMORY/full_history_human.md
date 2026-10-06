@@ -3148,3 +3148,10 @@ table called `documents`. Another app's data in that table was destroyed. Plain
 which is what CI and the README already do. The test setup also refuses to
 drop a `documents` table that doesn't look like this project's. Two of my own
 checks were initially testing nothing, and I caught and fixed both.
+
+## 2026-10-05 — the eval runner's dry run survives the env template (#272)
+
+Without a GitHub token, `run_eval --post-comment` prints the comment instead of
+posting it. The env template shipped a fake token, so loading the template
+made the runner try to post with it and fail. The token now ships empty, and
+the test that required a placeholder there requires it to be blank.

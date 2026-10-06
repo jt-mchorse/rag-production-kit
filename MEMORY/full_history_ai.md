@@ -3146,3 +3146,21 @@ context_for_next_session:
   - GOTCHA_A_PROBE_REPLACEMENT_STRING_WRITTEN_BEFORE_RUFF_FORMAT_NO_LONGER_MATCHED_ASSERT_THE_OLD_STRING_IS_PRESENT_IN_EVERY_PROBE
 followups: []
 ---
+
+---
+session: 2026-10-05T09:30Z
+duration_min: 2   # computed
+issue: 272
+branch: session/2026-10-05-0929-issue-272
+focus: ENV_TEMPLATE_PLACEHOLDER_GITHUB_TOKEN_DEFEATED_RUN_EVALS_DRY_RUN
+phase: shipped
+delta:
+  files_changed: 2
+  tests_added: 0
+  suite: "green; ruff clean"
+decisions_made: []
+measured: "placeholder pin test re-pinned blank; red against main's template"
+context_for_next_session:
+  - THIRD_REPO_OF_THE_PLACEHOLDER_ON_A_VAR_WITH_A_NO_VALUE_BEHAVIOUR_CLASS_leh_297_mcp_221_rag_272
+followups: []
+---
