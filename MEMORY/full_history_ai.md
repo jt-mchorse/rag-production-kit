@@ -3050,6 +3050,29 @@ followups: []
 ---
 
 ---
+session: 2026-10-05T07:42Z
+duration_min: 11   # first repro on the combined tree ~07:31Z -> 2026-10-05T07:42Z; plan comment 2026-10-05T07:39:48Z
+issue: 262
+focus: split_sentences_MISSED_THREE_SENTENCE_ENDINGS_CJK_WITH_NO_SPACE_A_CLOSER_RUN_AND_A_MARKER_RIGHT_AFTER_THE_TERMINATOR_each_let_an_uncited_claim_ride_its_neighbours_marker
+phase: shipped
+delta:
+  files_changed: 2
+  tests_added: 33
+  suite: "1846 -> 1879 green (8 postgres skips); ruff clean"
+decisions_made: []
+measured: "main acab504: 10 bypass rows ACCEPTED by enforce_citations, now refused; 10 fully cited controls stay accepted. Probes: closer set back to six 5 red, one closer no run 6 red, no marker-after-terminator 3 red, no CJK zero-width 6 red, writer keeps old six 4 red, neighbour zero-width after ASCII 16 red, neighbour CJK zero-width after a closer 2 red."
+context_for_next_session:
+  - FOUND_BY_A_HUNT_AGENT_READING_160S_SCOPE_one_optional_closing_quote_or_bracket_AND_144S_TEST_SHAPE_which_put_a_SPACE_after_the_ideographic_stop
+  - THE_MARKER_AFTER_TERMINATOR_SHAPE_WAS_MINE_found_while_checking_that_the_CJK_split_must_not_cut_before_a_marker_ASK_WHERE_THE_BOUNDARY_IS_WHEN_A_FORM_IS_ACCEPTED
+  - ONE__CLOSERS_SET_FEEDS_THE_SPLITTER_AND__TERMINATOR_THEN_CLOSERS_writer_reader_parity_pinned_by_template_round_trips
+  - A_DOT_NEVER_SPLITS_WITHOUT_WHITESPACE_AND_A_CLOSER_AFTER_A_CJK_TERMINATOR_STILL_NEEDS_WHITESPACE_japanese_quote_then_to_itta_continues_the_sentence
+  - NOT_DONE_A_DOT_SPACE_MARKER_IS_STILL_REFUSED_contract_change_AND_TERMINATORLESS_BULLETS_ARE_OFF_CONTRACT
+  - ADDENDUM_SAME_RUN_HUNTING_MY_OWN_DIFF_THE_WRITER_TOOK_ONE_TERMINATOR_BEFORE_CLOSERS_WHILE_THE_READER_TAKES_A_RUN_Really_bang_close_quote_and_Wait_ellipsis_close_quote_were_refused_fixed_on_the_same_PR_4_rows_red_against_single_terminator
+  - GOTCHA_ruff_format_check_PIPED_TO_tail_INSIDE_AND_CHAIN_COMMITTED_AN_UNFORMATTED_FILE_fixed_by_a_style_commit
+followups: []
+---
+
+---
 session: 2026-10-05T08:39Z
 duration_min: 2   # computed: started 08:37Z -> 08:39Z
 issue: 264
