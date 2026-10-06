@@ -73,7 +73,31 @@ _CITE_PATTERN = re.compile(r"\[cite:([^\]]+)\]")
 # unlike a `["'…]?` inside the split delimiter). Quoting source text and ending
 # the sentence at the closing quote is standard English punctuation, so this is
 # reachable in ordinary generated answers, not a synthetic input.
-_SENTENCE_SPLIT = re.compile(r"(?:(?<=[.!?…。！？؟])|(?<=[.!?…。！？؟][\"”’')\]]))\s+")
+#
+# That rule was one closer from six (#160), and model output ends sentences in
+# three more ways it did not see, each merging an uncited claim onto the next
+# sentence's marker (#262): a RUN of closers or a closer outside the six
+# (`.**` -- markdown bold, which Claude writes by default -- `.")`, `.»`, `。」`);
+# a `[cite:...]` marker straight after the terminator (`days.[cite:doc1] Next`,
+# which `enforce_citations` accepts as a cited sentence, so the boundary is
+# AFTER the marker); and Chinese/Japanese, which put no space after `。！？`.
+#
+# So a boundary is a terminator run, then any run of closers and markers, then
+# the GAP the text is cut at: whitespace, or -- after `。！？` only -- nothing at
+# all, before the next character that is not whitespace, a closer or `[`. `.`
+# never splits without whitespace (decimals). A closer straight after a CJK
+# terminator still needs whitespace: Japanese `「…です。」と言った` continues
+# the sentence, and an over-merge is the cheaper error here (`_ABBREVIATIONS`).
+# The gap is a capture group because the terminators and closers it follows
+# stay attached to the sentence they end; Python `re` has no variable-width
+# lookbehind to express that.
+_CLOSERS = "\"'”’»›)]}*_`~」』）】〕〗〙〛〉》＂＇］｝"
+_CJK_TERMINATORS = "。！？"
+_MARKER = r"\[cite:[^\]]+\]"
+_SENTENCE_SPLIT = re.compile(
+    rf"[.!?…。！？؟]+(?:[{re.escape(_CLOSERS)}]|{_MARKER})*(?P<gap>\s+)"
+    rf"|[{_CJK_TERMINATORS}]+(?:{_MARKER})*(?P<cjk>)(?=[^\s{re.escape(_CLOSERS)}\[])"
+)
 
 # Tokens that end in a period but are NOT sentence boundaries. The `_SENTENCE_SPLIT`
 # regex treats every period-then-whitespace as a boundary, so an ordinary
@@ -485,11 +509,12 @@ def split_sentences(text: str) -> list[str]:
     marker_spans = [m.span() for m in _CITE_PATTERN.finditer(stripped)]
     parts: list[str] = []
     start = 0
-    for gap in _SENTENCE_SPLIT.finditer(stripped):
-        if any(lo < gap.start() < hi for lo, hi in marker_spans):
+    for boundary in _SENTENCE_SPLIT.finditer(stripped):
+        gap_lo, gap_hi = boundary.span("gap" if boundary.group("gap") is not None else "cjk")
+        if any(lo < gap_lo < hi for lo, hi in marker_spans):
             continue
-        parts.append(stripped[start : gap.start()])
-        start = gap.end()
+        parts.append(stripped[start:gap_lo])
+        start = gap_hi
     parts.append(stripped[start:])
     merged: list[str] = []
     for part in parts:
@@ -501,9 +526,13 @@ def split_sentences(text: str) -> list[str]:
 
 
 _TERMINATORS = ".!?…。！？؟"
-# A terminator followed by closing punctuation -- the boundary `_SENTENCE_SPLIT`'s
-# second lookbehind splits on (#161).
-_TERMINATOR_THEN_CLOSERS = re.compile(r"[.!?…。！？؟][\"”’')\]]+$")
+# A terminator followed by closing punctuation -- a boundary `_SENTENCE_SPLIT`
+# splits after (#161). The same `_CLOSERS` as the splitter, so the writer cannot
+# emit a tail the reader cuts at a different place (#262).
+# A terminator RUN, as the splitter reads it: `?!”` or `...”` with one
+# terminator here left `?` / `..` in front of the marker, where the splitter
+# cut it off -- a fully grounded chunk refused (#262).
+_TERMINATOR_THEN_CLOSERS = re.compile(rf"[.!?…。！？؟]+[{re.escape(_CLOSERS)}]+$")
 
 
 def _template_sentence(sentence: str, external_id: str) -> str:
