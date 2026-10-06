@@ -420,8 +420,13 @@ def _post_composite_comment(repo: str, pr: int, deltas: dict[str, str], token: s
     try:
         with urllib.request.urlopen(req, timeout=_GITHUB_TIMEOUT_S) as resp:
             comments = json.loads(resp.read().decode())
+            # A 200 can carry JSON that is not the comment list -- an error
+            # object such as `{"message": ...}` -- and iterating that walked its
+            # keys into `str.get`, an AttributeError past this guard (#276).
+            if not isinstance(comments, list):
+                raise ValueError(f"expected a list of comments, got {type(comments).__name__}")
             for c in comments:
-                if marker in (c.get("body") or ""):
+                if isinstance(c, dict) and "id" in c and marker in (c.get("body") or ""):
                     existing_id = int(c["id"])
                     break
     # `URLError`, not `HTTPError`: the latter is a *subclass* of the former, so

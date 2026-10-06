@@ -72,8 +72,17 @@ def test_a_silent_github_connection_times_out_instead_of_hanging(monkeypatch) ->
         listener.close()
 
 
-def test_a_non_json_list_response_is_a_warning_and_the_post_still_happens(
-    monkeypatch, capsys
+@pytest.mark.parametrize(
+    ("body", "warns"),
+    [
+        pytest.param(b"<html>proxy login</html>", True, id="html"),
+        pytest.param(b'{"message": "Bad credentials"}', True, id="json-object"),
+        # Entries that are not comment objects match nothing; nothing to warn.
+        pytest.param(b'["not-a-comment", 7]', False, id="list-of-non-objects"),
+    ],
+)
+def test_a_list_response_that_is_not_comments_is_a_warning_and_the_post_still_happens(
+    monkeypatch, capsys, body: bytes, warns: bool
 ) -> None:
     calls: list[str] = []
 
@@ -81,13 +90,13 @@ def test_a_non_json_list_response_is_a_warning_and_the_post_still_happens(
         calls.append(req.get_method())
         assert timeout == run_eval._GITHUB_TIMEOUT_S
         if req.get_method() == "GET":
-            return _Resp(b"<html>proxy login</html>")
+            return _Resp(body)
         return _Resp(b"{}")
 
     monkeypatch.setattr(run_eval.urllib.request, "urlopen", fake_urlopen)
     assert run_eval._post_composite_comment("a/b", 1, {}, "ghp_fake") is True
     assert calls == ["GET", "POST"]
-    assert "warning: failed to list PR comments" in capsys.readouterr().err
+    assert ("warning: failed to list PR comments" in capsys.readouterr().err) is warns
 
 
 @pytest.mark.parametrize(
