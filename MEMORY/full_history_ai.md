@@ -3164,3 +3164,22 @@ context_for_next_session:
   - THIRD_REPO_OF_THE_PLACEHOLDER_ON_A_VAR_WITH_A_NO_VALUE_BEHAVIOUR_CLASS_leh_297_mcp_221_rag_272
 followups: []
 ---
+
+---
+session: 2026-10-06T08:38Z
+duration_min: 4   # computed: plan comment 08:34:34Z -> 08:38Z (date -u); the hang was measured from ~08:33Z (sibling sweep of llm-eval-harness#303)
+issue: 276
+branch: session/2026-10-06-0834-issue-276
+focus: run_eval_post_comment_URLOPEN_HAD_NO_TIMEOUT_a_silent_GitHub_connection_HUNG_THE_JOB_45s_plus_and_a_read_timeout_or_non_JSON_list_escaped_as_a_traceback
+phase: shipped
+delta:
+  files_changed: 3
+  tests_added: 5
+  suite: "1892 -> 1897 passed; ruff, format clean"
+decisions_made: []
+measured: "black-hole proxy: main still blocked at 45 s. Revert probes (array of ids, one subprocess each, 60 s alarm): no timeouts -> black-hole arm red; URLError arms -> exactly non-JSON, read-timeout and reset red."
+context_for_next_session:
+  - GOTCHA_I_PUSHED_BEFORE_THE_FULL_SUITE_FINISHED_and_two_old_fakes_urlopen_req_rejected_the_new_timeout_kwarg_fixed_in_a_second_commit_RUN_THE_SUITE_BEFORE_git_push
+  - GOTCHA_zsh_DOES_NOT_WORD_SPLIT_A_STRING_VARIABLE_my_first_probe_passed_ALL_IDS_AS_ONE_and_every_arm_read_RED_rc_4_USE_AN_ARRAY_and_check_rc_is_1_not_4
+followups: []
+---
