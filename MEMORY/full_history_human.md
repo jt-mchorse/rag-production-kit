@@ -3155,3 +3155,13 @@ Without a GitHub token, `run_eval --post-comment` prints the comment instead of
 posting it. The env template shipped a fake token, so loading the template
 made the runner try to post with it and fail. The token now ships empty, and
 the test that required a placeholder there requires it to be blank.
+
+## 2026-10-06 — the demo script stops the server it starts (#274)
+
+With `--launch-server`, the demo script starts the streaming server, fetches
+one stream from it and exits, but it never stopped the server. The server kept
+running in the background. On the next capture the new server could not get
+the port and crashed with its error showing in the recording, while the fetch
+quietly read the old server and the script reported success. The script now
+waits until its own server says it is listening, fails instead of fetching
+from someone else's server, and stops its server when the stage ends.

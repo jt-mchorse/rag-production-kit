@@ -3164,3 +3164,22 @@ context_for_next_session:
   - THIRD_REPO_OF_THE_PLACEHOLDER_ON_A_VAR_WITH_A_NO_VALUE_BEHAVIOUR_CLASS_leh_297_mcp_221_rag_272
 followups: []
 ---
+
+---
+session: 2026-10-06T08:04Z
+duration_min: 2   # computed: plan comment 08:02:06Z -> 08:04Z (date -u); reproduced from ~07:59Z after a sweep agent flagged it as suspected
+issue: 274
+branch: session/2026-10-06-0802-issue-274
+focus: capture_demo_launch_server_ORPHANED_THE_SSE_SERVER_the_next_captures_server_died_EADDRINUSE_and_curl_RECORDED_THE_ORPHAN_exit_0
+phase: shipped
+delta:
+  files_changed: 2
+  tests_added: 5
+  suite: "full suite green; ruff, format, mypy clean"
+decisions_made: []
+measured: "main, two runs: run 1 rc 0 + orphan ppid 1 on 8765; run 2 rc 0 with 'OSError [Errno 48]' in the take and curl reading run 1's server. Fixed: clean rc 0 and 8765 free after; held port rc 1 and the holder got 0 requests. Revert probe: both port arms red."
+context_for_next_session:
+  - MY_FIRST_REPRO_RAN_ON_YESTERDAYS_SESSION_BRANCH_main_IS_CHECKED_OUT_IN_THE_rag_eval_WORKTREE_SO_git_checkout_main_FAILED_SILENTLY_IN_A_CHAIN_use_git_checkout_detach_origin_main_AND_PRINT_git_log_1_BEFORE_REPRODUCING
+  - THIRD_INSTANCE_TODAY_OF_A_PORT_THAT_ACCEPTS_IS_NOT_YOUR_SERVER_aop_169_aiapp_153_rag_274_wait_for_the_childs_own_post_bind_line
+followups: []
+---
