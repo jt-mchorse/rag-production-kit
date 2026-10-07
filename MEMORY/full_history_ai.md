@@ -3166,6 +3166,44 @@ followups: []
 ---
 
 ---
+session: 2026-10-06T08:04Z
+duration_min: 2   # computed: plan comment 08:02:06Z -> 08:04Z (date -u); reproduced from ~07:59Z after a sweep agent flagged it as suspected
+issue: 274
+branch: session/2026-10-06-0802-issue-274
+focus: capture_demo_launch_server_ORPHANED_THE_SSE_SERVER_the_next_captures_server_died_EADDRINUSE_and_curl_RECORDED_THE_ORPHAN_exit_0
+phase: shipped
+delta:
+  files_changed: 2
+  tests_added: 5
+  suite: "full suite green; ruff, format, mypy clean"
+decisions_made: []
+measured: "main, two runs: run 1 rc 0 + orphan ppid 1 on 8765; run 2 rc 0 with 'OSError [Errno 48]' in the take and curl reading run 1's server. Fixed: clean rc 0 and 8765 free after; held port rc 1 and the holder got 0 requests. Revert probe: both port arms red."
+context_for_next_session:
+  - MY_FIRST_REPRO_RAN_ON_YESTERDAYS_SESSION_BRANCH_main_IS_CHECKED_OUT_IN_THE_rag_eval_WORKTREE_SO_git_checkout_main_FAILED_SILENTLY_IN_A_CHAIN_use_git_checkout_detach_origin_main_AND_PRINT_git_log_1_BEFORE_REPRODUCING
+  - THIRD_INSTANCE_TODAY_OF_A_PORT_THAT_ACCEPTS_IS_NOT_YOUR_SERVER_aop_169_aiapp_153_rag_274_wait_for_the_childs_own_post_bind_line
+followups: []
+---
+
+---
+session: 2026-10-06T08:38Z
+duration_min: 4   # computed: plan comment 08:34:34Z -> 08:38Z (date -u); the hang was measured from ~08:33Z (sibling sweep of llm-eval-harness#303)
+issue: 276
+branch: session/2026-10-06-0834-issue-276
+focus: run_eval_post_comment_URLOPEN_HAD_NO_TIMEOUT_a_silent_GitHub_connection_HUNG_THE_JOB_45s_plus_and_a_read_timeout_or_non_JSON_list_escaped_as_a_traceback
+phase: shipped
+delta:
+  files_changed: 3
+  tests_added: 5
+  suite: "1892 -> 1897 passed; ruff, format clean"
+decisions_made: []
+measured: "black-hole proxy: main still blocked at 45 s. Revert probes (array of ids, one subprocess each, 60 s alarm): no timeouts -> black-hole arm red; URLError arms -> exactly non-JSON, read-timeout and reset red."
+context_for_next_session:
+  - GOTCHA_I_PUSHED_BEFORE_THE_FULL_SUITE_FINISHED_and_two_old_fakes_urlopen_req_rejected_the_new_timeout_kwarg_fixed_in_a_second_commit_RUN_THE_SUITE_BEFORE_git_push
+  - GOTCHA_zsh_DOES_NOT_WORD_SPLIT_A_STRING_VARIABLE_my_first_probe_passed_ALL_IDS_AS_ONE_and_every_arm_read_RED_rc_4_USE_AN_ARRAY_and_check_rc_is_1_not_4
+followups: []
+---
+
+---
 session: 2026-10-06T09:29Z
 duration_min: 3   # computed: plan comment 09:26:45Z -> 09:29Z (date -u)
 issue: 278
