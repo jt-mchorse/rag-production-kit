@@ -161,7 +161,7 @@ def test_post_composite_comment_creates_when_no_existing(monkeypatch):
         def read(self) -> bytes:
             return b'{"id": 99}'
 
-    def _fake_urlopen(req):
+    def _fake_urlopen(req, timeout=None):
         url = req.full_url
         method = req.get_method()
         body = req.data.decode() if req.data else None
@@ -216,7 +216,7 @@ def test_post_composite_comment_patches_existing(monkeypatch):
         def read(self):
             return b'{"id": 8}'
 
-    def _fake_urlopen(req):
+    def _fake_urlopen(req, timeout=None):
         method = req.get_method()
         body = req.data.decode() if req.data else None
         calls.append((f"{method} {req.full_url}", json.loads(body) if body else {}))

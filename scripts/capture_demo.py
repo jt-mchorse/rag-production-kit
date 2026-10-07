@@ -46,9 +46,11 @@ from __future__ import annotations
 import argparse
 import importlib
 import math
+import queue
 import shutil
 import subprocess
 import sys
+import threading
 import time
 import webbrowser
 from pathlib import Path
@@ -204,19 +206,71 @@ def _nextjs_cheatsheet() -> str:
     )
 
 
-def _maybe_launch_sse_server() -> subprocess.Popen[bytes] | None:
-    """Spawn `python -m demo.streaming.server` as a child. Returns the
-    child for the operator to terminate when the recording is done.
-    Returns ``None`` if the spawn failed (rare — the server is
+def _maybe_launch_sse_server() -> subprocess.Popen[str] | None:
+    """Spawn `python -m demo.streaming.server` as a child, stdout piped.
+
+    Unbuffered (``-u``) so its startup line reaches the pipe as soon as it is
+    printed; stderr is inherited, so the request log still lands in the
+    recording. `main` waits for that line and stops the child at the end of
+    STAGE 2 (#274). Returns ``None`` if the spawn failed (rare -- the server is
     stdlib-only).
     """
     try:
         return subprocess.Popen(  # noqa: S603 — sys.executable, no shell.
-            [sys.executable, "-m", "demo.streaming.server"],
+            [sys.executable, "-u", "-m", "demo.streaming.server"],
             cwd=REPO_ROOT,
+            stdout=subprocess.PIPE,
+            text=True,
         )
     except OSError:
         return None
+
+
+# What `demo.streaming.server.main` prints once `ThreadingHTTPServer` has
+# bound its port -- after the bind, so seeing it means THIS child is serving.
+_LISTEN_LINE_PREFIX = "streaming demo on http://"
+
+
+def _wait_for_listen_line(child: subprocess.Popen[str], timeout: float) -> str | None:
+    """Return the child's listen line, or ``None`` if it exits or times out first.
+
+    Waiting for the port to accept would be satisfied by any process already
+    holding 8765 -- including the previous capture's server -- while this
+    child dies of EADDRINUSE. That is what the fixed one-second sleep let
+    through: the take recorded the other server and exited 0 (#274).
+    """
+    assert child.stdout is not None
+    lines: queue.Queue[str] = queue.Queue()
+    stdout = child.stdout
+
+    def pump() -> None:
+        # Keeps draining after the listen line so the pipe never fills.
+        for line in stdout:
+            lines.put(line)
+
+    threading.Thread(target=pump, daemon=True).start()
+    deadline = time.monotonic() + timeout
+    while (left := deadline - time.monotonic()) > 0:
+        try:
+            line = lines.get(timeout=min(left, 0.1))
+        except queue.Empty:
+            if child.poll() is not None and lines.empty():
+                return None
+            continue
+        if line.startswith(_LISTEN_LINE_PREFIX):
+            return line.rstrip("\n")
+    return None
+
+
+def _stop(child: subprocess.Popen[str]) -> None:
+    """Terminate and reap `child`, killing it if it ignores SIGTERM."""
+    if child.poll() is None:
+        child.terminate()
+        try:
+            child.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            child.kill()
+            child.wait()
 
 
 def _maybe_run_curl(query: str) -> None:
@@ -311,19 +365,27 @@ def main(argv: list[str] | None = None) -> int:
     # STAGE 2 — SSE server cheat-sheet (operator-action, optional spawn).
     print(_banner(2, "SSE server demo (python -m demo.streaming.server)"))
 
-    streamlit_child = None  # placeholder name; actually the SSE child.
     if args.launch_server:
-        streamlit_child = _maybe_launch_sse_server()
-        if streamlit_child is None:
+        child = _maybe_launch_sse_server()
+        if child is None:
             print("[capture] failed to spawn the SSE server subprocess; cheat-sheet only.")
         else:
-            print(
-                f"[capture] spawned SSE server (pid {streamlit_child.pid}); "
-                "Ctrl-C / terminate when the recording is done."
-            )
-            # Small grace period so the server's listen() is up before curl.
-            time.sleep(1.0)
-            _maybe_run_curl(args.query)
+            try:
+                listening = _wait_for_listen_line(child, timeout=10.0)
+                if listening is None:
+                    print(
+                        f"[capture] the SSE server (pid {child.pid}) exited or never reported "
+                        f"listening; is something already on {SSE_SERVER_URL}? Refusing to curl "
+                        "a server this capture did not start.",
+                        file=sys.stderr,
+                    )
+                    return 1
+                print(f"[capture] spawned SSE server (pid {child.pid}): {listening}")
+                _maybe_run_curl(args.query)
+            finally:
+                # The cheat-sheet's step 3: stop the server when the recording
+                # cuts to STAGE 3. It used to outlive the script (#274).
+                _stop(child)
 
     if not args.skip_server_cheatsheet:
         print(_server_cheatsheet(args.query))

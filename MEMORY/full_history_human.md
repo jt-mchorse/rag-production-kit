@@ -3156,6 +3156,34 @@ posting it. The env template shipped a fake token, so loading the template
 made the runner try to post with it and fail. The token now ships empty, and
 the test that required a placeholder there requires it to be blank.
 
+## 2026-10-06 — the demo script stops the server it starts (#274)
+
+With `--launch-server`, the demo script starts the streaming server, fetches
+one stream from it and exits, but it never stopped the server. The server kept
+running in the background. On the next capture the new server could not get
+the port and crashed with its error showing in the recording, while the fetch
+quietly read the old server and the script reported success. The script now
+waits until its own server says it is listening, fails instead of fetching
+from someone else's server, and stops its server when the stage ends.
+
+## 2026-10-06 — posting eval results to GitHub can no longer hang (#276)
+
+`run_eval --post-comment` made its two GitHub requests with no timeout. A
+connection that was accepted but never answered would hang the eval job
+until CI killed it; through a deliberately silent proxy it was still waiting
+after 45 seconds. Both requests now give up after 30 seconds, the same limit
+the eval harness's own comment poster uses, and a timeout or an unreadable
+response is reported as a normal error or warning instead of a crash.
+
+## 2026-10-06 — a dashboard that cannot start no longer seeds the database (#278)
+
+`telemetry_dashboard --seed` wrote its sample rows before claiming its port.
+Starting it a second time on the same port failed with "could not bind", but
+only after adding another batch of sample rows to the database the first
+dashboard was serving. The port is now claimed first, so a run that fails
+writes nothing. One existing test had relied on the old order and now checks
+the same message on a run that starts successfully.
+
 ## 2026-10-06 — connecting to Postgres gives up after ten seconds (#280)
 
 `rag_kit.db.connect` waited forever for Postgres, so a database host that
