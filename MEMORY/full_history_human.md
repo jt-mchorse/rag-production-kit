@@ -3208,3 +3208,9 @@ a Russian query ranked below an unrelated English chunk, and "café" became
 "caf". Both now use one shared tokenizer that handles any script and accents.
 English text tokenizes exactly as before, and the committed eval numbers didn't
 change.
+## 2026-10-07 — the two percentile functions now agree exactly (#287)
+
+The streaming pipeline and the telemetry module each computed percentiles with
+slightly different arithmetic, despite a comment saying they matched. The
+difference was tiny but could put a "p95" fractionally below every measured
+value. The streaming one now calls the telemetry one, so they can't disagree.
