@@ -3165,3 +3165,12 @@ the port and crashed with its error showing in the recording, while the fetch
 quietly read the old server and the script reported success. The script now
 waits until its own server says it is listening, fails instead of fetching
 from someone else's server, and stops its server when the stage ends.
+
+## 2026-10-06 — posting eval results to GitHub can no longer hang (#276)
+
+`run_eval --post-comment` made its two GitHub requests with no timeout. A
+connection that was accepted but never answered would hang the eval job
+until CI killed it; through a deliberately silent proxy it was still waiting
+after 45 seconds. Both requests now give up after 30 seconds, the same limit
+the eval harness's own comment poster uses, and a timeout or an unreadable
+response is reported as a normal error or warning instead of a crash.
