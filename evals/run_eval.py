@@ -34,7 +34,6 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
-import re
 import shutil
 import subprocess
 import sys
@@ -53,6 +52,7 @@ from rag_kit import (
 )
 from rag_kit.io_utils import atomic_write_text
 from rag_kit.retriever import RetrievalResult
+from rag_kit.text import word_tokens
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 DATASET_PATH = REPO_ROOT / "evals" / "dataset" / "rag_qa_v1.jsonl"
@@ -115,11 +115,9 @@ def _load_corpus(path: Path) -> list[_Chunk]:
     return out
 
 
-_TOKEN_RE = re.compile(r"[a-z0-9]+")
-
-
 def _tokens(text: str) -> list[str]:
-    return _TOKEN_RE.findall(text.lower())
+    # Unicode-aware since #285; the ASCII path is the old `[a-z0-9]+`.
+    return word_tokens(text)
 
 
 def _retrieve_in_memory(query: str, corpus: list[_Chunk], k: int) -> list[RetrievalResult]:
