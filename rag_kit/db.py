@@ -16,6 +16,7 @@ from .embedder import EMBEDDING_DIM
 
 try:
     import psycopg
+    from psycopg.conninfo import conninfo_to_dict
     from psycopg.types.json import Jsonb
 except ImportError as e:  # pragma: no cover
     raise ImportError("psycopg is required. Install with: pip install rag-production-kit") from e
@@ -24,15 +25,35 @@ except ImportError as e:  # pragma: no cover
 DEFAULT_DATABASE_URL = "postgresql://rag:rag@localhost:5432/rag"
 
 
-def connect(url: str | None = None) -> psycopg.Connection[Any]:
+#: Seconds to wait for a connection when nothing else says (#280).
+DEFAULT_CONNECT_TIMEOUT_S = 10
+
+
+def connect(
+    url: str | None = None, *, connect_timeout: int | None = None
+) -> psycopg.Connection[Any]:
     """Open a psycopg connection.
 
     Resolves the connection string from (in order) the caller-supplied
     ``url``, ``DATABASE_URL`` env var, then the default that matches the
     ``docker-compose.yml`` service.
+
+    The connection attempt is bounded (#280). libpq waits forever by default,
+    so a host that accepted TCP and never spoke Postgres hung the indexer and
+    the pgvector retriever. An explicit ``connect_timeout`` wins; otherwise a
+    ``connect_timeout`` in the DSN or ``PGCONNECT_TIMEOUT`` in the environment
+    is left to libpq, and only when neither is set does
+    ``DEFAULT_CONNECT_TIMEOUT_S`` apply.
     """
     dsn = url or os.environ.get("DATABASE_URL") or DEFAULT_DATABASE_URL
-    return psycopg.connect(dsn)
+    if connect_timeout is not None:
+        return psycopg.connect(dsn, connect_timeout=connect_timeout)
+    if (
+        "connect_timeout" in conninfo_to_dict(dsn)
+        or os.environ.get("PGCONNECT_TIMEOUT", "").strip()
+    ):
+        return psycopg.connect(dsn)
+    return psycopg.connect(dsn, connect_timeout=DEFAULT_CONNECT_TIMEOUT_S)
 
 
 def to_pgvector(vec: list[float], *, expected_dim: int = EMBEDDING_DIM) -> str:

@@ -3183,3 +3183,11 @@ only after adding another batch of sample rows to the database the first
 dashboard was serving. The port is now claimed first, so a run that fails
 writes nothing. One existing test had relied on the old order and now checks
 the same message on a run that starts successfully.
+
+## 2026-10-06 — connecting to Postgres gives up after ten seconds (#280)
+
+`rag_kit.db.connect` waited forever for Postgres, so a database host that
+accepted the connection but never answered hung the indexer and the pgvector
+retriever. It now gives up after 10 seconds unless the connection string or
+`PGCONNECT_TIMEOUT` sets a different limit, and callers can pass their own.
+`.env.example` lists the new variable.
