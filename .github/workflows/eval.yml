@@ -46,13 +46,17 @@ jobs:
         run: python -m evals.run_eval
       - name: Diff each suite against its committed baseline (preview in logs)
         run: |
+          # Exit 1 = a row was flagged: keep previewing the other suites. Exit 2 =
+          # bad input (a missing or unreadable current/baseline JSON): fail here
+          # rather than continue past it (#289). `|| echo` swallowed both.
           for suite in faithfulness recall_at_5 correctness; do
             echo "==> $suite"
+            rc=0
             eval-harness diff-json \
               --current "evals/current/$suite.json" \
               --baseline "evals/baselines/$suite.json" \
-              --format markdown \
-              || echo "($suite preview exited non-zero — regression flagged — continuing)"
+              --format markdown || rc=$?
+            [ "$rc" -le 1 ] || exit "$rc"
           done
       - name: Upsert composite sticky PR comment
         env:
