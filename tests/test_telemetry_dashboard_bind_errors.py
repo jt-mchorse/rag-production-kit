@@ -188,20 +188,35 @@ def test_a_successful_bind_still_serves_and_the_banner_is_unchanged(tmp_path: Pa
 
 
 def test_seed_success_still_reports_the_count(tmp_path: Path) -> None:
-    # The seed guard must not swallow the success message, and a writable `--db`
-    # must still be seeded before the bind.
+    # The seed guard must not swallow the success message. This used a
+    # bind-failing port to make the process exit after seeding, which pinned the
+    # seed-BEFORE-bind order #278 reverses (a run that cannot bind must write
+    # nothing): it now reads the message from a run that binds and serves.
     db = tmp_path / "t.db"
-    holder = socket.socket()
-    holder.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-    holder.bind(("127.0.0.1", 0))
-    holder.listen(1)
-    port = holder.getsockname()[1]
+    proc = subprocess.Popen(
+        [
+            sys.executable,
+            str(_SCRIPT),
+            "--host",
+            "127.0.0.1",
+            "--port",
+            "0",
+            "--db",
+            str(db),
+            "--seed",
+            "5",
+        ],
+        stderr=subprocess.PIPE,
+        text=True,
+        cwd=_REPO_ROOT,
+    )
     try:
-        # Deliberately bind-failing so the process exits instead of serving; the
-        # seed has already run and printed by then, which is what we assert.
-        proc = _run("--host", "127.0.0.1", "--port", str(port), "--db", str(db), "--seed", "5")
+        assert proc.stderr is not None
+        seeded = proc.stderr.readline()
+        serving = proc.stderr.readline()
+        assert f"seeded 5 synthetic records into {db}" in seeded, seeded
+        assert serving.startswith("serving http://127.0.0.1:"), serving
+        assert db.exists()
     finally:
-        holder.close()
-    assert "seeded 5 synthetic records into" in proc.stderr
-    assert db.exists(), "the seed really wrote the database before the bind was attempted"
-    assert proc.returncode == 2  # ...and then the bind failed cleanly, as above
+        proc.terminate()
+        proc.communicate(timeout=15)

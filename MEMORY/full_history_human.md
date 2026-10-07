@@ -3174,3 +3174,12 @@ until CI killed it; through a deliberately silent proxy it was still waiting
 after 45 seconds. Both requests now give up after 30 seconds, the same limit
 the eval harness's own comment poster uses, and a timeout or an unreadable
 response is reported as a normal error or warning instead of a crash.
+
+## 2026-10-06 — a dashboard that cannot start no longer seeds the database (#278)
+
+`telemetry_dashboard --seed` wrote its sample rows before claiming its port.
+Starting it a second time on the same port failed with "could not bind", but
+only after adding another batch of sample rows to the database the first
+dashboard was serving. The port is now claimed first, so a run that fails
+writes nothing. One existing test had relied on the old order and now checks
+the same message on a run that starts successfully.

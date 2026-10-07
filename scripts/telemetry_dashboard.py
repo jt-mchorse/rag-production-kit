@@ -392,22 +392,6 @@ def main(argv: Sequence[str] | None = None) -> int:
     if not 0 <= args.port <= 65535:
         parser.error(f"--port must be in 0-65535; got {args.port}")
 
-    if args.seed > 0:
-        # `--db` in a directory that doesn't exist came back as a raw
-        # `sqlite3.OperationalError: unable to open database file` traceback at
-        # exit 1 (#178) — reachable through the documented `--seed` path, and a
-        # diagnostic naming SQLite rather than the flag the operator typed.
-        # `sqlite3.Error` is NOT an `OSError` subclass, so it needs its own arm
-        # alongside the `OSError` one (a path component that is a file, a
-        # permission denial).
-        try:
-            with TelemetryStore(args.db) as store:
-                _seed(store, n=args.seed)
-        except (OSError, sqlite3.Error) as e:
-            print(f"::error::--db {args.db!r} is not usable: {e}", file=sys.stderr)
-            return 2
-        print(f"seeded {args.seed} synthetic records into {args.db}", file=sys.stderr)
-
     _Handler.db_path = args.db
     # The `--port` range check above covers one operand of this bind tuple, and
     # its comment states the contract for both: a usage error must not surface
@@ -440,6 +424,25 @@ def main(argv: Sequence[str] | None = None) -> int:
     # `serve_forever`'s. The `print` below can raise (a closed or full stdout),
     # and wrapping only `serve_forever` would leak the listener.
     try:
+        # Seeding after the bind, inside the block that closes the socket
+        # (#278). It ran before the bind, so a second instance on a busy port
+        # wrote its N rows into the running dashboard's DB and only then exited
+        # 2 -- the routine "started it twice" case the comment above names.
+        if args.seed > 0:
+            # `--db` in a directory that doesn't exist came back as a raw
+            # `sqlite3.OperationalError: unable to open database file` traceback at
+            # exit 1 (#178) — reachable through the documented `--seed` path, and a
+            # diagnostic naming SQLite rather than the flag the operator typed.
+            # `sqlite3.Error` is NOT an `OSError` subclass, so it needs its own arm
+            # alongside the `OSError` one (a path component that is a file, a
+            # permission denial).
+            try:
+                with TelemetryStore(args.db) as store:
+                    _seed(store, n=args.seed)
+            except (OSError, sqlite3.Error) as e:
+                print(f"::error::--db {args.db!r} is not usable: {e}", file=sys.stderr)
+                return 2
+            print(f"seeded {args.seed} synthetic records into {args.db}", file=sys.stderr)
         print(
             # The BOUND port: `--port 0` asks the OS to pick one, and printing
             # `args.port` advertised `:0`, where nothing listens (#268).
