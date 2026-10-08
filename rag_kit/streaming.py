@@ -34,6 +34,7 @@ from typing import Any, Literal, Protocol
 from .io_utils import atomic_write_text, copy_json_value
 from .reranker import Candidate, Reranker
 from .retriever import RetrievalResult
+from .telemetry import percentile as _telemetry_percentile
 
 EventType = Literal[
     "retrieving",  # phase start: retrieving from PG
@@ -214,11 +215,14 @@ class PhaseTimings:
             return values[0]
         if p >= 100:
             return values[-1]
-        rank = (p / 100.0) * (len(values) - 1)
-        lo = int(rank)
-        hi = min(lo + 1, len(values) - 1)
-        frac = rank - lo
-        return values[lo] * (1 - frac) + values[hi] * frac
+        # One formula, not two (#287). This interpolated as
+        # `lo * (1 - frac) + hi * frac` while `telemetry.percentile`, whose
+        # docstring says the two "agree on the number", uses `lo + (hi - lo) *
+        # frac`. They differ in the last bits: p95 of three samples of 204.41
+        # came out 204.40999999999997, below every sample, and 8,893 of 60k
+        # random (sample, percentile) pairs disagreed. Delegating makes the
+        # docstring's claim true by construction.
+        return _telemetry_percentile(values, p / 100.0)
 
     def summary(self) -> dict[str, dict[str, float | int | None]]:
         return {

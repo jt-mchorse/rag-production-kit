@@ -3273,5 +3273,19 @@ measured: "Cyrillic query: main ranks the matching chunk 2nd; fix 1st. run_eval 
 context_for_next_session:
   - GOTCHA_python_m_evals_run_eval_REWRITES_COMMITTED_evals_current_JSON_snapshot_then_git_checkout_them
   - SAME_CLASS_SHIPPED_IN_3_REPOS_TODAY_aiapp_165_leh_314_rag_285_csl_semantic_terminators_next
+session: 2026-10-07T09:18Z
+duration_min: 4
+issue: 287
+branch: session/2026-10-07-rag-percentile
+focus: TWO_PERCENTILE_FORMULAS_A_DOCSTRING_SAID_AGREE_DID_NOT
+phase: shipped
+delta:
+  files_changed: 2
+  tests_added: 7
+  suite: "1918 passed (junitxml); ruff, format clean"
+decisions_made: []
+measured: "main: p95 of [204.41]*3 -> 204.40999999999997. Revert 6/7 red."
+context_for_next_session:
+  - A_DOCSTRING_THAT_SAYS_TWO_FUNCTIONS_MATCH_IS_A_PARITY_TEST_WAITING_TO_BE_WRITTEN_then_delegate_so_it_cannot_drift
 followups: []
 ---
