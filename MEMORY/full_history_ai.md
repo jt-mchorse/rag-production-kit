@@ -3303,3 +3303,23 @@ context_for_next_session:
   - PORTFOLIO_SWEEP_FOR_OR_ECHO_OR_TRUE_IN_WORKFLOWS_DONE_10_07_only_leh_and_rag_had_it_do_not_re_sweep
 followups: []
 ---
+
+---
+session: 2026-10-08T07:25Z
+duration_min: 3   # computed: plan comment 07:25:36Z -> 07:28Z (date -u); reproduced end to end from ~07:22Z
+issue: 293
+branch: session/2026-10-08-issue-293
+focus: capture_demo_launch_server_CURL_URL_ENCODED_ONLY_SPACES_so_the_LIVE_STREAM_got_R_for_R_and_D_c_spaces_for_c_plus_plus_400_for_hash_and_mojibake_for_non_ASCII_EXIT_0
+phase: shipped
+delta:
+  files_changed: 2
+  tests_added: 10
+  suite: "full suite green (-m 'not pg'), re-run after commit; ruff check + format clean"
+decisions_made: []
+measured: "main, real server + curl: 'R&D budget' -> live query 'R'; 'c++ tuning' -> 'c   tuning'; '#1 postgres tip' -> 400 missing q; Cyrillic -> Latin-1 mojibake; all exit 0. Revert probes: helper back to replace(' ','+') 5 red (4 table rows + e2e); call site only 1 red (e2e)."
+context_for_next_session:
+  - THE_WRITE_SIDE_OF_A_QUERY_STRING_MUST_BE_THE_INVERSE_OF_THE_READERS_parse_qs_a_replace_space_plus_is_one_character_of_urlencode
+  - THE_CHEATSHEET_TOLD_THE_OPERATOR_TO_URL_ENCODE_and_the_scripts_own_curl_did_not_a_guards_prose_is_a_repro
+  - filed_294_low_capture_demo_query_empty_is_a_raw_traceback_at_exit_1
+followups: ["#294"]
+---
