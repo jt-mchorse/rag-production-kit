@@ -3219,3 +3219,13 @@ value. The streaming one now calls the telemetry one, so they can't disagree.
 Same fix as llm-eval-harness #310: the eval workflow's preview loop treated a
 missing or unreadable results file like an ordinary regression and carried on.
 It now continues only for flagged regressions and stops on real errors.
+
+## 2026-10-08 — the telemetry dashboard can listen on an IPv6 address (#291)
+
+`scripts/telemetry_dashboard.py --host ::1` failed with "nodename nor servname
+provided" and exit 2, even though the comment above the bind lists an IPv6
+literal as a valid host. The server always opened an IPv4 socket. It now asks
+the resolver which family the host needs, as `python -m http.server` does, and
+the startup banner wraps an IPv6 address in brackets so the printed URL can be
+opened. Any host with an IPv4 address (including `localhost` and the default
+`127.0.0.1`) binds exactly as before.
