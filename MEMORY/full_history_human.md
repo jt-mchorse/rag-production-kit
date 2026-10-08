@@ -3219,3 +3219,10 @@ value. The streaming one now calls the telemetry one, so they can't disagree.
 Same fix as llm-eval-harness #310: the eval workflow's preview loop treated a
 missing or unreadable results file like an ordinary regression and carried on.
 It now continues only for flagged regressions and stops on real errors.
+## 2026-10-08 — writing to a symlinked output updates the linked file (#296)
+
+When `--out` (or any other output path) was a symlink, the atomic writer
+replaced the link with a plain file and left the file it pointed at
+unchanged. It now writes through the link, the way a plain write does,
+and keeps that file's permissions. Same fix as python-async-llm-pipelines
+#157.

@@ -3303,3 +3303,21 @@ context_for_next_session:
   - PORTFOLIO_SWEEP_FOR_OR_ECHO_OR_TRUE_IN_WORKFLOWS_DONE_10_07_only_leh_and_rag_had_it_do_not_re_sweep
 followups: []
 ---
+
+---
+session: 2026-10-08T00:40Z
+duration_min: 10
+issue: 296
+branch: session/2026-10-08-issue-296
+focus: atomic_write_text_os_replace_RENAMED_ONTO_A_SYMLINKED_DESTINATION_link_became_a_regular_file_linked_file_kept_old_contents_sibling_of_pyasync_157
+phase: shipped
+delta:
+  files_changed: 2
+  tests_added: 10
+  suite: "1949 passed, 8 deselected (not pg), re-run after commit; ruff check + format clean"
+decisions_made: []
+measured: "main: atomic_write_text('link.md') -> islink False, real file still 'old'; bench_streaming --out link.json rc 0, link replaced, linked file still {}. Revert probe: 10 collected, 5 red (4 atomic arms + bench e2e), 5 green controls (3 write_text parity, link loop, plain path)."
+context_for_next_session:
+  - SYMLINK_WRITE_THROUGH_SWEEP_10_08_rag_leh_emb_csl_after_pyasync_158_a_link_loop_stays_unresolved_under_non_strict_realpath_and_the_mode_copy_os_stat_raises_ELOOP
+followups: []
+---
