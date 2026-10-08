@@ -510,10 +510,17 @@ def _post_composite_comment(repo: str, pr: int, deltas: dict[str, str], token: s
     return True
 
 
+class DiffFailedError(RuntimeError):
+    """`eval-harness diff-json` ran but produced no delta (#299)."""
+
+
 def _diff_markdown(current: Path, baseline: Path) -> str:
     """Shell out to `eval-harness diff-json --format markdown`.
 
     Keeps the diff rendering identical to llm-eval-harness's own output.
+
+    Raises `DiffFailedError` when the subcommand runs but yields no delta
+    (#299); `main` turns that into exit 2 without posting.
 
     `check=False` covers "the subcommand exited non-zero"; it does not cover
     "there is no such executable". `eval-harness` ships in the ``[eval]``
@@ -541,7 +548,22 @@ def _diff_markdown(current: Path, baseline: Path) -> str:
         )
     except FileNotFoundError:
         return _EVAL_HARNESS_MISSING
-    return out.stdout or out.stderr
+    # A delta is a 0 (clean) or 1 (flagged) exit WITH markdown on stdout.
+    # Anything else is a failed diff, and it used to be posted as the delta:
+    # `out.stdout or out.stderr` fell through to stderr, so a corrupt suite
+    # JSON's traceback became the PR's eval comment at exit 0 (#299). The
+    # check is on the SHAPE, not on the exit code alone, because the
+    # eval-harness this repo pins exits 1 for both a flagged row and an
+    # uncaught exception on bad input -- the exit-2 path #289's preview loop
+    # stops on does not exist in that version. A crash prints nothing to stdout.
+    if out.returncode not in (0, 1) or not out.stdout.strip():
+        stderr_lines = out.stderr.strip().splitlines()
+        raise DiffFailedError(
+            f"eval-harness diff-json --current {current} --baseline {baseline} "
+            f"exited {out.returncode} with no delta"
+            + (f": {stderr_lines[-1]}" if stderr_lines else "")
+        )
+    return out.stdout
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -658,7 +680,14 @@ def main(argv: list[str] | None = None) -> int:
             if not base.exists():
                 deltas[suite] = f"_(no baseline at {base.relative_to(REPO_ROOT)})_"
                 continue
-            deltas[suite] = _diff_markdown(cur, base)
+            try:
+                deltas[suite] = _diff_markdown(cur, base)
+            except DiffFailedError as e:
+                # Nothing is posted (or dry-run printed): a comment missing one
+                # suite's delta would read as a clean run. 2, the code #289's
+                # preview loop uses for a diff that fails on its input.
+                print(f"::error::{suite}: {e}", file=sys.stderr)
+                return 2
         # A failed post is a real failure, not a warning: the whole point of
         # `--post-comment` is that the delta reaches the PR. Returning 0 here
         # let a fork-PR 403 pass as a green CI step with the eval delta silently
