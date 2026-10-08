@@ -8,6 +8,7 @@ isolation from the retriever.
 from __future__ import annotations
 
 import math
+import re
 
 import pytest
 
@@ -737,6 +738,59 @@ class _FakeMessages:
 class _FakeClient:
     def __init__(self, text: str) -> None:
         self.messages = _FakeMessages(text)
+
+
+class _CopyingMessages:
+    """Answers by citing each chunk with the id text the prompt SHOWS (#282).
+
+    A model can only copy what it is given: the characters inside the tag's
+    `id=` attribute, minus one layer of surrounding quotes of either kind. The
+    citation reader then has to resolve exactly that string.
+    """
+
+    def __init__(self) -> None:
+        self.shown: list[str] = []
+
+    def create(self, **kwargs: object) -> _FakeMessage:
+        content = kwargs["messages"][0]["content"]  # type: ignore[index]
+        for attr in re.findall(r"<chunk id=(.+?)>\n", str(content)):
+            if len(attr) >= 2 and attr[0] == attr[-1] and attr[0] in "'\"":
+                attr = attr[1:-1]
+            self.shown.append(attr)
+        return _FakeMessage(" ".join(f"Claim {i} [cite:{a}]." for i, a in enumerate(self.shown)))
+
+
+class _CopyingClient:
+    def __init__(self) -> None:
+        self.messages = _CopyingMessages()
+
+
+class TestAnthropicGeneratorShowsCitableIds:
+    @pytest.mark.parametrize(
+        "external_id",
+        [
+            "docs/guide.md#3",
+            "it's v2",
+            "docs\\guide.md#3",
+            "doc\t1",
+        ],
+        ids=["plain", "apostrophe", "backslash", "tab"],
+    )
+    def test_citing_the_id_as_shown_is_accepted(self, external_id: str) -> None:
+        client = _CopyingClient()
+        gen = AnthropicGenerator(client=client)
+        result = gen.generate("?", [_result(external_id, "some text", fused=0.4)], threshold=0.05)
+        assert client.messages.shown == [external_id]
+        assert isinstance(result, GeneratedAnswer), result
+        assert [c.external_id for c in result.citations] == [external_id]
+
+    def test_two_chunks_each_cited_as_shown(self) -> None:
+        client = _CopyingClient()
+        gen = AnthropicGenerator(client=client)
+        retrieved = [_result("a\\b", "x", fused=0.4), _result("c", "y", fused=0.3)]
+        result = gen.generate("?", retrieved, threshold=0.05)
+        assert isinstance(result, GeneratedAnswer), result
+        assert [c.external_id for c in result.citations] == ["a\\b", "c"]
 
 
 class TestAnthropicGenerator:

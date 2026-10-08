@@ -795,7 +795,9 @@ class AnthropicGenerator:
     _SYSTEM_PROMPT = (
         "You are a careful RAG assistant. Answer the user's query using ONLY the provided "
         "context chunks. Every sentence in your answer must end with at least one "
-        "[cite:<external_id>] marker referencing the chunk that supports it. If the "
+        "[cite:<external_id>] marker referencing the chunk that supports it, where "
+        '<external_id> is copied character for character from that chunk\'s id="..." '
+        "attribute. If the "
         "context is not sufficient to answer, respond with exactly: REFUSE: <one-line reason>."
     )
 
@@ -827,7 +829,12 @@ class AnthropicGenerator:
 
     @staticmethod
     def _format_context(retrieved: Sequence[RetrievalResult]) -> str:
-        return "\n\n".join(f"<chunk id={r.external_id!r}>\n{r.text}\n</chunk>" for r in retrieved)
+        # The id goes in verbatim. It used to be written with `!r`, which shows
+        # `docs\guide.md` as `'docs\\guide.md'` and a tab as `\t`, so a model that
+        # copied the id it was shown cited a string `enforce_citations` does not
+        # know, and a grounded answer was refused as dangling (#282). Whatever
+        # sits between the quotes is exactly what a `[cite:...]` must contain.
+        return "\n\n".join(f'<chunk id="{r.external_id}">\n{r.text}\n</chunk>' for r in retrieved)
 
     def generate(
         self,

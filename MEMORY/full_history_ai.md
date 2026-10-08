@@ -3240,3 +3240,22 @@ context_for_next_session:
   - THE_ENV_READ_LOCK_FIRES_ON_A_NEW_os_environ_get_list_the_var_blank_in_env_example
 followups: []
 ---
+
+---
+session: 2026-10-07T07:32Z
+duration_min: 2   # computed from GitHub: plan comment 07:30:58Z -> PR 07:32:27Z; reproduced from a hunt agent's report
+issue: 282
+branch: session/2026-10-07-rag-prompt-ids
+focus: AnthropicGenerator_SHOWED_CHUNK_IDS_THROUGH_repr_SO_THE_MODEL_COPIED_AN_ESCAPED_ID_THE_CITATION_READER_DOES_NOT_KNOW
+phase: shipped
+delta:
+  files_changed: 2
+  tests_added: 5
+  suite: "full suite green; ruff check + format clean"
+decisions_made: []
+measured: "fake client citing the attribute text as shown: main refuses backslash, tab and a two-chunk case (3 red), plain and apostrophe green (repr switches to double quotes for an apostrophe, so the id survives)."
+context_for_next_session:
+  - THE_WRITER_AND_THE_READER_OF_AN_ID_ARE_A_PAIR_EVEN_WHEN_A_MODEL_SITS_BETWEEN_THEM_the_prompt_is_the_write_side_and_enforce_citations_the_read_side
+  - filed_283_low_TemplateGenerator_LITERAL_cite_IN_CHUNK_TEXT_and_its_no_cover_pragma_says_unreachable_needs_a_small_shape_choice
+followups: ["#283"]
+---

@@ -3191,3 +3191,12 @@ accepted the connection but never answered hung the indexer and the pgvector
 retriever. It now gives up after 10 seconds unless the connection string or
 `PGCONNECT_TIMEOUT` sets a different limit, and callers can pass their own.
 `.env.example` lists the new variable.
+
+## 2026-10-07 — the Claude generator shows chunk ids exactly as they must be cited (#282)
+
+The prompt showed each chunk's id in Python's quoted form, so an id with a
+backslash (a Windows-style path) or a tab was displayed escaped. A model that
+copied the id it was shown cited a string the citation checker did not know,
+and a well-grounded answer was refused. The ids now appear verbatim and the
+instructions say to copy them exactly. A related case in the template generator
+(chunk text that itself contains a `[cite:...]` marker) is filed as #283.
