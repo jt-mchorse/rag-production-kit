@@ -3219,3 +3219,11 @@ value. The streaming one now calls the telemetry one, so they can't disagree.
 Same fix as llm-eval-harness #310: the eval workflow's preview loop treated a
 missing or unreadable results file like an ordinary regression and carried on.
 It now continues only for flagged regressions and stops on real errors.
+
+## 2026-10-08 — the demo capture script rejects an empty query up front (#294)
+
+Running `scripts/capture_demo.py --query ''` printed the first stage's banner
+and then crashed with a Python traceback (exit 1). It now stops before anything
+runs, with exit 2 and the message `--query must be non-empty`, the same way it
+already handled a bad `--pause-seconds`. A query of only spaces is still
+allowed, because the streaming pipeline and the demo server both accept it.

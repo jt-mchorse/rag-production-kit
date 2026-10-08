@@ -3303,3 +3303,22 @@ context_for_next_session:
   - PORTFOLIO_SWEEP_FOR_OR_ECHO_OR_TRUE_IN_WORKFLOWS_DONE_10_07_only_leh_and_rag_had_it_do_not_re_sweep
 followups: []
 ---
+
+---
+session: 2026-10-08T08:05Z
+duration_min: 20
+issue: 294
+branch: session/2026-10-08-w3-issue-294
+focus: capture_demo_EMPTY_query_REACHED_StreamingPipeline_run_WHOSE_GUARD_SITS_ABOVE_THE_TRY_raw_ValueError_at_exit_1_now_parser_error_exit_2_before_STAGE_1
+phase: shipped
+delta:
+  files_changed: 2
+  tests_added: 5
+  suite: "1939 -> 1944 passed; ruff, format clean"
+decisions_made: []
+measured: "main: --query '' printed the STAGE 1 banner then ValueError traceback, rc 1. Revert probe: 2 empty-query arms red, 3 controls (whitespace-only, normal query, pipeline-guard parity) green."
+context_for_next_session:
+  - THE_PRE_CHECK_COPIES_run_S_RULE_EXACTLY_whitespace_only_still_streams_because_run_and_the_SSE_server_both_accept_it_rejecting_it_is_a_three_surface_contract_change
+  - MERGE_ORDER_open_PR_295_touches_the_same_script_in_different_hunks_MEMORY_append_will_conflict
+followups: []
+---
