@@ -3219,3 +3219,13 @@ value. The streaming one now calls the telemetry one, so they can't disagree.
 Same fix as llm-eval-harness #310: the eval workflow's preview loop treated a
 missing or unreadable results file like an ordinary regression and carried on.
 It now continues only for flagged regressions and stops on real errors.
+
+## 2026-10-08 — a broken eval diff is no longer posted as the PR's eval result (#299)
+
+When `eval-harness diff-json` failed (for example on a corrupt baseline file),
+`run_eval --post-comment` pasted the error traceback into the PR's eval comment
+as that suite's result and still reported success. It now posts nothing, prints
+an error naming the suite, and exits 2. The fix #289 made to the workflow did
+not cover this: the eval-harness version this repo pins exits 1 on bad input,
+not 2, so the workflow's preview loop treated the crash as an ordinary flagged
+regression.

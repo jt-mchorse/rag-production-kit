@@ -3303,3 +3303,22 @@ context_for_next_session:
   - PORTFOLIO_SWEEP_FOR_OR_ECHO_OR_TRUE_IN_WORKFLOWS_DONE_10_07_only_leh_and_rag_had_it_do_not_re_sweep
 followups: []
 ---
+
+---
+session: 2026-10-08T08:30Z
+duration_min: 20
+issue: 299
+branch: session/2026-10-08-w3-issue-299
+focus: run_eval_diff_markdown_RETURNED_stdout_OR_stderr_so_a_diff_json_TRACEBACK_WAS_POSTED_AS_THE_SUITE_DELTA_at_exit_0_and_the_PINNED_eval_harness_exits_1_on_bad_input_so_289s_exit_2_stop_never_fires
+phase: shipped
+delta:
+  files_changed: 2
+  tests_added: 9
+  suite: "1939 -> 1947 passed, 1 skipped (real-harness arm skips without the [eval] extra); ruff, format clean"
+decisions_made: []
+measured: "main + corrupt evals/baselines/recall_at_5.json: dry-run body carried the JSONDecodeError traceback under ## recall_at_5, rc 0. Pinned harness 2398cc3 diff-json: corrupt and missing baseline both exit 1, empty stdout. Revert probe: 6 red (4 raise arms via missing DiffFailedError, main rc 0 vs 2, real-harness arm), 3 controls green."
+context_for_next_session:
+  - VERIFY_THE_PREMISE_289_ASSUMED_diff_json_EXITS_2_ON_BAD_INPUT_the_PINNED_harness_has_no_exit_2_path_the_preview_loop_still_continues_past_a_crash_and_the_comment_step_is_what_now_fails_the_job
+  - a_pin_bump_of_the_eval_extra_would_make_the_preview_loop_distinction_live_not_done_here
+followups: []
+---
