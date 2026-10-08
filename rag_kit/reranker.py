@@ -24,12 +24,12 @@ from __future__ import annotations
 
 import math
 import os
-import re
 from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Any, Protocol
 
 from .io_utils import copy_json_value, refuse_bare_string
+from .text import word_tokens
 
 
 @dataclass(frozen=True)
@@ -113,11 +113,9 @@ class Reranker(Protocol):
 # ----------------------------------------------------------------------
 
 
-_TOKEN_RE = re.compile(r"[A-Za-z0-9]+")
-
-
 def _tokenize(s: str) -> list[str]:
-    return _TOKEN_RE.findall(s.lower())
+    # Unicode-aware since #285; the ASCII path is the old `[A-Za-z0-9]+`.
+    return word_tokens(s)
 
 
 class LexicalOverlapReranker:

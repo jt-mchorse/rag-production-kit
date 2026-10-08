@@ -3200,3 +3200,11 @@ copied the id it was shown cited a string the citation checker did not know,
 and a well-grounded answer was refused. The ids now appear verbatim and the
 instructions say to copy them exactly. A related case in the template generator
 (chunk text that itself contains a `[cite:...]` marker) is filed as #283.
+## 2026-10-07 — the lexical reranker understands non-Latin text (#285)
+
+The fallback reranker (and the CI eval's stand-in retriever) only recognised
+A–Z and 0–9 as word characters, so a Russian chunk that contained every word of
+a Russian query ranked below an unrelated English chunk, and "café" became
+"caf". Both now use one shared tokenizer that handles any script and accents.
+English text tokenizes exactly as before, and the committed eval numbers didn't
+change.

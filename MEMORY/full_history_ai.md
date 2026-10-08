@@ -3258,4 +3258,20 @@ context_for_next_session:
   - THE_WRITER_AND_THE_READER_OF_AN_ID_ARE_A_PAIR_EVEN_WHEN_A_MODEL_SITS_BETWEEN_THEM_the_prompt_is_the_write_side_and_enforce_citations_the_read_side
   - filed_283_low_TemplateGenerator_LITERAL_cite_IN_CHUNK_TEXT_and_its_no_cover_pragma_says_unreachable_needs_a_small_shape_choice
 followups: ["#283"]
+session: 2026-10-07T08:52Z
+duration_min: 6
+issue: 285
+branch: session/2026-10-07-rag-reranker-unicode
+focus: THE_LEXICAL_RERANKER_AND_EVAL_RETRIEVER_TOKENIZED_ASCII_ONLY
+phase: shipped
+delta:
+  files_changed: 4
+  tests_added: 13
+  suite: "1924 passed (junitxml), re-run after commit; ruff, format clean"
+decisions_made: []
+measured: "Cyrillic query: main ranks the matching chunk 2nd; fix 1st. run_eval outputs identical before/after (timestamps aside). Revert: reranker 2, run_eval 1."
+context_for_next_session:
+  - GOTCHA_python_m_evals_run_eval_REWRITES_COMMITTED_evals_current_JSON_snapshot_then_git_checkout_them
+  - SAME_CLASS_SHIPPED_IN_3_REPOS_TODAY_aiapp_165_leh_314_rag_285_csl_semantic_terminators_next
+followups: []
 ---
