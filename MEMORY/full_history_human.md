@@ -3214,3 +3214,8 @@ The streaming pipeline and the telemetry module each computed percentiles with
 slightly different arithmetic, despite a comment saying they matched. The
 difference was tiny but could put a "p95" fractionally below every measured
 value. The streaming one now calls the telemetry one, so they can't disagree.
+## 2026-10-07 — the eval preview stops on bad input (#289)
+
+Same fix as llm-eval-harness #310: the eval workflow's preview loop treated a
+missing or unreadable results file like an ordinary regression and carried on.
+It now continues only for flagged regressions and stops on real errors.

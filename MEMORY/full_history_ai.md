@@ -3287,5 +3287,19 @@ decisions_made: []
 measured: "main: p95 of [204.41]*3 -> 204.40999999999997. Revert 6/7 red."
 context_for_next_session:
   - A_DOCSTRING_THAT_SAYS_TWO_FUNCTIONS_MATCH_IS_A_PARITY_TEST_WAITING_TO_BE_WRITTEN_then_delegate_so_it_cannot_drift
+session: 2026-10-07T09:30Z
+duration_min: 3
+issue: 289
+branch: session/2026-10-07-rag-eval-yml-rc
+focus: SIBLING_OF_LEH_310_THE_EVAL_PREVIEW_LOOPS_OR_ECHO_SWALLOWED_EXIT_2
+phase: shipped
+delta:
+  files_changed: 2
+  tests_added: 3
+  suite: "full suite green"
+decisions_made: []
+measured: "call-counting stub under bash -e: main bad-input arm red (continued to 3 calls, rc 0); fix stops at 2, rc 2."
+context_for_next_session:
+  - PORTFOLIO_SWEEP_FOR_OR_ECHO_OR_TRUE_IN_WORKFLOWS_DONE_10_07_only_leh_and_rag_had_it_do_not_re_sweep
 followups: []
 ---
