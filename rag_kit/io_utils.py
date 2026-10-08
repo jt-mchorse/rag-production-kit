@@ -105,6 +105,30 @@ def _open_temp(target: Path) -> tuple[int, Path]:
     raise FileExistsError(f"no usable temporary name beside {target}")
 
 
+def _resolve_symlinked_target(target: Path) -> Path:
+    """The file a write to *target* lands in: through a symlink, as `write_text` does (#296).
+
+    `os.replace` renames onto the LINK, not the file it points at. So a
+    symlinked destination became a regular file and the linked file kept its
+    old contents, while the `Path.write_text` this helper replaced writes
+    through the link. The mode copy below already followed the link
+    (`os.stat`), so the linked file's mode was copied onto a file that then
+    replaced the link instead (python-async-llm-pipelines#157).
+
+    Resolving here also places the temp file beside the RESOLVED file, which
+    keeps the rename on one filesystem when the link points at a different
+    one, and gives `_open_temp` the resolved basename to cap. A dangling link
+    resolves to the path it names, and the write creates that file, as
+    `write_text` would. With a link loop, non-strict `realpath` returns the
+    path unresolved, and the mode copy's `os.stat` raises `OSError` (ELOOP),
+    which is the error the write-seam guards already translate. A plain path
+    comes back unchanged.
+    """
+    if not target.is_symlink():
+        return target
+    return Path(os.path.realpath(target))
+
+
 def atomic_write_text(path: str | Path, text: str) -> None:
     # Write to a sibling temp file in the destination's parent
     # directory, fsync, then `os.replace` (atomic on POSIX within the
@@ -112,7 +136,7 @@ def atomic_write_text(path: str | Path, text: str) -> None:
     # filesystem so the rename cannot fall back to a copy. On any
     # exception between the temp write and the rename, the temp is
     # unlinked.
-    target = Path(path)
+    target = _resolve_symlinked_target(Path(path))
     target.parent.mkdir(parents=True, exist_ok=True)
     tmp_path: Path | None = None
     try:
