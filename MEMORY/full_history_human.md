@@ -3275,3 +3275,11 @@ Khmer was read as one long sentence, so a claim with no citation passed as long
 as the next sentence had one. The splitter now uses the same per-script list
 that chunking-strategies-lab adopted. The template writer and the query
 rewriter share that one list, so they cannot drift apart again.
+
+## 2026-10-09 — Telemetry prices and latencies refuse a true/false or a string (#303)
+
+The cost telemetry checks that prices and latencies are sensible numbers. Only
+one of the three fields (the per-phase timings) also checked that the value
+*is* a number. A `True` price was charged as $1 per million tokens, a `True`
+latency was stored as 1 ms, and a price given as text failed with an unhelpful
+error that did not name the field. All three fields now apply the same check.
