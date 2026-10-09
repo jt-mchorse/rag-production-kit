@@ -3255,3 +3255,13 @@ and then crashed with a Python traceback (exit 1). It now stops before anything
 runs, with exit 2 and the message `--query must be non-empty`, the same way it
 already handled a bad `--pause-seconds`. A query of only spaces is still
 allowed, because the streaming pipeline and the demo server both accept it.
+
+## 2026-10-08 — a broken eval diff is no longer posted as the PR's eval result (#299)
+
+When `eval-harness diff-json` failed (for example on a corrupt baseline file),
+`run_eval --post-comment` pasted the error traceback into the PR's eval comment
+as that suite's result and still reported success. It now posts nothing, prints
+an error naming the suite, and exits 2. The fix #289 made to the workflow did
+not cover this: the eval-harness version this repo pins exits 1 on bad input,
+not 2, so the workflow's preview loop treated the crash as an ordinary flagged
+regression.
