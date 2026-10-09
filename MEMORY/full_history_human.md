@@ -3229,3 +3229,14 @@ the resolver which family the host needs, as `python -m http.server` does, and
 the startup banner wraps an IPv6 address in brackets so the printed URL can be
 opened. Any host with an IPv4 address (including `localhost` and the default
 `127.0.0.1`) binds exactly as before.
+
+## 2026-10-08 — the demo capture streams the query you typed (#293)
+
+`scripts/capture_demo.py --launch-server --query ...` curled the live SSE server
+with a URL in which spaces were the only encoded character. A query such as
+`R&D budget` therefore reached the server as `R`, `c++ tuning` as `c   tuning`,
+a query beginning with `#` got a 400, and Cyrillic text arrived garbled. The
+script still finished successfully, so the recording showed a different query
+in the live stage than in the preview. The URL is now properly encoded, and the
+default query still appears as `q=postgres+tuning`. A related gap, where an
+empty `--query` crashes with a traceback, is filed as #294.
