@@ -3398,3 +3398,22 @@ context_for_next_session:
   - a_pin_bump_of_the_eval_extra_would_make_the_preview_loop_distinction_live_not_done_here
 followups: []
 ---
+
+---
+session: 2026-10-09T09:12Z
+duration_min: 7   # computed: issue filed 2026-10-09T09:10:03Z -> PR 2026-10-09T09:12:02Z (gh createdAt); hunt-agent lead re-measured on local PG first
+issue: 308
+branch: session/2026-10-09-0920-issue-308
+focus: DOCUMENT_ACCEPTED_NUL_AND_LONE_SURROGATES_POSTGRES_REFUSED_THEM_ONLY_AFTER_THE_WHOLE_BATCH_WAS_EMBEDDED
+phase: shipped
+delta:
+  files_changed: 2
+  tests_added: 16
+  suite: "1982 -> 1998 passed; ruff check + format clean"
+decisions_made: []
+measured: "PG 17.6 with a text domain for vector: main 1000+NUL text DataError after 1001 embed calls; metadata NUL 501; surrogate text/metadata, NUL id/key 201 each. Branch: ValueError at Document construction, 0 calls. Revert 11 red / 5 controls."
+context_for_next_session:
+  - NO_PGVECTOR_LOCALLY_a_CREATE_DOMAIN_vector_AS_text_stand_in_lets_the_real_Indexer_SQL_run_against_PG17
+  - SAME_CLASS_AS_aop_196_but_here_refusal_is_right_the_document_has_not_been_paid_for_yet
+followups: []
+---

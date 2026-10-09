@@ -3265,3 +3265,12 @@ an error naming the suite, and exits 2. The fix #289 made to the workflow did
 not cover this: the eval-harness version this repo pins exits 1 on bad input,
 not 2, so the workflow's preview loop treated the crash as an ordinary flagged
 regression.
+
+## 2026-10-09 — Documents Postgres cannot store are refused before embedding (#308)
+
+The indexer embeds a whole batch of documents and then writes them to
+Postgres. A document whose text, id or metadata contained a NUL character or
+a broken Unicode character passed every check. Postgres then rejected it at
+the very end, after all 1,001 documents had been embedded (and paid for, with
+a paid embedder). Such documents are now refused the moment they are created,
+with an error naming the field.
