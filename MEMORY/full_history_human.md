@@ -3265,3 +3265,13 @@ an error naming the suite, and exits 2. The fix #289 made to the workflow did
 not cover this: the eval-harness version this repo pins exits 1 on bad input,
 not 2, so the workflow's preview loop treated the crash as an ordinary flagged
 regression.
+
+## 2026-10-09 — A citation marker inside a document is not mistaken for a citation (#283)
+
+The template generator copies sentences from the retrieved documents and then
+checks the answer's citation markers. If a document itself contained text like
+`[cite:doc2]`, as documentation about this tool does, that text was read as a
+real citation. The answer was then either refused or credited to the wrong
+document. Such text is now rewritten to `(cite:…)` before it is copied, so the
+only markers left are the ones the generator adds. The fix had been written in
+an earlier session but never committed; this session finished and shipped it.

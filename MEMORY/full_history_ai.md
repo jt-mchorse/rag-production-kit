@@ -3398,3 +3398,21 @@ context_for_next_session:
   - a_pin_bump_of_the_eval_extra_would_make_the_preview_loop_distinction_live_not_done_here
 followups: []
 ---
+
+---
+session: 2026-10-09T09:05Z
+duration_min: 6   # computed: WIP found ~09:06Z, PR 2026-10-09T09:05:20Z (gh createdAt); issue and plan were from 2026-10-08
+issue: 283
+branch: session/2026-10-09-0910-issue-283
+focus: TEMPLATE_GENERATOR_READ_A_CITE_MARKER_INSIDE_CHUNK_TEXT_AS_A_CITATION_REFUSED_OR_MISATTRIBUTED_PICKED_UP_ORPHANED_10_08_WIP
+phase: shipped
+delta:
+  files_changed: 2
+  tests_added: 7
+  suite: "1982 -> 1989 passed; ruff check + format clean"
+decisions_made: []
+measured: "TemplateGenerator main: '[cite:<external_id>]' and '[cite:doc2]' in chunk text refused as dangling; with doc2 retrieved citations ['doc2','doc1']; an unclosed '[cite:' refused as dangling 'marker here [cite:doc1'. Branch: all accepted, ['doc1'] / ['doc1','doc2']. Revert 6 red / 1 control."
+context_for_next_session:
+  - THE_10_08_SESSION_POSTED_A_PLAN_AND_LEFT_THE_FIX_UNCOMMITTED_IN_A_HUNT_WORKTREE_tmp_hunt_rag_production_kit_283_check_git_worktree_list_for_orphaned_WIP_before_rewriting
+followups: []
+---
