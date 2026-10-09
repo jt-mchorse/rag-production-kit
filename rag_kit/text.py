@@ -21,6 +21,21 @@ import unicodedata
 
 _ASCII_TOKEN_RE = re.compile(r"[a-z0-9]+")
 
+# The sentence terminators: ONE set for every site that reads or writes a
+# sentence end -- `generator`'s splitter, its template writer's strip and
+# tail, and `rewriter`'s then-split and strip (#301). A curated subset of
+# Unicode's Sentence_Terminal, one row per script, the same set
+# chunking-strategies-lab settled on in csl#240:
+#   ASCII  . ! ?          Devanagari  । ॥        Arabic/Urdu  ؟ ۔
+#   Ethiopic  ። ፧        Armenian  ։ ՜ ՞      Myanmar  ။    Khmer  ។ ៕
+#   CJK  。！？ ｡ (halfwidth)                    general  … ‼ ⁇ ⁈ ⁉
+# The splitter knew only `.!?…。！？؟`, so a Hindi, Urdu, Amharic, Armenian,
+# Burmese or Khmer answer was ONE sentence and an uncited claim passed on its
+# neighbour's marker. The Greek question mark (U+037E) is left out: it is
+# canonically `;` (NFC maps it there), and a semicolon ends no sentence in any
+# other script, so the two cannot be told apart.
+SENTENCE_TERMINATORS = ".!?…。！？｡؟۔।॥።፧։՜՞။។៕‼⁇⁈⁉"
+
 
 def word_tokens(text: str) -> list[str]:
     """Lowercased word tokens of ``text``; underscores and punctuation separate."""

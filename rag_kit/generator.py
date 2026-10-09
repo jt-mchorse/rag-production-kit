@@ -43,6 +43,7 @@ from typing import Any, Protocol
 from .comparison import render_comparison
 from .io_utils import copy_json_value
 from .retriever import RetrievalResult
+from .text import SENTENCE_TERMINATORS
 
 _DEFAULT_THRESHOLD = 0.02  # tuned against the in-repo retrieval tests; >0 by construction
 # Decimal places the refusal detail has always rendered at, and still renders
@@ -51,6 +52,9 @@ _DEFAULT_THRESHOLD = 0.02  # tuned against the in-repo retrieval tests; >0 by co
 # module's width stays this module's business (#225, D-021).
 _DETAIL_PLACES = 4
 _CITE_PATTERN = re.compile(r"\[cite:([^\]]+)\]")
+# One terminator set for the splitter, the template writer and the rewriter
+# (#301); the per-script table lives with it in `text.py`.
+_TERMINATORS = SENTENCE_TERMINATORS
 # Sentence terminators. Besides ASCII `.!?`, this includes the unicode
 # terminators `…` (U+2026 ellipsis), `。` (ideographic full stop), `！`/`？`
 # (fullwidth), and `؟` (U+061F Arabic question mark), so a claim ending in one
@@ -92,10 +96,10 @@ _CITE_PATTERN = re.compile(r"\[cite:([^\]]+)\]")
 # stay attached to the sentence they end; Python `re` has no variable-width
 # lookbehind to express that.
 _CLOSERS = "\"'”’»›)]}*_`~」』）】〕〗〙〛〉》＂＇］｝"
-_CJK_TERMINATORS = "。！？"
+_CJK_TERMINATORS = "。！？｡"
 _MARKER = r"\[cite:[^\]]+\]"
 _SENTENCE_SPLIT = re.compile(
-    rf"[.!?…。！？؟]+(?:[{re.escape(_CLOSERS)}]|{_MARKER})*(?P<gap>\s+)"
+    rf"[{re.escape(_TERMINATORS)}]+(?:[{re.escape(_CLOSERS)}]|{_MARKER})*(?P<gap>\s+)"
     rf"|[{_CJK_TERMINATORS}]+(?:{_MARKER})*(?P<cjk>)(?=[^\s{re.escape(_CLOSERS)}\[])"
 )
 
@@ -525,14 +529,13 @@ def split_sentences(text: str) -> list[str]:
     return [p for p in merged if any(ch.isalnum() for ch in p)]
 
 
-_TERMINATORS = ".!?…。！？؟"
 # A terminator followed by closing punctuation -- a boundary `_SENTENCE_SPLIT`
 # splits after (#161). The same `_CLOSERS` as the splitter, so the writer cannot
 # emit a tail the reader cuts at a different place (#262).
 # A terminator RUN, as the splitter reads it: `?!”` or `...”` with one
 # terminator here left `?` / `..` in front of the marker, where the splitter
 # cut it off -- a fully grounded chunk refused (#262).
-_TERMINATOR_THEN_CLOSERS = re.compile(rf"[.!?…。！？؟]+[{re.escape(_CLOSERS)}]+$")
+_TERMINATOR_THEN_CLOSERS = re.compile(rf"[{re.escape(_TERMINATORS)}]+[{re.escape(_CLOSERS)}]+$")
 
 
 def _template_sentence(sentence: str, external_id: str) -> str:
