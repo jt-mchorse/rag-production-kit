@@ -3302,3 +3302,12 @@ real citation. The answer was then either refused or credited to the wrong
 document. Such text is now rewritten to `(cite:…)` before it is copied, so the
 only markers left are the ones the generator adds. The fix had been written in
 an earlier session but never committed; this session finished and shipped it.
+
+## 2026-10-09 — Documents Postgres cannot store are refused before embedding (#308)
+
+The indexer embeds a whole batch of documents and then writes them to
+Postgres. A document whose text, id or metadata contained a NUL character or
+a broken Unicode character passed every check. Postgres then rejected it at
+the very end, after all 1,001 documents had been embedded (and paid for, with
+a paid embedder). Such documents are now refused the moment they are created,
+with an error naming the field.
