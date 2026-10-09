@@ -38,6 +38,8 @@ import re
 from dataclasses import dataclass
 from typing import Any, Protocol
 
+from .text import SENTENCE_TERMINATORS as _SENTENCE_TERMINATORS
+
 
 @dataclass(frozen=True)
 class RewriteResult:
@@ -116,8 +118,12 @@ _COMPARE_RE = re.compile(
 # (`[\"”’')\]]`) so the two split sites stay in parity (#161 sibling). Python's
 # `re` forbids a variable-width lookbehind, so the two fixed-width alternatives
 # are alternated; the closing punct stays attached to the preceding step.
+# The terminator set is `text.SENTENCE_TERMINATORS`, the one the generator's
+# splitter uses (#301), so the two
+# split sites cannot drift apart again.
 _THEN_SPLIT = re.compile(
-    r"(?:(?<=[.!?…。！？؟])|(?<=[.!?…。！？؟][\"”’')\]]))\s+(?=then\b)",
+    rf"(?:(?<=[{re.escape(_SENTENCE_TERMINATORS)}])"
+    rf"|(?<=[{re.escape(_SENTENCE_TERMINATORS)}][\"”’')\]]))\s+(?=then\b)",
     re.IGNORECASE,
 )
 # Strip the leading "Then" connective from each split part. The split above
@@ -145,7 +151,9 @@ _AND_SPLIT_RE = re.compile(r"\s*,?\s+and\s+", re.IGNORECASE)
 # sites so the well-formed-question contract holds for non-ASCII locales, and
 # kept in parity with the `…`-aware `_THEN_SPLIT` and `generator._SENTENCE_SPLIT`
 # (#150, sibling of #144/#146).
-_TERMINATORS = "?.!？！؟。…"
+# (#301) Now `text.SENTENCE_TERMINATORS`, the splitter's own set: a question ending in `।` or `۔`
+# kept it, and got a `?` stacked on top.
+_TERMINATORS = _SENTENCE_TERMINATORS
 
 _QUESTION_PREFIXES = (
     "who",
