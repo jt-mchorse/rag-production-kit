@@ -92,6 +92,44 @@ class Document:
             )
         if not self.text:
             raise ValueError("Document.text must be non-empty")
+        # Postgres can store neither a NUL (`text` refuses it, `jsonb` refuses
+        # the `\u0000` escape) nor a lone surrogate (it has no UTF-8 encoding),
+        # and `Indexer.add_documents` embeds the WHOLE batch before it writes
+        # (#308): measured, one such document among 1,000 cost 1,001 embedding
+        # calls before the write refused it. `db.py` makes the same argument for
+        # a wrong-width vector (#194). Refused here, before any embedding.
+        _require_storable(self.external_id, "Document.external_id")
+        _require_storable(self.text, "Document.text")
+        _require_storable_tree(self.metadata, "Document.metadata")
+
+
+def _unstorable(text: str) -> str | None:
+    """Why Postgres cannot store `text`, or None (#308)."""
+    if "\x00" in text:
+        return f"a NUL (\\x00) at index {text.index(chr(0))}"
+    for i, ch in enumerate(text):
+        if "\ud800" <= ch <= "\udfff":
+            return f"a lone surrogate (U+{ord(ch):04X}) at index {i}"
+    return None
+
+
+def _require_storable(text: str, where: str) -> None:
+    reason = _unstorable(text)
+    if reason is not None:
+        raise ValueError(f"{where} contains {reason}, which Postgres cannot store")
+
+
+def _require_storable_tree(value: Any, where: str) -> None:
+    if isinstance(value, str):
+        _require_storable(value, where)
+    elif isinstance(value, dict):
+        for key, item in value.items():
+            if isinstance(key, str):
+                _require_storable(key, f"{where} key {key!r}")
+            _require_storable_tree(item, f"{where}[{key!r}]")
+    elif isinstance(value, (list, tuple)):
+        for i, item in enumerate(value):
+            _require_storable_tree(item, f"{where}[{i}]")
 
 
 class Indexer:
