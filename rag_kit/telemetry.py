@@ -65,6 +65,12 @@ class ModelPrice:
             ("prompt_per_million", self.prompt_per_million),
             ("completion_per_million", self.completion_per_million),
         ):
+            # The type half of the contract (#303), as `CostRecord.build`
+            # states it for `per_phase_ms`: bool is an int subclass, so
+            # `ModelPrice(True, False)` priced at $1/$0, and a str escaped
+            # `math.isfinite` as a bare TypeError naming no field.
+            if isinstance(value, bool) or not isinstance(value, (int, float)):
+                raise ValueError(f"{name} must be a finite number >= 0.0; got {value!r}")
             if not math.isfinite(value) or value < 0.0:
                 raise ValueError(f"{name} must be a finite number >= 0.0; got {value}")
 
@@ -271,6 +277,12 @@ class CostRecord:
         # which sorts a list with NaN — Python's sort is stable but NaN
         # comparisons are all false, so the returned percentile is implementation-
         # defined and silently wrong. Mirrors the ModelPrice guard above.
+        # And its type half (#303), as `per_phase_ms` below has it: `True` was
+        # stored as 1.0 ms and a str escaped as a bare TypeError.
+        if isinstance(total_latency_ms, bool) or not isinstance(total_latency_ms, (int, float)):
+            raise ValueError(
+                f"total_latency_ms must be a finite non-negative number; got {total_latency_ms!r}"
+            )
         if not math.isfinite(total_latency_ms) or total_latency_ms < 0:
             raise ValueError(
                 f"total_latency_ms must be a finite non-negative number; got {total_latency_ms}"
