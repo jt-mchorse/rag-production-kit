@@ -28,6 +28,7 @@ import argparse
 import html
 import http.server
 import json
+import socket
 import sqlite3
 import sys
 import time
@@ -369,6 +370,38 @@ class _Handler(http.server.BaseHTTPRequestHandler):
         self.wfile.write(body)
 
 
+def _address_family(host: str, port: int) -> socket.AddressFamily:
+    """The socket family to bind ``host`` with: IPv4 unless it has no IPv4 address (#291).
+
+    `ThreadingHTTPServer` always opens an `AF_INET` socket. With that socket,
+    `--host ::1` (or any IPv6 literal, or a name that resolves only to IPv6)
+    exits 2 with ``nodename nor servname provided``, even though the bind
+    comment in `main` lists an IPv6 literal as a valid host. Stdlib
+    ``python -m http.server --bind ::1`` avoids this by asking `getaddrinfo`
+    for the family before it binds. This does the same.
+
+    IPv4 still wins whenever the host has an IPv4 address, so every host that
+    worked before binds exactly as it did: `localhost` stays on 127.0.0.1 even
+    where the resolver lists ::1 first, and a bare ``""`` stays 0.0.0.0. A host
+    that does not resolve at all raises `socket.gaierror` here, inside the
+    caller's `OSError` arm, with the same message as before.
+    """
+    if not host:
+        return socket.AF_INET
+    families = {
+        info[0]
+        for info in socket.getaddrinfo(host, port, type=socket.SOCK_STREAM, flags=socket.AI_PASSIVE)
+    }
+    if socket.AF_INET in families or socket.AF_INET6 not in families:
+        return socket.AF_INET
+    return socket.AF_INET6
+
+
+def _url_host(host: str) -> str:
+    """``host`` as it goes in a URL: an IPv6 literal needs brackets (RFC 3986 §3.2.2)."""
+    return f"[{host}]" if ":" in host else host
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description="Serve a stdlib dashboard for the cost-telemetry SQLite store."
@@ -413,7 +446,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     # Starting the dashboard twice, or on a port something else already holds,
     # is the routine case and the one where a clear message matters most.
     try:
-        server = http.server.ThreadingHTTPServer((args.host, args.port), _Handler)
+        family = _address_family(args.host, args.port)
+        server_cls = type(
+            "_DashboardServer", (http.server.ThreadingHTTPServer,), {"address_family": family}
+        )
+        server = server_cls((args.host, args.port), _Handler)
     except OSError as e:
         print(
             f"::error::could not bind --host {args.host!r} --port {args.port}: {e}",
@@ -445,8 +482,10 @@ def main(argv: Sequence[str] | None = None) -> int:
             print(f"seeded {args.seed} synthetic records into {args.db}", file=sys.stderr)
         print(
             # The BOUND port: `--port 0` asks the OS to pick one, and printing
-            # `args.port` advertised `:0`, where nothing listens (#268).
-            f"serving http://{args.host}:{server.server_address[1]}/ from {args.db} "
+            # `args.port` advertised `:0`, where nothing listens (#268). An
+            # IPv6 host is bracketed, or the URL is not one (#291).
+            f"serving http://{_url_host(args.host)}:{server.server_address[1]}/ "
+            f"from {args.db} "
             "(Ctrl-C to stop)",
             file=sys.stderr,
         )

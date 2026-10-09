@@ -3303,3 +3303,22 @@ context_for_next_session:
   - PORTFOLIO_SWEEP_FOR_OR_ECHO_OR_TRUE_IN_WORKFLOWS_DONE_10_07_only_leh_and_rag_had_it_do_not_re_sweep
 followups: []
 ---
+
+---
+session: 2026-10-08T07:21Z
+duration_min: 3   # computed: plan comment 07:21:28Z -> 07:24Z (date -u); hunted from 07:19Z (00:19 PDT)
+issue: 291
+branch: session/2026-10-08-issue-291
+focus: telemetry_dashboard_ThreadingHTTPServer_IS_ALWAYS_AF_INET_so_host_colon_colon_1_EXITED_2_nodename_nor_servname_WHILE_THE_BIND_COMMENT_LISTED_AN_IPV6_LITERAL_AS_VALID
+phase: shipped
+delta:
+  files_changed: 2
+  tests_added: 10
+  suite: "full suite green (-m 'not pg'); ruff check + format clean"
+decisions_made: []
+measured: "main: --host ::1 --port 0 -> exit 2 '[Errno 8] nodename nor servname'. Fixed: banner http://[::1]:<port>/ and curl 200; localhost and 127.0.0.1 still bind IPv4; 'not a host' still exit 2. Revert probes: call-site 1 red, banner-only 1 red, helper-always-AF_INET 2 red."
+context_for_next_session:
+  - A_PROSE_LIST_OF_VALID_INPUTS_IN_A_COMMENT_IS_A_TEST_TABLE_the_178_comment_named_an_IPv6_literal_and_nobody_ran_it
+  - IPv4_WINS_WHEN_THE_HOST_HAS_ONE_so_localhost_and_empty_host_bind_exactly_as_before_only_IPv6_only_hosts_change
+followups: []
+---
