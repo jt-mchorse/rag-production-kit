@@ -3240,3 +3240,10 @@ script still finished successfully, so the recording showed a different query
 in the live stage than in the preview. The URL is now properly encoded, and the
 default query still appears as `q=postgres+tuning`. A related gap, where an
 empty `--query` crashes with a traceback, is filed as #294.
+## 2026-10-08 — writing to a symlinked output updates the linked file (#296)
+
+When `--out` (or any other output path) was a symlink, the atomic writer
+replaced the link with a plain file and left the file it pointed at
+unchanged. It now writes through the link, the way a plain write does,
+and keeps that file's permissions. Same fix as python-async-llm-pipelines
+#157.
