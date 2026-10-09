@@ -3265,3 +3265,13 @@ an error naming the suite, and exits 2. The fix #289 made to the workflow did
 not cover this: the eval-harness version this repo pins exits 1 on bad input,
 not 2, so the workflow's preview loop treated the crash as an ordinary flagged
 regression.
+
+## 2026-10-09 — Citation enforcement recognises every script's full stop (#301)
+
+The answer checker splits an answer into sentences and requires a citation on
+each one. It only recognised the full stops of English, Chinese/Japanese and
+Arabic. An answer in Hindi (।), Urdu (۔), Amharic (።), Armenian, Burmese or
+Khmer was read as one long sentence, so a claim with no citation passed as long
+as the next sentence had one. The splitter now uses the same per-script list
+that chunking-strategies-lab adopted. The template writer and the query
+rewriter share that one list, so they cannot drift apart again.

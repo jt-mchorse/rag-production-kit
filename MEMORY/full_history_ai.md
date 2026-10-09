@@ -3398,3 +3398,23 @@ context_for_next_session:
   - a_pin_bump_of_the_eval_extra_would_make_the_preview_loop_distinction_live_not_done_here
 followups: []
 ---
+
+---
+session: 2026-10-09T07:41Z
+duration_min: 9   # computed: issue filed 2026-10-09T07:35:15Z -> PR 2026-10-09T07:41:00Z (gh createdAt); hunt-agent lead verified first
+issue: 301
+branch: session/2026-10-09-0745-issue-301
+focus: SENTENCE_SPLIT_MISSED_DANDA_URDU_ETHIOPIC_ARMENIAN_MYANMAR_KHMER_HALFWIDTH_AN_UNCITED_CLAIM_RODE_ON_ITS_NEIGHBOURS_MARKER
+phase: shipped
+delta:
+  files_changed: 4
+  tests_added: 49
+  suite: "1982 -> 2031 passed; ruff check + format --check clean"
+decisions_made: []
+measured: "main: uncited+cited answer ending in each of । ॥ ۔ ። ։ ။ ។ ｡ ‼ -> ACCEPTED, n=1 sentence; English control refused. Revert: full 34 red (15 fully-cited controls green); writer-only revert (new splitter, old rstrip set) 15 red."
+context_for_next_session:
+  - THE_SET_LIVES_IN_text_SENTENCE_TERMINATORS_rewriter_importing_generator_IS_A_CIRCULAR_IMPORT_via_retriever
+  - A_READER_FIX_NEEDS_ITS_WRITER_the_template_rstrip_kept_the_danda_before_the_marker_and_the_new_splitter_cut_there
+  - SAME_SET_AS_csl_240_port_the_set_not_the_regex_rag_has_its_own_closer_and_marker_rules
+followups: []
+---
