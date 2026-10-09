@@ -3265,3 +3265,12 @@ an error naming the suite, and exits 2. The fix #289 made to the workflow did
 not cover this: the eval-harness version this repo pins exits 1 on bad input,
 not 2, so the workflow's preview loop treated the crash as an ordinary flagged
 regression.
+
+## 2026-10-09 — An unfinished answer is not published as a finished one (#305)
+
+The Claude-backed generator never checked why the model stopped. If the answer
+hit the length limit right after a citation, it was returned as a complete,
+grounded answer even though the rest was missing. Other unfinished answers were
+refused, but with a reason that blamed the citations. The generator now looks
+at the stop reason first. Anything other than a normal finish is refused, with
+the actual cause named, using the same two refusal reasons as before.

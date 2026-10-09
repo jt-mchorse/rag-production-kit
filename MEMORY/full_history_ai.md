@@ -3398,3 +3398,22 @@ context_for_next_session:
   - a_pin_bump_of_the_eval_extra_would_make_the_preview_loop_distinction_live_not_done_here
 followups: []
 ---
+
+---
+session: 2026-10-09T08:06Z
+duration_min: 5   # computed: issue filed 2026-10-09T08:03:26Z -> PR 2026-10-09T08:06:23Z (gh createdAt); found sweeping lco#285's "keyed on SDK values" lens
+issue: 305
+branch: session/2026-10-09-0810-issue-305
+focus: ANTHROPIC_GENERATOR_IGNORED_stop_reason_AN_ANSWER_CUT_AT_max_tokens_AFTER_A_MARKER_WAS_PUBLISHED_AS_COMPLETE_AND_GROUNDED
+phase: shipped
+delta:
+  files_changed: 2
+  tests_added: 11
+  suite: "1982 -> 1993 passed; ruff clean"
+decisions_made: []
+measured: "fake client main: max_tokens + text ending '[cite:a]' -> GeneratedAnswer; mid-sentence cut -> 'sentence has no [cite:...] marker'; refusal + [] -> 'no sentences'. Branch: all three refused naming stop_reason. Revert 7 red / 4 controls."
+context_for_next_session:
+  - STAYED_INSIDE_THE_DOCUMENTED_REFUSAL_PAIR_a_new_reason_would_be_a_contract_change_for_JT
+  - SIBLINGS_NOT_FIXED_leh_judge_and_rag_rewriter_also_ignore_stop_reason_but_both_fail_loud_or_degrade_to_the_original_query
+followups: []
+---

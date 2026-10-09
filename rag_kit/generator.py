@@ -884,6 +884,20 @@ class AnthropicGenerator:
                 "insufficient_context", stripped[len("REFUSE:") :].strip(), threshold, top
             )
 
+        # An answer the model did not finish is not judged as if it were (#305).
+        # Cut at `max_tokens` straight after a marker, it passed enforcement and
+        # was published as a complete grounded answer; cut mid-sentence, the
+        # refusal blamed its citations; a model refusal read as "no sentences".
+        # Same reason as any unusable output -- the documented pair is unchanged
+        # -- with a detail that names the real cause. A client that reports no
+        # `stop_reason` (a duck-typed fake) is judged as before.
+        stop_reason = getattr(message, "stop_reason", None)
+        if stop_reason is not None and stop_reason not in _FINISHED_STOP_REASONS:
+            detail = f"the model stopped with stop_reason={stop_reason!r}"
+            if stop_reason == "max_tokens":
+                detail += f" (max_tokens={self.max_tokens}); the answer is incomplete"
+            return _refusal("unparseable_output", detail, threshold, top)
+
         try:
             citations = enforce_citations(stripped, retrieved)
         except CitationError as e:
@@ -894,6 +908,13 @@ class AnthropicGenerator:
             used_threshold=threshold,
             top_score=top,
         )
+
+
+#: The `stop_reason`s that mean the model finished its answer (#305): it ended
+#: its turn, or hit a stop sequence. `AnthropicGenerator` sends no tools and no
+#: stop sequences of its own, so anything else -- `max_tokens`, `refusal`,
+#: `pause_turn`, `tool_use` -- leaves an answer that is not the model's whole one.
+_FINISHED_STOP_REASONS = frozenset({"end_turn", "stop_sequence"})
 
 
 __all__ = [
