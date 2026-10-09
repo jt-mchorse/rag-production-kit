@@ -554,6 +554,33 @@ def _template_sentence(sentence: str, external_id: str) -> str:
     return f"Per the retrieved context, {s.rstrip(_TERMINATORS)} [cite:{external_id}]."
 
 
+_MARKER_OPEN = "[cite:"
+
+
+def _neutralise_markers(text: str) -> str:
+    """Chunk text with every `[cite:` in it made unreadable as a marker (#283).
+
+    `TemplateGenerator` copies a chunk's sentences into its answer word for
+    word and then validates the answer with `enforce_citations` -- and
+    `evals/run_eval.py` re-runs that check over `GeneratedAnswer.text`. So a
+    `[cite:X]` already present in a chunk's *text* (a documentation corpus
+    that describes the marker syntax, this repo's own README among them) was
+    read as a real citation: refused as dangling when `X` was not retrieved,
+    and, when it was, credited `X` with a sentence that came from another
+    chunk. An *unclosed* `[cite:` in the text is caught too: the template's
+    own marker closes it, so `[cite: marker here [cite:doc1]` read as one
+    dangling id.
+
+    A complete marker becomes `(cite:X)` and any leftover opener `(cite:`,
+    which `_CITE_PATTERN` cannot match. Applied to the chunk text BEFORE
+    `split_sentences`: the splitter refuses to cut inside a real marker, so
+    neutralising afterwards would leave a `[cite:faq.md#Q3. refunds]`
+    sentence whole for the template but cut in two for the validator.
+    """
+    text = _CITE_PATTERN.sub(lambda m: f"(cite:{m.group(1)})", text)
+    return text.replace(_MARKER_OPEN, "(cite:")
+
+
 def _marker_readback(external_id: str) -> str | None:
     """What a `[cite:<external_id>]` marker actually resolves to, or `None`.
 
@@ -761,19 +788,25 @@ class TemplateGenerator:
         # `split_sentences` fragment it and leave every sentence but the last
         # uncited — a false "unparseable_output" refusal. Each chunk still
         # yields exactly one deduped Citation.
+        # The chunk's own `[cite:...]` text is neutralised first, so the only
+        # markers in the answer are the ones `_template_sentence` appends (#283).
         sentences = [
-            _template_sentence(s, c.external_id) for c in chosen for s in split_sentences(c.text)
+            _template_sentence(s, c.external_id)
+            for c in chosen
+            for s in split_sentences(_neutralise_markers(c.text))
         ]
         text = " ".join(sentences)
         try:
             citations = enforce_citations(text, retrieved)
-        # pragma: no cover - defensive: only reachable if every chosen chunk is
-        # empty / punctuation-only, which yields no cited sentences. (Until #256
-        # it was also reached by any id containing a terminator and a space,
-        # which `split_sentences` split inside its own marker; until #258 by a
-        # sentence ending in a terminator plus a closing quote/bracket, which
-        # `_template_sentence` now keeps with its marker.)
-        except CitationError as e:  # pragma: no cover
+        # Reached when every chosen chunk is empty / punctuation-only (no cited
+        # sentences), and when `retrieved` holds two ids a marker cannot tell
+        # apart (the collision check at the top of `enforce_citations`). Until
+        # #256 it was also reached by any id containing a terminator and a
+        # space, which `split_sentences` split inside its own marker; until
+        # #258 by a sentence ending in a terminator plus a closing
+        # quote/bracket, which `_template_sentence` now keeps with its marker;
+        # until #283 by a chunk whose own text contained a `[cite:` marker.
+        except CitationError as e:
             return _refusal(e.reason, e.detail, threshold, top)
         return GeneratedAnswer(
             text=text,
