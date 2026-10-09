@@ -366,6 +366,16 @@ def main(argv: list[str] | None = None) -> int:
     # bench_rewriter.py already use for the same class of usage error.
     if (msg := _validate_pause_seconds(args.pause_seconds)) is not None:
         parser.error(msg)
+    # `--query` gets the same treatment (#294). STAGE 1 hands it straight to
+    # `StreamingPipeline.run`, whose `if not query` guard sits above the
+    # generator's `try` -- so an empty value surfaced as a raw `ValueError`
+    # traceback at exit 1 after the STAGE 1 banner had printed. The rule here is
+    # that guard's rule, copied exactly: whitespace-only is NOT rejected,
+    # because `run` and the SSE server (`parse_qs` keeps `q=+++` as three
+    # spaces) both stream it, and a capture stricter than the surfaces it
+    # records would be a different contract, not a pre-check.
+    if not args.query:
+        parser.error(f"--query must be non-empty; got {args.query!r}")
 
     # STAGE 1 — in-process streaming preview, hermetic.
     print(

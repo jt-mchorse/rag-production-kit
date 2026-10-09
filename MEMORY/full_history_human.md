@@ -3247,3 +3247,11 @@ replaced the link with a plain file and left the file it pointed at
 unchanged. It now writes through the link, the way a plain write does,
 and keeps that file's permissions. Same fix as python-async-llm-pipelines
 #157.
+
+## 2026-10-08 — the demo capture script rejects an empty query up front (#294)
+
+Running `scripts/capture_demo.py --query ''` printed the first stage's banner
+and then crashed with a Python traceback (exit 1). It now stops before anything
+runs, with exit 2 and the message `--query must be non-empty`, the same way it
+already handled a bad `--pause-seconds`. A query of only spaces is still
+allowed, because the streaming pipeline and the demo server both accept it.
