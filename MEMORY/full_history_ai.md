@@ -3398,3 +3398,21 @@ context_for_next_session:
   - a_pin_bump_of_the_eval_extra_would_make_the_preview_loop_distinction_live_not_done_here
 followups: []
 ---
+
+---
+session: 2026-10-09T07:59Z
+duration_min: 4   # computed: issue filed 2026-10-09T07:57:18Z -> PR 2026-10-09T07:59:17Z (gh createdAt)
+issue: 303
+branch: session/2026-10-09-0800-issue-303
+focus: TELEMETRY_TYPE_HALF_OF_THE_NUMERIC_CONTRACT_WAS_ON_per_phase_ms_ONLY_ModelPrice_AND_total_latency_ms_TOOK_A_BOOL_AS_1
+phase: shipped
+delta:
+  files_changed: 2
+  tests_added: 25
+  suite: "1982 -> 2007 passed; ruff clean"
+decisions_made: []
+measured: "main: ModelPrice(True, False) -> cost(1M,1M) (1.0, 0.0); ModelPrice('1.0', 2.0) TypeError; total_latency_ms=True stored, read back 1.0; '12.5' TypeError. Revert 17 red / 8 accept controls green."
+context_for_next_session:
+  - SAME_GAP_lco_158_CLOSED_FOR_ModelPrice_a_contract_copied_between_repos_copies_its_gaps_too
+followups: []
+---
