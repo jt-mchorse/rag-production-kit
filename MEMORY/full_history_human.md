@@ -3283,3 +3283,12 @@ one of the three fields (the per-phase timings) also checked that the value
 *is* a number. A `True` price was charged as $1 per million tokens, a `True`
 latency was stored as 1 ms, and a price given as text failed with an unhelpful
 error that did not name the field. All three fields now apply the same check.
+
+## 2026-10-09 — An unfinished answer is not published as a finished one (#305)
+
+The Claude-backed generator never checked why the model stopped. If the answer
+hit the length limit right after a citation, it was returned as a complete,
+grounded answer even though the rest was missing. Other unfinished answers were
+refused, but with a reason that blamed the citations. The generator now looks
+at the stop reason first. Anything other than a normal finish is refused, with
+the actual cause named, using the same two refusal reasons as before.
