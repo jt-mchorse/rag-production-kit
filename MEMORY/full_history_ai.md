@@ -3305,6 +3305,63 @@ followups: []
 ---
 
 ---
+session: 2026-10-08T07:21Z
+duration_min: 3   # computed: plan comment 07:21:28Z -> 07:24Z (date -u); hunted from 07:19Z (00:19 PDT)
+issue: 291
+branch: session/2026-10-08-issue-291
+focus: telemetry_dashboard_ThreadingHTTPServer_IS_ALWAYS_AF_INET_so_host_colon_colon_1_EXITED_2_nodename_nor_servname_WHILE_THE_BIND_COMMENT_LISTED_AN_IPV6_LITERAL_AS_VALID
+phase: shipped
+delta:
+  files_changed: 2
+  tests_added: 10
+  suite: "full suite green (-m 'not pg'); ruff check + format clean"
+decisions_made: []
+measured: "main: --host ::1 --port 0 -> exit 2 '[Errno 8] nodename nor servname'. Fixed: banner http://[::1]:<port>/ and curl 200; localhost and 127.0.0.1 still bind IPv4; 'not a host' still exit 2. Revert probes: call-site 1 red, banner-only 1 red, helper-always-AF_INET 2 red."
+context_for_next_session:
+  - A_PROSE_LIST_OF_VALID_INPUTS_IN_A_COMMENT_IS_A_TEST_TABLE_the_178_comment_named_an_IPv6_literal_and_nobody_ran_it
+  - IPv4_WINS_WHEN_THE_HOST_HAS_ONE_so_localhost_and_empty_host_bind_exactly_as_before_only_IPv6_only_hosts_change
+followups: []
+---
+
+---
+session: 2026-10-08T07:25Z
+duration_min: 3   # computed: plan comment 07:25:36Z -> 07:28Z (date -u); reproduced end to end from ~07:22Z
+issue: 293
+branch: session/2026-10-08-issue-293
+focus: capture_demo_launch_server_CURL_URL_ENCODED_ONLY_SPACES_so_the_LIVE_STREAM_got_R_for_R_and_D_c_spaces_for_c_plus_plus_400_for_hash_and_mojibake_for_non_ASCII_EXIT_0
+phase: shipped
+delta:
+  files_changed: 2
+  tests_added: 10
+  suite: "full suite green (-m 'not pg'), re-run after commit; ruff check + format clean"
+decisions_made: []
+measured: "main, real server + curl: 'R&D budget' -> live query 'R'; 'c++ tuning' -> 'c   tuning'; '#1 postgres tip' -> 400 missing q; Cyrillic -> Latin-1 mojibake; all exit 0. Revert probes: helper back to replace(' ','+') 5 red (4 table rows + e2e); call site only 1 red (e2e)."
+context_for_next_session:
+  - THE_WRITE_SIDE_OF_A_QUERY_STRING_MUST_BE_THE_INVERSE_OF_THE_READERS_parse_qs_a_replace_space_plus_is_one_character_of_urlencode
+  - THE_CHEATSHEET_TOLD_THE_OPERATOR_TO_URL_ENCODE_and_the_scripts_own_curl_did_not_a_guards_prose_is_a_repro
+  - filed_294_low_capture_demo_query_empty_is_a_raw_traceback_at_exit_1
+followups: ["#294"]
+---
+
+---
+session: 2026-10-08T00:40Z
+duration_min: 10
+issue: 296
+branch: session/2026-10-08-issue-296
+focus: atomic_write_text_os_replace_RENAMED_ONTO_A_SYMLINKED_DESTINATION_link_became_a_regular_file_linked_file_kept_old_contents_sibling_of_pyasync_157
+phase: shipped
+delta:
+  files_changed: 2
+  tests_added: 10
+  suite: "1949 passed, 8 deselected (not pg), re-run after commit; ruff check + format clean"
+decisions_made: []
+measured: "main: atomic_write_text('link.md') -> islink False, real file still 'old'; bench_streaming --out link.json rc 0, link replaced, linked file still {}. Revert probe: 10 collected, 5 red (4 atomic arms + bench e2e), 5 green controls (3 write_text parity, link loop, plain path)."
+context_for_next_session:
+  - SYMLINK_WRITE_THROUGH_SWEEP_10_08_rag_leh_emb_csl_after_pyasync_158_a_link_loop_stays_unresolved_under_non_strict_realpath_and_the_mode_copy_os_stat_raises_ELOOP
+followups: []
+---
+
+---
 session: 2026-10-08T08:05Z
 duration_min: 20
 issue: 294
