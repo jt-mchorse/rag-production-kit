@@ -3292,3 +3292,13 @@ grounded answer even though the rest was missing. Other unfinished answers were
 refused, but with a reason that blamed the citations. The generator now looks
 at the stop reason first. Anything other than a normal finish is refused, with
 the actual cause named, using the same two refusal reasons as before.
+
+## 2026-10-09 — A citation marker inside a document is not mistaken for a citation (#283)
+
+The template generator copies sentences from the retrieved documents and then
+checks the answer's citation markers. If a document itself contained text like
+`[cite:doc2]`, as documentation about this tool does, that text was read as a
+real citation. The answer was then either refused or credited to the wrong
+document. Such text is now rewritten to `(cite:…)` before it is copied, so the
+only markers left are the ones the generator adds. The fix had been written in
+an earlier session but never committed; this session finished and shipped it.
