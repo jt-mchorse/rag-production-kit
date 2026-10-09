@@ -54,6 +54,7 @@ import threading
 import time
 import webbrowser
 from pathlib import Path
+from urllib.parse import urlencode
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
@@ -273,6 +274,21 @@ def _stop(child: subprocess.Popen[str]) -> None:
             child.wait()
 
 
+def _stream_url(query: str) -> str:
+    """The `/stream` URL whose ``q`` the server's `parse_qs` reads back as ``query``.
+
+    `urlencode`, not ``query.replace(' ', '+')`` (#293). Spaces were the only
+    character that got encoded, but `parse_qs` decodes ``+``, ``%XX`` and ``&``,
+    and curl drops everything from ``#`` onward. So the live take streamed a
+    different query from the one STAGE 1 previewed, and still exited 0:
+    ``R&D budget`` arrived as ``R``, ``c++ tuning`` as ``c   tuning``,
+    ``#1 postgres tip`` got a 400 ``missing q``, and non-ASCII text arrived as
+    raw UTF-8 decoded as Latin-1. The default still comes out as
+    ``q=postgres+tuning``, the form the README and the cheat-sheet show.
+    """
+    return f"{SSE_SERVER_URL}/stream?{urlencode({'q': query})}"
+
+
 def _maybe_run_curl(query: str) -> None:
     """Run `curl -N <stream-url>?q=<query>` to consume the SSE stream
     so the operator's recording captures the wire frames. No-op if
@@ -284,7 +300,7 @@ def _maybe_run_curl(query: str) -> None:
             "PATH; falling back to the cheat-sheet."
         )
         return
-    url = f"{SSE_SERVER_URL}/stream?q={query.replace(' ', '+')}"
+    url = _stream_url(query)
     # `-N` disables curl's output buffering so SSE frames land
     # in-order in the recording terminal.
     subprocess.run(  # noqa: S603 — absolute resolution of curl, no shell.

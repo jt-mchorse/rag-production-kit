@@ -3219,6 +3219,27 @@ value. The streaming one now calls the telemetry one, so they can't disagree.
 Same fix as llm-eval-harness #310: the eval workflow's preview loop treated a
 missing or unreadable results file like an ordinary regression and carried on.
 It now continues only for flagged regressions and stops on real errors.
+
+## 2026-10-08 — the telemetry dashboard can listen on an IPv6 address (#291)
+
+`scripts/telemetry_dashboard.py --host ::1` failed with "nodename nor servname
+provided" and exit 2, even though the comment above the bind lists an IPv6
+literal as a valid host. The server always opened an IPv4 socket. It now asks
+the resolver which family the host needs, as `python -m http.server` does, and
+the startup banner wraps an IPv6 address in brackets so the printed URL can be
+opened. Any host with an IPv4 address (including `localhost` and the default
+`127.0.0.1`) binds exactly as before.
+
+## 2026-10-08 — the demo capture streams the query you typed (#293)
+
+`scripts/capture_demo.py --launch-server --query ...` curled the live SSE server
+with a URL in which spaces were the only encoded character. A query such as
+`R&D budget` therefore reached the server as `R`, `c++ tuning` as `c   tuning`,
+a query beginning with `#` got a 400, and Cyrillic text arrived garbled. The
+script still finished successfully, so the recording showed a different query
+in the live stage than in the preview. The URL is now properly encoded, and the
+default query still appears as `q=postgres+tuning`. A related gap, where an
+empty `--query` crashes with a traceback, is filed as #294.
 ## 2026-10-08 — writing to a symlinked output updates the linked file (#296)
 
 When `--out` (or any other output path) was a symlink, the atomic writer
