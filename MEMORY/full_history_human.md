@@ -3265,3 +3265,11 @@ an error naming the suite, and exits 2. The fix #289 made to the workflow did
 not cover this: the eval-harness version this repo pins exits 1 on bad input,
 not 2, so the workflow's preview loop treated the crash as an ordinary flagged
 regression.
+
+## 2026-10-09 — Telemetry prices and latencies refuse a true/false or a string (#303)
+
+The cost telemetry checks that prices and latencies are sensible numbers. Only
+one of the three fields (the per-phase timings) also checked that the value
+*is* a number. A `True` price was charged as $1 per million tokens, a `True`
+latency was stored as 1 ms, and a price given as text failed with an unhelpful
+error that did not name the field. All three fields now apply the same check.
