@@ -465,20 +465,25 @@ def main(argv: Sequence[str] | None = None) -> int:
         # (#278). It ran before the bind, so a second instance on a busy port
         # wrote its N rows into the running dashboard's DB and only then exited
         # 2 -- the routine "started it twice" case the comment above names.
-        if args.seed > 0:
-            # `--db` in a directory that doesn't exist came back as a raw
-            # `sqlite3.OperationalError: unable to open database file` traceback at
-            # exit 1 (#178) — reachable through the documented `--seed` path, and a
-            # diagnostic naming SQLite rather than the flag the operator typed.
-            # `sqlite3.Error` is NOT an `OSError` subclass, so it needs its own arm
-            # alongside the `OSError` one (a path component that is a file, a
-            # permission denial).
-            try:
-                with TelemetryStore(args.db) as store:
+        # `--db` in a directory that doesn't exist came back as a raw
+        # `sqlite3.OperationalError: unable to open database file` traceback at
+        # exit 1 (#178) — a diagnostic naming SQLite rather than the flag the
+        # operator typed. `sqlite3.Error` is NOT an `OSError` subclass, so it
+        # needs its own arm alongside the `OSError` one (a path component that
+        # is a file, a permission denial).
+        #
+        # The store is opened whether or not `--seed` was given (#310). The
+        # check sat inside the seed branch, so the README's command, which has
+        # no `--seed`, printed `serving` on an unusable `--db` and then dropped
+        # every request with that traceback on stderr.
+        try:
+            with TelemetryStore(args.db) as store:
+                if args.seed > 0:
                     _seed(store, n=args.seed)
-            except (OSError, sqlite3.Error) as e:
-                print(f"::error::--db {args.db!r} is not usable: {e}", file=sys.stderr)
-                return 2
+        except (OSError, sqlite3.Error) as e:
+            print(f"::error::--db {args.db!r} is not usable: {e}", file=sys.stderr)
+            return 2
+        if args.seed > 0:
             print(f"seeded {args.seed} synthetic records into {args.db}", file=sys.stderr)
         print(
             # The BOUND port: `--port 0` asks the OS to pick one, and printing

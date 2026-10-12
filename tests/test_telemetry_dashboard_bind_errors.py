@@ -132,6 +132,26 @@ def test_db_path_that_is_a_directory_exits_two(tmp_path: Path) -> None:
     assert "--db" in proc.stderr
 
 
+@pytest.mark.parametrize("shape", ["missing-dir", "file-as-dir", "dir-as-db"])
+def test_an_unusable_db_without_seed_exits_two_before_serving(tmp_path: Path, shape: str) -> None:
+    # #310: the check above sat inside `if args.seed > 0`, and the README's
+    # command has no `--seed`. Without one, an unusable `--db` printed
+    # `serving` and dropped every request with a raw sqlite3 traceback. A short
+    # timeout: on the unfixed script this process serves until it is killed.
+    if shape == "missing-dir":
+        bad = tmp_path / "no-such-dir" / "t.db"
+    elif shape == "file-as-dir":
+        (tmp_path / "plain").write_text("x", encoding="utf-8")
+        bad = tmp_path / "plain" / "t.db"
+    else:
+        bad = tmp_path / "telemetry.db"
+        bad.mkdir()
+    proc = _run("--port", "0", "--db", str(bad), timeout=10.0)
+    _assert_clean_usage_failure(proc)
+    assert "--db" in proc.stderr
+    assert "serving http://" not in proc.stderr
+
+
 def test_a_failed_seed_does_not_reach_the_bind(tmp_path: Path) -> None:
     # Ordering: the seed step runs before the bind, so a bad `--db` must return
     # 2 without ever opening a socket. If it fell through, an operator with a
