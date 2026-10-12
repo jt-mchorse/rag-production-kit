@@ -535,7 +535,14 @@ def split_sentences(text: str) -> list[str]:
 # A terminator RUN, as the splitter reads it: `?!”` or `...”` with one
 # terminator here left `?` / `..` in front of the marker, where the splitter
 # cut it off -- a fully grounded chunk refused (#262).
-_TERMINATOR_THEN_CLOSERS = re.compile(rf"[{re.escape(_TERMINATORS)}]+[{re.escape(_CLOSERS)}]+$")
+# And whatever terminators or closers follow that (#314): `up?".` and
+# `FAQ.).` end in a terminator AFTER the closer, so a tail anchored on closers
+# matched nothing, the strip took only the last `.`, and the marker landed after
+# `?"` -- where the splitter cut the claim from it again.
+_TERMINATOR_THEN_CLOSERS = re.compile(
+    rf"[{re.escape(_TERMINATORS)}]+[{re.escape(_CLOSERS)}]+"
+    rf"[{re.escape(_TERMINATORS + _CLOSERS)}]*$"
+)
 
 
 def _template_sentence(sentence: str, external_id: str) -> str:
