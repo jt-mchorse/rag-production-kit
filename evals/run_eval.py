@@ -666,7 +666,10 @@ def main(argv: list[str] | None = None) -> int:
     if args.post_comment:
         import os
 
-        token = os.environ.get(args.token_env)
+        # Blank counts as absent (#316). `.env.example` ships `GITHUB_TOKEN=`
+        # empty and the documented loader exports it as "", which is not None:
+        # the dry run was skipped and the post went out as `Bearer ` -> 401.
+        token = (os.environ.get(args.token_env) or "").strip() or None
         deltas: dict[str, str] = {}
         for suite in SUITES:
             if args.suite is not None and suite != args.suite:
