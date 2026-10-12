@@ -3550,3 +3550,21 @@ context_for_next_session:
   - THE_CONTROL_He_said_hi_KEEPS_ITS_OLD_OUTPUT_BYTE_FOR_BYTE_the_fix_only_widens_tails_that_already_start_terminator_closer
 followups: []
 ---
+
+---
+session: 2026-10-12T08:38:26Z
+duration_min: 1   # computed: plan comment 2026-10-12T08:38:26Z -> PR 2026-10-12T08:39:43Z (gh createdAt)
+issue: 316
+branch: session/2026-10-12-0838-issue-316
+focus: RUN_EVAL_POST_COMMENT_DECIDED_THE_DRY_RUN_WITH_TOKEN_IS_NONE_AND_ENV_EXAMPLE_SHIPS_A_BLANK_GITHUB_TOKEN
+phase: shipped
+delta:
+  files_changed: 2
+  tests_added: 5
+  suite: "2090 -> 2095 passed, 9 skipped; ruff clean"
+decisions_made: []
+measured: "hunt agent: blank token -> 401 from api.github.com, exit 1. Revert: empty/space/ws red, unset + control green."
+context_for_next_session:
+  - AN_ENV_EXAMPLE_THAT_SHIPS_A_BLANK_VALUE_MAKES_EMPTY_STRING_THE_COMMON_CASE_not_None_check_every_reader_with_or
+followups: []
+---

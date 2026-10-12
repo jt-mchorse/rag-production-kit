@@ -3337,3 +3337,12 @@ stop (or a full stop, a bracket and a full stop) got its marker in the wrong
 place. The sentence splitter then separated the claim from its citation, and
 the whole answer was refused. In a random test, 5,213 of 60,000 inputs were
 refused before the fix and none after.
+
+## 2026-10-12 — A blank GitHub token means "dry run", as intended (#316)
+
+Without a GitHub token, `run_eval --post-comment` is meant to just print the
+comment it would post. The example environment file sets `GITHUB_TOKEN=` to
+blank, and the script only treated a missing variable as "no token", not an
+empty one. So anyone who followed the setup instructions sent a real request
+with an empty token, got rejected, and saw a failure. A blank or
+whitespace-only token now counts as no token.
