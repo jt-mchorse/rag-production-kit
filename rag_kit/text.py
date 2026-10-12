@@ -36,6 +36,12 @@ _ASCII_TOKEN_RE = re.compile(r"[a-z0-9]+")
 # other script, so the two cannot be told apart.
 SENTENCE_TERMINATORS = ".!?…。！？｡؟۔।॥።፧։՜՞။។៕‼⁇⁈⁉"
 
+#: Closing punctuation that may follow a terminator inside the sentence it ends
+#: (`."`, `.)`, `."**`, `。」`), as the generator's splitter reads it (#161, #262).
+#: One set for every split site, so the rewriter's Then-split cannot drift from
+#: the generator again (#320).
+SENTENCE_CLOSERS = "\"'”’»›)]}*_`~」』）】〕〗〙〛〉》＂＇］｝"
+
 
 def word_tokens(text: str) -> list[str]:
     """Lowercased word tokens of ``text``; underscores and punctuation separate."""

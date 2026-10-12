@@ -38,6 +38,7 @@ import re
 from dataclasses import dataclass
 from typing import Any, Protocol
 
+from .text import SENTENCE_CLOSERS as _SENTENCE_CLOSERS
 from .text import SENTENCE_TERMINATORS as _SENTENCE_TERMINATORS
 
 
@@ -119,13 +120,30 @@ _COMPARE_RE = re.compile(
 # `re` forbids a variable-width lookbehind, so the two fixed-width alternatives
 # are alternated; the closing punct stays attached to the preceding step.
 # The terminator set is `text.SENTENCE_TERMINATORS`, the one the generator's
-# splitter uses (#301), so the two
-# split sites cannot drift apart again.
-_THEN_SPLIT = re.compile(
-    rf"(?:(?<=[{re.escape(_SENTENCE_TERMINATORS)}])"
-    rf"|(?<=[{re.escape(_SENTENCE_TERMINATORS)}][\"”’')\]]))\s+(?=then\b)",
-    re.IGNORECASE,
+# splitter uses (#301), and the closers are `text.SENTENCE_CLOSERS`, its closer
+# set (#320). Python's `re` forbids a variable-width lookbehind, so this used two
+# fixed-width alternatives -- a terminator, or a terminator and ONE closer from a
+# six-character class. After #262 widened the generator to 26 closers in runs,
+# `.»`, `.」`, `.）`, `.**` and `.")` before "Then" no longer decomposed. So the
+# candidate gaps are found here and the text before each is checked instead.
+_THEN_GAP = re.compile(r"\s+(?=then\b)", re.IGNORECASE)
+_ENDS_A_SENTENCE = re.compile(
+    rf"[{re.escape(_SENTENCE_TERMINATORS)}][{re.escape(_SENTENCE_CLOSERS)}]*$"
 )
+
+
+def _then_parts(query: str) -> list[str]:
+    """`query` split at every `then` that follows a sentence end (and its closers)."""
+    parts: list[str] = []
+    start = 0
+    for gap in _THEN_GAP.finditer(query):
+        if _ENDS_A_SENTENCE.search(query, start, gap.start()):
+            parts.append(query[start : gap.start()])
+            start = gap.end()
+    parts.append(query[start:])
+    return parts
+
+
 # Strip the leading "Then" connective from each split part. The split above
 # fires on `then\b` (a word boundary), so the connective can be followed by
 # punctuation — "Then, ...", "Then; ...", "Then- ..." — not just a space.
@@ -149,7 +167,7 @@ _AND_SPLIT_RE = re.compile(r"\s*,?\s+and\s+", re.IGNORECASE)
 # left those non-ASCII enders in place, so `+ "?"` stacked a doubled terminator
 # ("... work？?", "... Java…?"). Used as an `str.rstrip` argument at both strip
 # sites so the well-formed-question contract holds for non-ASCII locales, and
-# kept in parity with the `…`-aware `_THEN_SPLIT` and `generator._SENTENCE_SPLIT`
+# kept in parity with the `…`-aware `_then_parts` and `generator._SENTENCE_SPLIT`
 # (#150, sibling of #144/#146).
 # (#301) Now `text.SENTENCE_TERMINATORS`, the splitter's own set: a question ending in `।` or `۔`
 # kept it, and got a `?` stacked on top.
@@ -189,7 +207,7 @@ def _looks_like_question(s: str) -> bool:
 
 
 def _split_then(query: str) -> list[str] | None:
-    parts = _THEN_SPLIT.split(query)
+    parts = _then_parts(query)
     if len(parts) < 2:
         return None
     cleaned = []

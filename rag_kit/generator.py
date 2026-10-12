@@ -43,7 +43,7 @@ from typing import Any, Protocol
 from .comparison import render_comparison
 from .io_utils import copy_json_value
 from .retriever import RetrievalResult
-from .text import SENTENCE_TERMINATORS
+from .text import SENTENCE_CLOSERS, SENTENCE_TERMINATORS
 
 _DEFAULT_THRESHOLD = 0.02  # tuned against the in-repo retrieval tests; >0 by construction
 # Decimal places the refusal detail has always rendered at, and still renders
@@ -95,7 +95,7 @@ _TERMINATORS = SENTENCE_TERMINATORS
 # The gap is a capture group because the terminators and closers it follows
 # stay attached to the sentence they end; Python `re` has no variable-width
 # lookbehind to express that.
-_CLOSERS = "\"'”’»›)]}*_`~」』）】〕〗〙〛〉》＂＇］｝"
+_CLOSERS = SENTENCE_CLOSERS  # shared with the rewriter (#320)
 _CJK_TERMINATORS = "。！？｡"
 _MARKER = r"\[cite:[^\]]+\]"
 _SENTENCE_SPLIT = re.compile(
