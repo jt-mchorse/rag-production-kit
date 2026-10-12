@@ -28,7 +28,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import re
 import statistics
 import sys
 import time
@@ -42,6 +41,7 @@ if str(_REPO_ROOT) not in sys.path:
 
 from rag_kit.fusion import reciprocal_rank_fusion  # noqa: E402
 from rag_kit.rewriter import Rewriter, TemplateRewriter  # noqa: E402
+from rag_kit.text import word_tokens  # noqa: E402
 
 # ----------------------------------------------------------------------
 # Synthetic multi-hop fixture
@@ -126,11 +126,12 @@ _QUERIES: tuple[_Query, ...] = (
 # ----------------------------------------------------------------------
 
 
-_TOKEN_RE = re.compile(r"[a-z0-9]+")
-
-
 def _tokens(text: str) -> list[str]:
-    return _TOKEN_RE.findall(text.lower())
+    # The tokenizer `evals/run_eval.py` uses (#312). #285 moved that twin and
+    # the reranker to `word_tokens` and left this copy on ASCII-only
+    # `[a-z0-9]+`, so a Cyrillic query tokenized to nothing here. ASCII text
+    # takes the same path in both, which is why the published table is unchanged.
+    return word_tokens(text)
 
 
 def _retrieve_in_memory(query: str, corpus: Sequence[tuple[str, str]], k: int) -> list[str]:
