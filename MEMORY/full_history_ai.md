@@ -3531,3 +3531,22 @@ context_for_next_session:
   - bench_streaming_HAS_A_FOURTH_WHITESPACE_SPLIT_RETRIEVER_left_alone_it_measures_latency_and_claims_no_parity
 followups: []
 ---
+
+---
+session: 2026-10-12T08:14:44Z
+duration_min: 1   # computed: plan comment 2026-10-12T08:14:44Z -> PR 2026-10-12T08:16:06Z (gh createdAt)
+issue: 314
+branch: session/2026-10-12-0814-issue-314
+focus: TEMPLATE_GENERATOR_REFUSED_A_GROUNDED_CHUNK_ENDING_TERMINATOR_CLOSER_TERMINATOR_THE_258_262_TAIL_REGEX_WAS_ANCHORED_ON_CLOSERS
+phase: shipped
+delta:
+  files_changed: 2
+  tests_added: 190
+  suite: "2090 -> 2280 passed, 9 skipped; ruff clean"
+decisions_made: []
+measured: "seeded 60k-draw fuzz: 5213 refusals on main, 0 on branch. Revert 189 red / 1 control green."
+context_for_next_session:
+  - A_TAIL_REGEX_ANCHORED_ON_ONE_ORDER_MISSES_THE_OTHER_ORDER_enumerate_terminator_closer_PERMUTATIONS_not_just_runs
+  - THE_CONTROL_He_said_hi_KEEPS_ITS_OLD_OUTPUT_BYTE_FOR_BYTE_the_fix_only_widens_tails_that_already_start_terminator_closer
+followups: []
+---

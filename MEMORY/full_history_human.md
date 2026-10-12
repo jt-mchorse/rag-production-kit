@@ -3328,3 +3328,12 @@ bench copy was missed, so a Russian query came out as no words at all. The
 bench now uses the shared tokenizer. A test ranks the same mixed-language
 corpus through both copies and checks they agree. The published numbers are
 unchanged, because the bench's own data is plain English.
+
+## 2026-10-12 — Template answers handle `?".` and `.).` endings (#314)
+
+The template generator copies source sentences and adds a citation marker to
+each. A sentence ending in a question mark, a closing quote and then a full
+stop (or a full stop, a bracket and a full stop) got its marker in the wrong
+place. The sentence splitter then separated the claim from its citation, and
+the whole answer was refused. In a random test, 5,213 of 60,000 inputs were
+refused before the fix and none after.
