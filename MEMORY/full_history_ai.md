@@ -3586,3 +3586,22 @@ context_for_next_session:
   - THE_308_TREE_WALK_RECURSES_ON_A_CYCLIC_DICT_running_json_dumps_first_turns_it_into_a_clean_ValueError
 followups: []
 ---
+
+---
+session: 2026-10-12T08:57:30Z
+duration_min: 1   # computed: plan comment 2026-10-12T08:57:30Z -> PR 2026-10-12T08:59:06Z (gh createdAt)
+issue: 320
+branch: session/2026-10-12-0857-issue-320
+focus: REWRITER_THEN_SPLIT_KEPT_A_6_CLOSER_SINGLE_CLOSER_LOOKBEHIND_AFTER_262_WIDENED_THE_GENERATOR_TO_26_IN_RUNS_DESPITE_A_PARITY_COMMENT
+phase: shipped
+delta:
+  files_changed: 4
+  tests_added: 37
+  suite: "2092 -> 2129 passed, 9 skipped; ruff clean"
+decisions_made: []
+measured: "main: '.»' '.」' '.）' '.**' '.\")' before Then -> no_decomposition. Revert 28 red / 11 green. bench_rewriter k=2,3,5 identical except elapsed."
+context_for_next_session:
+  - A_PARITY_COMMENT_IS_A_CLAIM_SHARE_THE_SET_IN_text_py_so_the_two_sites_cannot_drift_text_SENTENCE_CLOSERS_now_exists
+  - NO_VARIABLE_WIDTH_LOOKBEHIND_IN_PYTHON_RE_find_the_gaps_then_check_the_prefix_with_a_dollar_anchored_search
+followups: []
+---

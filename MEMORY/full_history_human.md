@@ -3354,3 +3354,12 @@ such as NaN (common in data from spreadsheets), infinity, a date or a set,
 was only noticed when the database write failed, after every document in
 the batch had already been sent for embedding. A `Document` now checks its
 metadata when it is created, so the batch fails before any embedding work.
+
+## 2026-10-12 — The query rewriter splits steps after any closing mark (#320)
+
+The rewriter breaks "Do X. Then do Y?" into two searches. It only recognised
+a full stop followed by at most one of six closing marks. The answer
+generator had since learned 26 closing marks, in any combination. So a first
+step ending with something like `.»` or `."**` stayed glued to the second.
+Both now share one list of closing marks and read them the same way. The
+benchmark numbers are unchanged.
