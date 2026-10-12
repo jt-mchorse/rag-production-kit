@@ -3346,3 +3346,11 @@ blank, and the script only treated a missing variable as "no token", not an
 empty one. So anyone who followed the setup instructions sent a real request
 with an empty token, got rejected, and saw a failure. A blank or
 whitespace-only token now counts as no token.
+
+## 2026-10-12 — Bad document metadata is caught before embedding (#318)
+
+Document metadata is stored in Postgres as JSON. A value JSON can't hold,
+such as NaN (common in data from spreadsheets), infinity, a date or a set,
+was only noticed when the database write failed, after every document in
+the batch had already been sent for embedding. A `Document` now checks its
+metadata when it is created, so the batch fails before any embedding work.

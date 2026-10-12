@@ -3568,3 +3568,21 @@ context_for_next_session:
   - AN_ENV_EXAMPLE_THAT_SHIPS_A_BLANK_VALUE_MAKES_EMPTY_STRING_THE_COMMON_CASE_not_None_check_every_reader_with_or
 followups: []
 ---
+
+---
+session: 2026-10-12T08:51:40Z
+duration_min: 3   # computed: plan comment 2026-10-12T08:51:40Z -> PR 2026-10-12T08:55:19Z (gh createdAt)
+issue: 318
+branch: session/2026-10-12-0851-issue-318
+focus: DOCUMENT_METADATA_NAN_INF_DATE_SET_TUPLE_KEY_PASSED_CONSTRUCTION_AND_FAILED_AT_THE_JSONB_WRITE_AFTER_THE_BATCH_WAS_EMBEDDED_308_SIBLING
+phase: shipped
+delta:
+  files_changed: 2
+  tests_added: 9
+  suite: "2090 -> 2099 passed, 9 skipped; ruff clean"
+decisions_made: []
+measured: "PG 17: '{\"a\": NaN}'::jsonb -> invalid input syntax for type json. main: NaN/inf/date/set/tuple-key Document() OK. Branch: refused at construction; 1001-doc batch 0 embed calls. Revert 8 red / 1 green."
+context_for_next_session:
+  - THE_308_TREE_WALK_RECURSES_ON_A_CYCLIC_DICT_running_json_dumps_first_turns_it_into_a_clean_ValueError
+followups: []
+---
