@@ -7,6 +7,7 @@ the FTS configuration colocated with the schema.
 
 from __future__ import annotations
 
+import json
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field
 from typing import Any
@@ -100,6 +101,16 @@ class Document:
         # a wrong-width vector (#194). Refused here, before any embedding.
         _require_storable(self.external_id, "Document.external_id")
         _require_storable(self.text, "Document.text")
+        # As JSON at all (#318). `metadata` is written as `Jsonb(...)`, which is
+        # `json.dumps`: NaN / Infinity become tokens Postgres's json parser
+        # refuses, and a date, a set or a tuple key raise at dump time -- both
+        # after the whole batch was embedded, the cost #308 names. Before the
+        # tree walk, because `json.dumps` reports a cyclic dict as a clean
+        # ValueError where the walk would recurse until RecursionError.
+        try:
+            json.dumps(self.metadata, allow_nan=False)
+        except (TypeError, ValueError, RecursionError) as e:
+            raise ValueError(f"Document.metadata cannot be stored as Postgres JSON: {e}") from None
         _require_storable_tree(self.metadata, "Document.metadata")
 
 
