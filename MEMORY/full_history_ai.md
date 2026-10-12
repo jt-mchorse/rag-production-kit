@@ -3511,3 +3511,23 @@ context_for_next_session:
   - A_TEST_OF_A_SERVER_THAT_SHOULD_EXIT_NEEDS_A_SHORT_TIMEOUT_unfixed_it_serves_forever
 followups: []
 ---
+
+---
+session: 2026-10-12T07:30:03Z
+duration_min: 1   # computed: plan comment 2026-10-12T07:30:03Z -> PR 2026-10-12T07:31:22Z (gh createdAt)
+issue: 312
+branch: session/2026-10-12-0730-issue-312
+focus: BENCH_REWRITER_KEPT_THE_ASCII_TOKENIZER_285_REPLACED_IN_ITS_TWIN_EVALS_RUN_EVAL_A_CYRILLIC_QUERY_TOKENIZED_TO_NOTHING
+phase: shipped
+delta:
+  files_changed: 2
+  tests_added: 7
+  suite: "1982 -> 1989 passed, 9 skipped; ruff check + format clean"
+decisions_made: []
+measured: "main: tokens('ошибка импорта модуля') == [], bench top1 a-en vs eval top1 b-ru. Revert 5 red / 2 ASCII controls green. bench_rewriter --k 2,3,5 --output md identical to main except elapsed."
+context_for_next_session:
+  - THREE_COPIES_OF_ONE_RETRIEVER_285_FIXED_TWO_count_the_copies_with_grep_before_closing_a_tokenizer_fix
+  - PARITY_TEST_RANKS_THE_SAME_CORPUS_THROUGH_BOTH_COPIES_rather_than_comparing_tokenizers_so_a_scoring_drift_also_shows
+  - bench_streaming_HAS_A_FOURTH_WHITESPACE_SPLIT_RETRIEVER_left_alone_it_measures_latency_and_claims_no_parity
+followups: []
+---

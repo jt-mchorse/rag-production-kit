@@ -3319,3 +3319,12 @@ given. The README's command doesn't pass `--seed`. With a bad path, the
 dashboard said it was serving and then dropped every request, printing a
 database traceback. It now checks the database before serving either way and
 exits with a clear error naming `--db`.
+
+## 2026-10-12 — The rewriter bench tokenizes like the eval suite (#312)
+
+The README says the rewriter benchmark uses the same simple retriever as the
+eval suite. When the eval copy learned to handle non-English text (#285), the
+bench copy was missed, so a Russian query came out as no words at all. The
+bench now uses the shared tokenizer. A test ranks the same mixed-language
+corpus through both copies and checks they agree. The published numbers are
+unchanged, because the bench's own data is plain English.
