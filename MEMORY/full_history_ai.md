@@ -3492,3 +3492,22 @@ context_for_next_session:
   - SAME_CLASS_AS_aop_196_but_here_refusal_is_right_the_document_has_not_been_paid_for_yet
 followups: []
 ---
+
+---
+session: 2026-10-12T07:27:33Z
+duration_min: 1   # computed: plan comment 2026-10-12T07:27:33Z -> PR 2026-10-12T07:29:16Z (gh createdAt)
+issue: 310
+branch: session/2026-10-12-0727-issue-310
+focus: DASHBOARD_DB_CHECK_178_SAT_INSIDE_THE_SEED_BRANCH_SO_THE_README_COMMAND_SERVED_AN_UNUSABLE_DB_AND_DROPPED_EVERY_REQUEST
+phase: shipped
+delta:
+  files_changed: 2
+  tests_added: 3
+  suite: "1982 -> 1985 passed, 9 skipped; ruff check + format clean"
+decisions_made: []
+measured: "main: --db /tmp/w/nope_dir/t.db --port 0 -> 'serving', curl / and /api/last_24h -> 000, OperationalError per request. Fixed: exit 2 ::error::--db, no serving line. Revert 3 of 3 new red (10 s timeouts), 9 green."
+context_for_next_session:
+  - A_GUARD_INSIDE_AN_OPTIONAL_FLAGS_BRANCH_178_WAS_FOUND_THROUGH_SEED_AND_SCOPED_TO_IT_the_README_command_never_passes_seed
+  - A_TEST_OF_A_SERVER_THAT_SHOULD_EXIT_NEEDS_A_SHORT_TIMEOUT_unfixed_it_serves_forever
+followups: []
+---

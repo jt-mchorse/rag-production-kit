@@ -3311,3 +3311,11 @@ a broken Unicode character passed every check. Postgres then rejected it at
 the very end, after all 1,001 documents had been embedded (and paid for, with
 a paid embedder). Such documents are now refused the moment they are created,
 with an error naming the field.
+
+## 2026-10-12 — The dashboard checks its database even without `--seed` (#310)
+
+An earlier fix made a bad `--db` path a clear error, but only when `--seed` was
+given. The README's command doesn't pass `--seed`. With a bad path, the
+dashboard said it was serving and then dropped every request, printing a
+database traceback. It now checks the database before serving either way and
+exits with a clear error naming `--db`.
