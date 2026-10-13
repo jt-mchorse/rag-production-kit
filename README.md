@@ -174,7 +174,7 @@ with connect() as conn:    # reads DATABASE_URL or falls back to the compose ser
     ])
 
     retr = Retriever(conn, embedder)
-    for r in retr.search("refund window", k=3):
+    for r in retr.search("refund policy", k=3):
         print(f"{r.external_id:10}  fused={r.fused_score:.4f}  ranks={r.ranks}")
         print(f"  {r.text}")
 ```
@@ -188,8 +188,11 @@ from rag_kit import GeneratedAnswer, Refusal, TemplateGenerator
 gen = TemplateGenerator()
 # The default threshold (0.02) is on the fused-score scale: without a reranker,
 # reciprocal-rank fusion with k=60 tops out at 2/61 ~= 0.033, so a threshold at
-# or above that refuses every answer (#237). With a reranker, the reranker's
-# own score is what gets compared.
+# or above that refuses every answer (#237). That ceiling needs BOTH channels:
+# a chunk only one channel found tops out at 1/61 ~= 0.016, below the default,
+# and the lexical channel (`plainto_tsquery`) matches only a chunk holding every
+# query term -- "refund window" matches none of the three above, so it refuses
+# (#327). With a reranker, the reranker's own score is what gets compared.
 out = gen.generate("when do refunds expire?", retrieved)
 if isinstance(out, GeneratedAnswer):
     print(out.text)                           # "...[cite:doc-1]. ...[cite:doc-2]."
