@@ -545,12 +545,21 @@ def percentile(values: Sequence[float], q: float) -> float:
     invalid JSON a strict log-tailer rejects whole. Fail loud at the metric
     boundary, the same posture as the q-range guard below and `PhaseTimings.record`.
     """
+    # `q` first, before the empty-window return (#330). Checked after it, a bad
+    # `q` -- `95` for the 95th percentile -- returned 0.0 for as long as the
+    # window was empty and raised only once the first record landed, so the
+    # same call behaved two ways depending on how much data was stored.
+    # `PhaseTimings.percentile` checks `p` first and refuses bool by name (#42);
+    # a bare range check let `True`/`False` through as q=1.0/0.0 and a `str`
+    # crash as a raw TypeError. NaN fails the range check below.
+    if isinstance(q, bool) or not isinstance(q, (int, float)):
+        raise ValueError(f"q must be a number in [0.0, 1.0]; got {q!r}")
+    if not 0.0 <= q <= 1.0:
+        raise ValueError(f"q must be in [0.0, 1.0]; got {q}")
     if not values:
         return 0.0
     if any(not math.isfinite(v) for v in values):
         raise ValueError(f"values must all be finite numbers; got {list(values)!r}")
-    if not 0.0 <= q <= 1.0:
-        raise ValueError(f"q must be in [0.0, 1.0]; got {q}")
     s = sorted(values)
     if q == 0.0:
         return s[0]
