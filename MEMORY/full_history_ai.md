@@ -3645,3 +3645,23 @@ context_for_next_session:
 followups:
   - "rows indexed before this keep their old tsv until rewritten (no migrations in v0)"
 ---
+
+---
+session: 2026-10-13T07:58:44Z
+duration_min: 15   # plan comment 2026-10-13T07:58:44Z -> PR (approx)
+issue: 327
+branch: session/2026-10-13-0758-issue-327
+focus: README_QUICKSTART_SEARCH_REFUND_WINDOW_HAD_NO_LEXICAL_MATCH_SO_EVERY_RESULT_WAS_DENSE_ONLY_AND_1_OVER_61_IS_BELOW_THE_0_02_DEFAULT_THE_INPUT_237_LOCK_DID_NOT_RUN
+phase: shipped
+delta:
+  files_changed: 2
+  tests_added: 2
+  suite: "2343 passed, 2 skipped (not pg); 9 pg passed; ruff clean"
+decisions_made: []
+measured: "PG 16 (pgserver): README search 'refund window' -> ranks all {'dense': n}, generate -> Refusal top_score=0.0164 below threshold=0.0200. 'refund policy' -> doc-1 {'lexical': 1, 'dense': 1} 0.0328 -> GeneratedAnswer. Revert 2 red / 0 green."
+context_for_next_session:
+  - PLAINTO_TSQUERY_ANDS_ITS_TERMS_a_natural_question_rarely_has_every_term_in_one_chunk_so_lexical_is_often_empty
+  - A_DENSE_ONLY_TOP_RESULT_ALWAYS_REFUSES_AT_THE_DEFAULT_1_over_61_lt_0_02_the_semantics_question_is_a_separate_decision_revisit
+  - A_README_LOCK_MUST_RUN_THE_README_CODE_not_a_best_case_input_the_test_builds_itself
+followups: []
+---

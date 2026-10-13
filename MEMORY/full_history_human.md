@@ -3384,3 +3384,15 @@ extractors) was never found by a query typed the usual way, and vice versa.
 The kit's own Python tokenizer already treated the two forms as the same
 word. The database index and the search query are now both normalised to the
 same form before matching. The stored text itself is unchanged.
+
+## 2026-10-13 — The README's search-then-answer example now actually answers (#327)
+
+The Quickstart indexed three documents and searched for "refund window", and
+the next example passed those results to the answer generator. Postgres's text
+search only matches a document that contains every word of the query, and none
+of the three contains both "refund" and "window". So only the similarity search
+found anything, and a result from one search method alone can never score above
+the generator's default confidence cut-off. The documented example refused
+instead of answering. The example now searches "refund policy". The note next
+to it now says when the default cut-off refuses. A new database test runs the
+README's own code.
