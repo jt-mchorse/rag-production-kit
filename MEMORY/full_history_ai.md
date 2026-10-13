@@ -3665,3 +3665,21 @@ context_for_next_session:
   - A_README_LOCK_MUST_RUN_THE_README_CODE_not_a_best_case_input_the_test_builds_itself
 followups: []
 ---
+
+---
+session: 2026-10-13T08:05:00Z
+duration_min: 8   # plan comment -> PR (approx)
+issue: 330
+branch: session/2026-10-13-0804-issue-330
+focus: TELEMETRY_PERCENTILE_CHECKED_Q_AFTER_THE_EMPTY_VALUES_RETURN_SO_A_BAD_Q_WAS_0_0_ON_AN_EMPTY_WINDOW_AND_AN_ERROR_ONCE_DATA_LANDED_BOOL_Q_READ_AS_0_1
+phase: shipped
+delta:
+  files_changed: 2
+  tests_added: 25
+  suite: "2343 -> 2367 passed, 2 skipped (not pg); ruff clean"
+decisions_made: []
+measured: "main: percentile([], 95) -> 0.0, percentile([1,2,3], 95) -> ValueError; percentile([1,2,3], True) -> 3.0; percentile([1], '0.5') -> TypeError. Revert 13 red / 12 green (controls + populated out-of-range already refused)."
+context_for_next_session:
+  - AN_EARLY_RETURN_ABOVE_A_GUARD_IS_A_POPULATION_THE_GUARD_NEVER_SEES_check_the_order_against_the_twin
+followups: []
+---

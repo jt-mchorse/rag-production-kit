@@ -3396,3 +3396,11 @@ the generator's default confidence cut-off. The documented example refused
 instead of answering. The example now searches "refund policy". The note next
 to it now says when the default cut-off refuses. A new database test runs the
 README's own code.
+
+## 2026-10-13 — The telemetry percentile helper checks its inputs even with no data (#330)
+
+`percentile(values, q)` only checked that `q` was between 0 and 1 when there
+was at least one value. A common mistake such as passing 95 instead of 0.95
+quietly returned 0 while the store was empty, then started raising errors once
+real requests were recorded. It also read `True` and `False` as 1 and 0. It
+now checks `q` first, the same way the streaming pipeline's percentile does.
