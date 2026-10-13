@@ -3363,3 +3363,13 @@ generator had since learned 26 closing marks, in any combination. So a first
 step ending with something like `.»` or `."**` stayed glued to the second.
 Both now share one list of closing marks and read them the same way. The
 benchmark numbers are unchanged.
+
+## 2026-10-13 — Split questions no longer end in two question marks (#322)
+
+The query rewriter splits "Who wrote X and when was it published?" into two
+questions, and each one should end in a single question mark. When the first
+half ended in a question mark followed by a closing quote, bracket or bold
+marker, as in `"Dune?"`, the rewriter could not see that question mark. It
+added another one, giving `Who wrote "Dune?"?`. The rewriter now removes the
+inner mark and keeps the closing punctuation, giving `Who wrote "Dune"?`.
+"Compare X with Y" queries get the same fix.

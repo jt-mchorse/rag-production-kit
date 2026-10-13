@@ -3605,3 +3605,22 @@ context_for_next_session:
   - NO_VARIABLE_WIDTH_LOOKBEHIND_IN_PYTHON_RE_find_the_gaps_then_check_the_prefix_with_a_dollar_anchored_search
 followups: []
 ---
+
+---
+session: 2026-10-13T07:21Z
+duration_min: 15   # approx: branch 07:21Z -> PR; issue + plan filed first
+issue: 322
+branch: session/2026-10-13-0721-issue-322
+focus: REWRITER_STRIP_SITES_RSTRIP_SAW_ONLY_A_LAST_CHARACTER_TERMINATOR_SO_A_CLOSER_AFTER_IT_STACKED_A_SECOND_ONE_THE_SITES_320_DID_NOT_LIST
+phase: shipped
+delta:
+  files_changed: 2
+  tests_added: 13
+  suite: "2342 -> 2355 passed, 2 skipped (not pg, rebased on 9e51627); ruff check + format clean"
+decisions_made: []
+measured: "main eec326a: 'Who wrote \"Dune?\" and ...' -> 'Who wrote \"Dune?\"?'; '**RAG?**' -> '**RAG?**?'; compare '\"Java.\"' -> 'What is \"Java.\"?'. Fixed: '\"Dune\"?', '**RAG**?', '\"Java\"?'. Revert 8 of 13 new red, 5 controls green. bench_rewriter md identical except elapsed."
+context_for_next_session:
+  - SHARED_SET_HUNKS_COPIED_BYTE_IDENTICAL_FROM_OPEN_PR_321_it_merged_mid_session_and_the_code_commit_rebased_with_no_conflict
+  - A_SUB_MINUS_2_CHECK_CANNOT_SEE_A_DOUBLED_TERMINATOR_BEHIND_A_CLOSER_check_the_whole_trailing_run
+followups: []
+---
