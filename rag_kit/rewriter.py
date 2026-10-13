@@ -224,6 +224,33 @@ def _split_then(query: str) -> list[str] | None:
     return None
 
 
+# The trailing run of terminators and closers that `_as_question` rewrites
+# (#322). The two strip sites used `rstrip(_TERMINATORS)`, which stops at the
+# last character. A closing quote, bracket or markdown emphasis after the
+# terminator (`"Dune?"`, `fusion?)`, `**RAG?**`) hid the terminator, and the
+# appended `?` stacked a second one after the closer. That is the same doubled
+# terminator #94/#111/#132/#150 removed for the bare case. The closers are
+# the generator's set (`text.SENTENCE_CLOSERS`), the one #320 gave the
+# Then-split.
+_TRAILING_PUNCT = re.compile(rf"[{re.escape(_TERMINATORS + _SENTENCE_CLOSERS)}]+$")
+
+
+def _as_question(s: str) -> str:
+    """`s` ending in exactly one `?`, after any closers that end it (#322).
+
+    The terminators in the trailing punctuation run are dropped and the
+    closers are kept in order, so `What is "Dune?"` becomes `What is "Dune"?`
+    and `What is **RAG?**` becomes `What is **RAG**?`. A run with no closer
+    behaves as the old `rstrip(_TERMINATORS) + "?"`. Internal punctuation, such
+    as a decimal like 3.5, is not part of the run and is left alone.
+    """
+    tail = _TRAILING_PUNCT.search(s)
+    if tail is None:
+        return s + "?"
+    closers = "".join(ch for ch in tail.group() if ch not in _TERMINATORS)
+    return s[: tail.start()] + closers + "?"
+
+
 def _split_compare(query: str) -> list[str] | None:
     match = _COMPARE_RE.match(query)
     if not match:
@@ -243,7 +270,9 @@ def _split_compare(query: str) -> list[str] | None:
     # seam already applies (#94/#113); the compare seam predates that fix and was
     # never given the same treatment. Only a *trailing* terminator is stripped, so
     # internal punctuation (a decimal like "3.5") is preserved.
-    return [f"What is {a.rstrip(_TERMINATORS)}?", f"What is {b.rstrip(_TERMINATORS)}?"]
+    # `_as_question` also strips a terminator that a closer follows (`"Java."`,
+    # #322).
+    return [_as_question(f"What is {a}"), _as_question(f"What is {b}")]
 
 
 def _split_question_and(query: str) -> list[str] | None:
@@ -271,8 +300,9 @@ def _split_question_and(query: str) -> list[str] | None:
         # malformed "What is the price!?" and breaking the well-formed-question
         # contract. `rstrip(_TERMINATORS)` is idempotent on a lone trailing `?`,
         # covers non-ASCII enders (`？！。؟`, #111), and leaves internal
-        # punctuation (a decimal like 3.5) untouched.
-        s = s.rstrip(_TERMINATORS) + "?"
+        # punctuation (a decimal like 3.5) untouched. `_as_question` also strips
+        # a terminator that a closer follows (`"Dune?"`, #322).
+        s = _as_question(s)
         out.append(s)
     return out if len(out) >= 2 else None
 
