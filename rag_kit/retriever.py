@@ -23,6 +23,7 @@ single-shot path with the rewritten query.
 
 from __future__ import annotations
 
+import unicodedata
 from dataclasses import dataclass
 from typing import Any
 
@@ -181,8 +182,13 @@ class Retriever:
         ORDER BY ts_rank_cd(tsv, plainto_tsquery('english', %s)) DESC, external_id ASC
         LIMIT %s
         """
+        # NFC, because the trigger builds `tsv` from the NFC form (#324): FTS
+        # compares code points, so a decomposed `café` and a composed one were
+        # different words. Lexical channel only -- the dense channel embeds the
+        # query exactly as given, which is the embedder's business.
+        lex_query = unicodedata.normalize("NFC", query)
         with self.conn.cursor() as cur:
-            cur.execute(lexical_sql, (query, query, candidate_k))
+            cur.execute(lexical_sql, (lex_query, lex_query, candidate_k))
             lex_rows = cur.fetchall()
 
         # --- Dense channel --------------------------------------------------

@@ -65,9 +65,23 @@ CREATE INDEX IF NOT EXISTS documents_embedding_hnsw_idx
 
 -- Maintain `tsv` automatically on insert/update. English config is a v0.1
 -- default — a real deployment configures the dictionary per language.
+--
+-- The text is put in NFC before the parser sees it (#324). Postgres FTS
+-- compares code points, so a chunk storing `café` decomposed (`e` + U+0301,
+-- as macOS file names and some PDF extractors produce) was invisible to the
+-- same word typed composed, and the two forms do not even stem alike
+-- (`crème` vs `crèm`). `Retriever` NFC-normalises the query to match, as
+-- `rag_kit.text.word_tokens` already does for the Python lexical paths (#285).
+-- Only `tsv` is normalised: `text` is stored exactly as written. Postgres's
+-- `normalize()` refuses to run unless the server encoding is UTF8, so another
+-- encoding keeps the old behaviour rather than failing every insert.
 CREATE OR REPLACE FUNCTION documents_tsv_trigger() RETURNS trigger AS $$
 BEGIN
-    NEW.tsv := to_tsvector('english', coalesce(NEW.text, ''));
+    IF current_setting('server_encoding') = 'UTF8' THEN
+        NEW.tsv := to_tsvector('english', normalize(coalesce(NEW.text, ''), NFC));
+    ELSE
+        NEW.tsv := to_tsvector('english', coalesce(NEW.text, ''));
+    END IF;
     RETURN NEW;
 END
 $$ LANGUAGE plpgsql;
