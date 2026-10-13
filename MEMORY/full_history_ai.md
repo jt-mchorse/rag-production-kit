@@ -3624,3 +3624,24 @@ context_for_next_session:
   - A_SUB_MINUS_2_CHECK_CANNOT_SEE_A_DOUBLED_TERMINATOR_BEHIND_A_CLOSER_check_the_whole_trailing_run
 followups: []
 ---
+
+---
+session: 2026-10-13T07:43:03Z
+duration_min: 4   # computed: plan comment 2026-10-13T07:43:03Z -> PR (gh createdAt)
+issue: 324
+branch: session/2026-10-13-0743-issue-324
+focus: LEXICAL_CHANNEL_COMPARED_CODE_POINTS_AN_NFD_CHUNK_WAS_INVISIBLE_TO_AN_NFC_QUERY_WHILE_THE_KITS_OWN_word_tokens_NFC_NORMALISES_285
+phase: shipped
+delta:
+  files_changed: 3
+  tests_added: 5
+  suite: "2342 -> 2344 passed (not pg), 8 -> 11 passed (pg); ruff clean"
+decisions_made: []
+measured: "PG 17.6 + pgvector 0.8.0: NFD chunk 'café' -> NFC query lexical hits [], NFD query ['nfd-doc']; reverse for an NFC chunk. to_tsvector('crème') NFC 'crème', NFD 'crèm'. Revert both: 3 red / 2 green; revert retriever only: 2 red; revert trigger only: 1 red."
+context_for_next_session:
+  - A_PYTHON_TOKENIZER_FIX_DOES_NOT_REACH_THE_SQL_TWIN_285_normalised_word_tokens_and_the_tsvector_channel_it_stands_in_for_kept_comparing_code_points
+  - ONLY_tsv_IS_NORMALISED_stored_text_reads_back_byte_for_byte_and_the_dense_channel_embeds_the_query_as_given
+  - POSTGRES_normalize_REFUSES_ON_A_NON_UTF8_SERVER_the_trigger_branches_on_server_encoding_so_it_cannot_fail_every_insert
+followups:
+  - "rows indexed before this keep their old tsv until rewritten (no migrations in v0)"
+---

@@ -3373,3 +3373,14 @@ marker, as in `"Dune?"`, the rewriter could not see that question mark. It
 added another one, giving `Who wrote "Dune?"?`. The rewriter now removes the
 inner mark and keeps the closing punctuation, giving `Who wrote "Dune"?`.
 "Compare X with Y" queries get the same fix.
+
+## 2026-10-13 — Keyword search finds accented words however they are encoded (#324)
+
+An accented letter like `é` can be stored as one character or as `e` plus a
+separate accent mark. Both look identical and Unicode treats them as the same
+text. Postgres keyword search compared the raw characters, though. A chunk
+stored the second way (common in text from macOS file names or some PDF
+extractors) was never found by a query typed the usual way, and vice versa.
+The kit's own Python tokenizer already treated the two forms as the same
+word. The database index and the search query are now both normalised to the
+same form before matching. The stored text itself is unchanged.
