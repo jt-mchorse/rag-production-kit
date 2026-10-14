@@ -3683,3 +3683,22 @@ context_for_next_session:
   - AN_EARLY_RETURN_ABOVE_A_GUARD_IS_A_POPULATION_THE_GUARD_NEVER_SEES_check_the_order_against_the_twin
 followups: []
 ---
+
+---
+session: 2026-10-14T07:17Z
+duration_min: 10   # approx: plan comment 07:17Z -> PR
+issue: 332
+branch: session/2026-10-14-0717-issue-332
+focus: REWRITER_THEN_PREFIX_BACKSLASH_W_STAR_ATE_THE_OPENER_OF_THE_NEXT_STEP_QUOTE_BRACKET_EMPHASIS_LEAVING_ITS_CLOSER_UNBALANCED_THE_OPENER_SIDE_320_322_DID_NOT_LIST
+phase: shipped
+delta:
+  files_changed: 2
+  tests_added: 21
+  suite: "2357 -> 2378 passed, 2 skipped (not pg, rebased on 751ad1e); ruff check + format clean"
+decisions_made: []
+measured: "main 1a31f33: 'Then \"Attention Is All You Need\" -- ...' -> 'Attention Is All You Need\" -- ...'; '(optionally)' -> 'optionally)'; '**rerank**' -> 'rerank**'; '¿qué' -> 'qué'; '.NET' -> 'NET'. Fixed: opener kept; #92 Then, / Then; / Then- / then-do unchanged. Revert 10 of 21 new red, 11 separator controls green. bench_rewriter md identical."
+context_for_next_session:
+  - A_COMPLEMENT_CLASS_IS_WIDER_THAN_THE_LIST_IT_WAS_WRITTEN_FOR_92_listed_comma_semicolon_dash_and_backslash_W_took_every_opener_too
+  - KNOWN_LEFT_AS_IS_Then_minus_5_still_loses_the_minus_an_attached_dash_is_92s_own_repro_then_do
+followups: []
+---

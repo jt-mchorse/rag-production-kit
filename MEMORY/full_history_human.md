@@ -3404,3 +3404,13 @@ was at least one value. A common mistake such as passing 95 instead of 0.95
 quietly returned 0 while the store was empty, then started raising errors once
 real requests were recorded. It also read `True` and `False` as 1 and 0. It
 now checks `q` first, the same way the streaming pipeline's percentile does.
+
+## 2026-10-14 — The rewriter keeps the opening quote after "Then" (#332)
+
+When the rewriter splits "Find the paper. Then "Attention Is All You Need" --
+who wrote it?" into two steps, it removes the word "Then" and any comma or
+dash after it from the second step. It also removed the opening quote, giving
+`Attention Is All You Need" -- who wrote it?` with a stray closing quote. The
+same happened to an opening bracket, bold markers, a backtick, a Spanish `¿`
+and the dot in `.NET`. It now removes only the word and the separator
+punctuation after it, so the step keeps its own first character.
