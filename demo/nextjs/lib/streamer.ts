@@ -54,10 +54,13 @@ export function buildAnswer(results: ReadonlyArray<RetrievalResult>): string {
 }
 
 function firstSentence(s: string): string {
-  // Trim to roughly one sentence so the answer is readable.
-  const idx = s.indexOf(".");
-  if (idx === -1) return s.trim();
-  return s.slice(0, idx + 1).trim();
+  // Trim to one sentence so the answer is readable. A sentence ends at a
+  // terminator followed by whitespace or the end of the text, not at the
+  // first `.` anywhere (#336): that quoted the rerank chunk's "by 0.05–0.12"
+  // as "improves NDCG@5 by 0." and the rrf chunk as "(Cormack et al.".
+  const m = /[.!?](?=\s|$)/.exec(s);
+  if (m === null) return s.trim();
+  return s.slice(0, m.index + 1).trim();
 }
 
 /**

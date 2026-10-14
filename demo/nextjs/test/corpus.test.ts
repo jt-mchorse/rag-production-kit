@@ -48,6 +48,42 @@ describe("buildAnswer + tokenize", () => {
     expect(citations[citations.length - 1]).toBe(r.length);
   });
 
+  // #336: each chunk is quoted as "says: <snippet> [n]." and the snippet must
+  // be a whole sentence of that chunk. The checks above count tokens and never
+  // read a snippet, so a decimal point and "et al." ended the quote mid-claim.
+  const snippetOf = (id: string): string => {
+    const chunk = CORPUS.find((c) => c.id === id);
+    if (chunk === undefined) throw new Error(`no corpus chunk ${id}`);
+    const answer = buildAnswer([{ chunk, score: 1 }]);
+    const m = / says: (.*) \[1\]\./.exec(answer);
+    if (m === null) throw new Error(`no quoted snippet in ${JSON.stringify(answer)}`);
+    return m[1];
+  };
+
+  it("does not end a quote at a decimal point", () => {
+    expect(snippetOf("rerank")).toBe(CORPUS.find((c) => c.id === "rerank")?.text);
+    expect(snippetOf("rerank")).not.toMatch(/by 0\.$/);
+  });
+
+  it("does not end a quote at an abbreviation's period", () => {
+    expect(snippetOf("rrf")).toBe(CORPUS.find((c) => c.id === "rrf")?.text);
+  });
+
+  it("still ends a quote at a real sentence boundary", () => {
+    expect(snippetOf("hnsw")).toBe(
+      "HNSW index parameters: M controls graph degree (higher = better recall, more memory).",
+    );
+  });
+
+  it.each(CORPUS.map((c) => c.id))("quotes %s as a prefix with balanced parentheses", (id) => {
+    const chunk = CORPUS.find((c) => c.id === id);
+    const snippet = snippetOf(id);
+    expect(chunk?.text.startsWith(snippet)).toBe(true);
+    expect(snippet).toMatch(/[.!?]$/);
+    expect(snippet.split("(").length).toBe(snippet.split(")").length);
+    expect(snippet).not.toMatch(/\d\.$/);
+  });
+
   it("reassembled tokens equal the original answer string", () => {
     const r = retrieve("postgres rerank hnsw", 4);
     const answer = buildAnswer(r);
