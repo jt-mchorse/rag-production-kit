@@ -3722,3 +3722,22 @@ context_for_next_session:
   - DASHBOARD_404_USES_self_path_WHICH_IS_LATIN1_DECODED_AND_NOT_PERCENT_DECODED_so_it_cannot_hit_this
 followups: []
 ---
+
+---
+session: 2026-10-14T07:33:14Z
+duration_min: 6   # approx: plan comment 2026-10-14T07:33:14Z -> PR
+issue: 336
+branch: session/2026-10-14-0733-issue-336
+focus: NEXTJS_DEMO_firstSentence_CUT_AT_THE_FIRST_PERIOD_ANYWHERE_SO_THE_ANSWER_QUOTED_THE_RERANK_CHUNK_AS_IMPROVES_NDCG_BY_0_AND_RRF_AS_CORMACK_ET_AL_UNCLOSED
+phase: shipped
+delta:
+  files_changed: 2
+  tests_added: 9
+  suite: "vitest 16 -> 25 passed; tsc clean; pytest not-pg 2383 passed, 2 skipped (unchanged)"
+decisions_made: []
+measured: "main 88610fa: buildAnswer(retrieve('zzz',4)) quotes 'Reciprocal Rank Fusion (Cormack et al.' and '...improves NDCG@5 by 0.'. Revert: 4 of 9 new red (decimal, abbreviation, rrf+rerank prefix/paren rows); 5 controls green (hnsw boundary + 4 clean chunks)."
+context_for_next_session:
+  - A_TS_TWIN_DID_NOT_GET_THE_PYTHON_SENTENCE_RULES_decimal_and_et_al_are_handled_in_generator_py_not_in_demo_nextjs
+  - THE_VITEST_SUITE_COUNTED_CITATION_TOKENS_AND_NEVER_READ_A_SNIPPET_test_the_drawn_text
+followups: []
+---

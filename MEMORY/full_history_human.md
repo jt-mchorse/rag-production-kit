@@ -3423,3 +3423,13 @@ allows Latin-1 characters. A `k` containing something outside Latin-1, like a
 Chinese character or an em dash, made the server crash while writing the
 error. The browser got no response at all. The value is now shown with
 non-ASCII characters escaped (`'一'`), so the 400 always goes out.
+
+## 2026-10-14 — The Next.js demo quotes whole sentences from its sources (#336)
+
+The Next.js demo builds its answer by quoting the first sentence of each
+retrieved chunk. It treated the first full stop anywhere as the end of the
+sentence. So "improves NDCG@5 by 0.05–0.12" was quoted as "improves NDCG@5
+by 0.", which says the opposite of the source. "Reciprocal Rank Fusion
+(Cormack et al., SIGIR 2009) ..." was cut off at "et al.". A sentence now
+ends only at a full stop, question mark or exclamation mark followed by a
+space or the end of the text.
