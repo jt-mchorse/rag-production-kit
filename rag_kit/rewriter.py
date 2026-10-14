@@ -151,7 +151,15 @@ def _then_parts(query: str) -> list[str]:
 # characters. (A bare `startswith("then ")` only handled the space case, so a
 # punctuated connective leaked into the sub-query.) `then\b` won't touch a
 # content word like "thence" (no boundary), consistent with the split. See #92.
-_THEN_PREFIX = re.compile(r"^then\b\W*", re.IGNORECASE)
+#
+# Only SEPARATOR punctuation goes with the connective: `, ; :`, the dashes, and
+# an ellipsis (`…` or a run of dots). The first pattern was `then\b\W*`, and
+# `\W` also matched the opening punctuation of the step's own content, so
+# `Then "Dune" ...` became `Dune" ...` and `Then (optionally) ...` became
+# `optionally) ...`, leaving the closer unbalanced (#332). The same happened to
+# `**`, a backtick, `¿`, `「` and the `.` of `.NET`. #320/#322 keep closers;
+# this keeps their openers. A single `.` is not a separator for that reason.
+_THEN_PREFIX = re.compile(r"^then\b\s*(?:(?:[,;:…‐-―-]|\.{2,})+\s*)?", re.IGNORECASE)
 
 # Conjunction split for "X and Y" / "X, and Y" — bounded so we don't
 # over-fragment a query like "wine and cheese pairings". Only fire when
