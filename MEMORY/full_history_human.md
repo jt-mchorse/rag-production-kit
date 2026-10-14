@@ -3414,3 +3414,12 @@ dash after it from the second step. It also removed the opening quote, giving
 same happened to an opening bracket, bold markers, a backtick, a Spanish `¿`
 and the dot in `.NET`. It now removes only the word and the separator
 punctuation after it, so the step keeps its own first character.
+
+## 2026-10-14 — The streaming demo answers any bad `k` with a 400 (#334)
+
+The demo server rejects a `k` that isn't a whole number with a 400 error that
+names the value. That message goes into the HTTP status line, which only
+allows Latin-1 characters. A `k` containing something outside Latin-1, like a
+Chinese character or an em dash, made the server crash while writing the
+error. The browser got no response at all. The value is now shown with
+non-ASCII characters escaped (`'一'`), so the 400 always goes out.

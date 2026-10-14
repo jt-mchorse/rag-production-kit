@@ -3702,3 +3702,23 @@ context_for_next_session:
   - KNOWN_LEFT_AS_IS_Then_minus_5_still_loses_the_minus_an_attached_dash_is_92s_own_repro_then_do
 followups: []
 ---
+
+---
+session: 2026-10-14T07:27:02Z
+duration_min: 8   # approx: plan comment 2026-10-14T07:27:02Z -> PR
+issue: 334
+branch: session/2026-10-14-0727-issue-334
+focus: DEMO_STREAMING_UNPARSEABLE_K_400_FORMATTED_THE_PERCENT_DECODED_VALUE_WITH_REPR_INTO_A_LATIN1_STRICT_STATUS_LINE_A_CJK_OR_EM_DASH_K_DROPPED_THE_CONNECTION
+phase: shipped
+delta:
+  files_changed: 2
+  tests_added: 5
+  suite: "2383 -> 2388 passed, 2 skipped (not pg, rebased on 88610fa); ruff check + format clean"
+decisions_made: []
+measured: "main 751ad1e: k=abc -> 400, k=%C3%A9 -> 400, k=%E4%B8%80 / %E2%80%94 -> RemoteDisconnected + UnicodeEncodeError 'latin-1' in server log. Revert: 5 of 5 new red (4 non-Latin-1 cases + the Latin-1 spelling pin)."
+context_for_next_session:
+  - SEND_ERROR_MESSAGE_IS_THE_STATUS_LINE_LATIN1_STRICT_format_a_client_value_with_ascii_not_repr
+  - THE_166_LOCK_PARAMETRIZED_K_OVER_ASCII_ONLY_the_encoder_population_was_never_run
+  - DASHBOARD_404_USES_self_path_WHICH_IS_LATIN1_DECODED_AND_NOT_PERCENT_DECODED_so_it_cannot_hit_this
+followups: []
+---
