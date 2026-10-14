@@ -202,7 +202,7 @@ class CohereReranker:
     """Production reranker backed by Cohere's /rerank API.
 
     Requires the `rerank-cohere` optional dependency:
-        pip install 'rag-production-kit[rerank-cohere]'
+        pip install -e '.[rerank-cohere]'    # from the checkout
 
     The API key is read from `COHERE_API_KEY`. Model id, batch size, and
     timeout are configurable.
@@ -250,7 +250,7 @@ class CohereReranker:
         except ImportError as e:
             raise ImportError(
                 "CohereReranker requires the optional 'rerank-cohere' extra. "
-                "Install with: pip install 'rag-production-kit[rerank-cohere]'"
+                "Install with: pip install -e '.[rerank-cohere]' from the rag-production-kit checkout"
             ) from e
 
         self._cohere_module = cohere

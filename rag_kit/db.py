@@ -19,7 +19,9 @@ try:
     from psycopg.conninfo import conninfo_to_dict
     from psycopg.types.json import Jsonb
 except ImportError as e:  # pragma: no cover
-    raise ImportError("psycopg is required. Install with: pip install rag-production-kit") from e
+    raise ImportError(
+        "psycopg is required. Install with: pip install -e . from the rag-production-kit checkout"
+    ) from e
 
 
 DEFAULT_DATABASE_URL = "postgresql://rag:rag@localhost:5432/rag"
