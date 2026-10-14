@@ -20,6 +20,7 @@ client that disconnected early; the traceback is what names it.
 from __future__ import annotations
 
 import contextlib
+import http.client
 import importlib.util
 import io
 import socket
@@ -30,6 +31,7 @@ import urllib.request
 from collections.abc import Iterator
 from http.server import ThreadingHTTPServer
 from pathlib import Path
+from urllib.parse import quote
 
 import pytest
 
@@ -131,6 +133,51 @@ def test_unusable_k_is_a_400_with_no_partial_stream(server: _Captured, k: str) -
     # Not a truncated 200: the client's `!resp.ok` branch has to be the one
     # that fires, since that is the only path `app.js` renders an error from.
     assert b"event: retrieving" not in body
+    _assert_no_traceback(server)
+
+
+# Outside Latin-1, the population the ASCII list above never reached (#334).
+# `send_error` writes its message into the status line, which `http.server`
+# encodes as Latin-1 strictly, and `raw_k` arrives percent-decoded: each of
+# these raised `UnicodeEncodeError` in the handler and the client got no
+# response at all. Built from code points so the file stays ASCII.
+_NON_LATIN1_K = {
+    "cjk-one": chr(0x4E00),
+    "em-dash": chr(0x2014),
+    "three-then-fullwidth-comma": "3" + chr(0xFF0C),
+    "astral-emoji": chr(0x1F600),
+}
+
+
+def _status_and_reason(server: _Captured, path: str) -> tuple[int, str]:
+    host, port = server.server_address[0], server.server_address[1]
+    conn = http.client.HTTPConnection(host, port, timeout=10)
+    try:
+        conn.request("GET", path)
+        resp = conn.getresponse()
+        resp.read()
+        return resp.status, resp.reason
+    finally:
+        conn.close()
+
+
+@pytest.mark.parametrize("k", list(_NON_LATIN1_K.values()), ids=list(_NON_LATIN1_K))
+def test_a_k_outside_latin1_is_still_a_400(server: _Captured, k: str) -> None:
+    status, reason = _status_and_reason(server, f"/stream?q=refund&k={quote(k)}")
+    assert status == 400
+    # The value is still named, escaped: the operator sees which input was refused.
+    assert reason == f"k must be a positive integer, got {ascii(k)}"
+    _assert_no_traceback(server)
+
+
+def test_a_latin1_k_keeps_its_readable_spelling_in_the_reason(server: _Captured) -> None:
+    # Control: `ascii()` escapes `é` too, which `!r` printed as itself. The
+    # reason phrase is a diagnostic, not a round-trip format, so the escape is
+    # the trade for one rule that cannot fail; pinned so the change is visible.
+    k = "1" + chr(0xE9)
+    status, reason = _status_and_reason(server, f"/stream?q=refund&k={quote(k)}")
+    assert status == 400
+    assert reason == "k must be a positive integer, got '1\\xe9'"
     _assert_no_traceback(server)
 
 

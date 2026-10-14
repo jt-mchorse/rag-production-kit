@@ -170,11 +170,17 @@ class Handler(BaseHTTPRequestHandler):
         # An unparseable `k` used to fall back to 3 silently. It 400s now: a
         # typo and an out-of-range value are the same class of client mistake,
         # and defaulting one while rejecting the other would be arbitrary.
+        #
+        # `ascii()`, not `!r` (#334). `send_error` puts this message in the
+        # status line, which `http.server` encodes as Latin-1 strictly, and
+        # `raw_k` is percent-decoded: `!r` leaves a printable `一` or `—` as
+        # itself, so the encode raised inside the handler and the client got
+        # no response at all instead of this 400.
         raw_k = (qs.get("k") or ["3"])[0]
         try:
             k = int(raw_k)
         except ValueError:
-            self.send_error(400, f"k must be a positive integer, got {raw_k!r}")
+            self.send_error(400, f"k must be a positive integer, got {ascii(raw_k)}")
             return
         if k <= 0:
             self.send_error(400, f"k must be a positive integer, got {k!r}")
