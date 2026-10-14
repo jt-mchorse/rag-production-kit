@@ -3741,3 +3741,20 @@ context_for_next_session:
   - THE_VITEST_SUITE_COUNTED_CITATION_TOKENS_AND_NEVER_READ_A_SNIPPET_test_the_drawn_text
 followups: []
 ---
+
+---
+session: 2026-10-14T08:15Z
+issue: 338
+focus: INSTALL_HINTS_SAID_PIP_INSTALL_RAG_PRODUCTION_KIT_WHICH_404S_ON_PYPI_AND_IS_UNCLAIMED
+phase: shipped
+delta:
+  files_changed: 3
+  tests_added: 3
+  suite: "pytest -m 'not pg' green (rc 0); ruff check + format clean"
+decisions_made: []
+measured: "pypi.org/pypi/rag-production-kit/json -> 404. db.py psycopg hint, CohereReranker docstring and its ImportError named it. Revert probe: 1 of 3 new arms red, 2 controls green."
+context_for_next_session:
+  - PORTFOLIO_SWEEP_FROM_csl_266_leh_369_AND_vsas_234_WERE_TAKEN_NAMES_rag_lco_ems_ARE_404s
+  - HERE_THE_REPO_NAME_EQUALS_THE_DIST_NAME_so_the_lock_cuts_the_args_at_from_or_in_before_matching_otherwise_from_the_rag_production_kit_checkout_trips_it
+followups: []
+---

@@ -3433,3 +3433,13 @@ by 0.", which says the opposite of the source. "Reciprocal Rank Fusion
 (Cormack et al., SIGIR 2009) ..." was cut off at "et al.". A sentence now
 ends only at a full stop, question mark or exclamation mark followed by a
 space or the end of the text.
+
+## 2026-10-14 — install hints install from the checkout (#338)
+
+The psycopg and Cohere-reranker error messages told the operator to run
+`pip install 'rag-production-kit[...]'`. The project isn't on PyPI, so that
+command fails, and anyone could register the name later. They now say
+`pip install -e '.[...]'` from the checkout, as the README does. A new test fails
+if any tracked file tells the reader to install this project's name from an
+index. Tonight the same mistake was fixed in llm-eval-harness and
+vector-search-at-scale, where the name on PyPI already belongs to someone else.
