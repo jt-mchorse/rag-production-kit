@@ -488,8 +488,12 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(
             # The BOUND port: `--port 0` asks the OS to pick one, and printing
             # `args.port` advertised `:0`, where nothing listens (#268). An
-            # IPv6 host is bracketed, or the URL is not one (#291).
-            f"serving http://{_url_host(args.host)}:{server.server_address[1]}/ "
+            # IPv6 host is bracketed, or the URL is not one (#291). A bare
+            # `--host ""` (all interfaces) printed `http://:<port>/`, which curl
+            # and browsers reject, so it names the BOUND host too, `0.0.0.0`,
+            # as stdlib `http.server --bind ""` does (#344).
+            f"serving http://{_url_host(args.host or server.server_address[0])}"
+            f":{server.server_address[1]}/ "
             f"from {args.db} "
             "(Ctrl-C to stop)",
             file=sys.stderr,
