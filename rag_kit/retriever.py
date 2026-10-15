@@ -24,6 +24,7 @@ single-shot path with the rewritten query.
 from __future__ import annotations
 
 import unicodedata
+from contextlib import AbstractContextManager, nullcontext
 from dataclasses import dataclass
 from typing import Any
 
@@ -36,6 +37,17 @@ from .rewriter import Rewriter
 # How many candidates each channel pulls before fusion. Tuned to keep
 # fusion meaningful (RRF needs distinct ranks) without overfetching.
 _CANDIDATE_MULTIPLIER = 4
+
+
+def _read_scope(conn: Any) -> AbstractContextManager[Any]:
+    """The transaction scope a search's SELECTs run in (#346).
+
+    `conn.transaction()` for a psycopg connection; no scope for a duck-typed
+    connection that only offers `cursor()`, which is what the unit-test fakes
+    are and which has no transaction to leave open.
+    """
+    transaction = getattr(conn, "transaction", None)
+    return transaction() if callable(transaction) else nullcontext()
 
 
 @dataclass
@@ -147,79 +159,93 @@ class Retriever:
         # true on the query path as well as the write path.
         qvec = to_pgvector(self.embedder.embed(query))
 
-        # --- Lexical channel ------------------------------------------------
-        # `ORDER BY <non-unique key> LIMIT n` leaves the choice among tied rows
-        # undefined, and Postgres settles it by physical row order — so *which
-        # documents come back* moved whenever rows moved on disk (#180). An
-        # ordinary no-op `UPDATE ... SET text = text` was enough. Measured on
-        # Postgres 16 with six documents sharing one term profile, all at
-        # ts_rank_cd 0.1, LIMIT 3:
-        #
-        #   initial insert     -> doc-alpha,  doc-bravo,   doc-charlie
-        #   one row rewritten  -> doc-bravo,  doc-charlie, doc-delta
-        #   two more rewritten -> doc-delta,  doc-echo,    doc-foxtrot
-        #
-        # Complete membership turnover: the first and third sets share nothing.
-        # For a RAG kit that is which chunks get retrieved, generated from, and
-        # cited. Equal ranks are ordinary, not contrived — templated or
-        # boilerplate documents share a term profile by construction.
-        #
-        # `#40` gave RRF a doc-id tiebreak, but on a different axis: it made the
-        # fused output independent of the order *methods* are supplied in. It
-        # cannot absorb an unstable input *ranking*, because a different input
-        # rank changes the fused score itself, which that tiebreak never sees.
-        # Feeding the three orderings above into `reciprocal_rank_fusion` gave
-        # three different top-3s.
-        #
-        # The tiebreak is free here, verified with EXPLAIN: `ts_rank_cd` is a
-        # computed expression no index can order by, so this query already
-        # sorts, and `external_id` only extends the existing sort key. Same
-        # plan, same Seq Scan.
-        lexical_sql = """
-        SELECT external_id, text, metadata
-        FROM documents
-        WHERE tsv @@ plainto_tsquery('english', %s)
-        ORDER BY ts_rank_cd(tsv, plainto_tsquery('english', %s)) DESC, external_id ASC
-        LIMIT %s
-        """
-        # NFC, because the trigger builds `tsv` from the NFC form (#324): FTS
-        # compares code points, so a decomposed `café` and a composed one were
-        # different words. Lexical channel only -- the dense channel embeds the
-        # query exactly as given, which is the embedder's business.
-        lex_query = unicodedata.normalize("NFC", query)
-        with self.conn.cursor() as cur:
-            cur.execute(lexical_sql, (lex_query, lex_query, candidate_k))
-            lex_rows = cur.fetchall()
+        # Both channels run in one `conn.transaction()` (#346). The SELECTs used
+        # to run bare on the caller's connection, and `rag_kit.db.connect()`
+        # leaves autocommit off, so the first search left the connection idle
+        # in transaction holding `AccessShareLock` on `documents` until
+        # something else on it committed: a second connection's
+        # `Indexer.clear()` (`TRUNCATE`) waited forever, and one statement the
+        # server rejected (a 20,000-word query overflows `plainto_tsquery`'s
+        # stack) failed every later search with `InFailedSqlTransaction`.
+        # psycopg's scope is `BEGIN ... COMMIT` on an idle connection and a
+        # `SAVEPOINT` inside a transaction the caller already has open, rolled
+        # back on error either way, so a search leaves the connection in the
+        # state it found it. The embedding above stays outside it: no lock is
+        # held while the embedder runs.
+        with _read_scope(self.conn):
+            # --- Lexical channel ------------------------------------------------
+            # `ORDER BY <non-unique key> LIMIT n` leaves the choice among tied rows
+            # undefined, and Postgres settles it by physical row order — so *which
+            # documents come back* moved whenever rows moved on disk (#180). An
+            # ordinary no-op `UPDATE ... SET text = text` was enough. Measured on
+            # Postgres 16 with six documents sharing one term profile, all at
+            # ts_rank_cd 0.1, LIMIT 3:
+            #
+            #   initial insert     -> doc-alpha,  doc-bravo,   doc-charlie
+            #   one row rewritten  -> doc-bravo,  doc-charlie, doc-delta
+            #   two more rewritten -> doc-delta,  doc-echo,    doc-foxtrot
+            #
+            # Complete membership turnover: the first and third sets share nothing.
+            # For a RAG kit that is which chunks get retrieved, generated from, and
+            # cited. Equal ranks are ordinary, not contrived — templated or
+            # boilerplate documents share a term profile by construction.
+            #
+            # `#40` gave RRF a doc-id tiebreak, but on a different axis: it made the
+            # fused output independent of the order *methods* are supplied in. It
+            # cannot absorb an unstable input *ranking*, because a different input
+            # rank changes the fused score itself, which that tiebreak never sees.
+            # Feeding the three orderings above into `reciprocal_rank_fusion` gave
+            # three different top-3s.
+            #
+            # The tiebreak is free here, verified with EXPLAIN: `ts_rank_cd` is a
+            # computed expression no index can order by, so this query already
+            # sorts, and `external_id` only extends the existing sort key. Same
+            # plan, same Seq Scan.
+            lexical_sql = """
+            SELECT external_id, text, metadata
+            FROM documents
+            WHERE tsv @@ plainto_tsquery('english', %s)
+            ORDER BY ts_rank_cd(tsv, plainto_tsquery('english', %s)) DESC, external_id ASC
+            LIMIT %s
+            """
+            # NFC, because the trigger builds `tsv` from the NFC form (#324): FTS
+            # compares code points, so a decomposed `café` and a composed one were
+            # different words. Lexical channel only -- the dense channel embeds the
+            # query exactly as given, which is the embedder's business.
+            lex_query = unicodedata.normalize("NFC", query)
+            with self.conn.cursor() as cur:
+                cur.execute(lexical_sql, (lex_query, lex_query, candidate_k))
+                lex_rows = cur.fetchall()
 
-        # --- Dense channel --------------------------------------------------
-        # Same defect, deliberately a different shape (#180). Appending
-        # `, external_id` to this ORDER BY would make it deterministic too, but
-        # that is exactly the form that stops pgvector using an HNSW
-        # index-ordered scan, turning an ANN lookup into a full scan plus sort.
-        # So: select the distance, leave the ORDER BY alone so the index scan is
-        # preserved, and impose the deterministic order on the returned rows
-        # below.
-        #
-        # What that fixes and what it does not: the dense *ranking* becomes a
-        # function of the data. Membership at the LIMIT boundary is still the
-        # index's choice, so a tied row can still fall outside `candidate_k` —
-        # a weaker guarantee than the lexical channel gets. That is the right
-        # place to stop, because HNSW is an *approximate* index whose recall is
-        # already not exact (the open question in vector-search-at-scale#71).
-        # Making dense membership exact is a different problem from making it
-        # deterministic.
-        #
-        # (`qvec` is computed at the top of this method, before the lexical
-        # channel — see the note there.)
-        dense_sql = """
-        SELECT external_id, text, metadata, embedding <=> %s::vector AS dist
-        FROM documents
-        ORDER BY embedding <=> %s::vector
-        LIMIT %s
-        """
-        with self.conn.cursor() as cur:
-            cur.execute(dense_sql, (qvec, qvec, candidate_k))
-            dense_raw = cur.fetchall()
+            # --- Dense channel --------------------------------------------------
+            # Same defect, deliberately a different shape (#180). Appending
+            # `, external_id` to this ORDER BY would make it deterministic too, but
+            # that is exactly the form that stops pgvector using an HNSW
+            # index-ordered scan, turning an ANN lookup into a full scan plus sort.
+            # So: select the distance, leave the ORDER BY alone so the index scan is
+            # preserved, and impose the deterministic order on the returned rows
+            # below.
+            #
+            # What that fixes and what it does not: the dense *ranking* becomes a
+            # function of the data. Membership at the LIMIT boundary is still the
+            # index's choice, so a tied row can still fall outside `candidate_k` —
+            # a weaker guarantee than the lexical channel gets. That is the right
+            # place to stop, because HNSW is an *approximate* index whose recall is
+            # already not exact (the open question in vector-search-at-scale#71).
+            # Making dense membership exact is a different problem from making it
+            # deterministic.
+            #
+            # (`qvec` is computed at the top of this method, before the lexical
+            # channel — see the note there.)
+            dense_sql = """
+            SELECT external_id, text, metadata, embedding <=> %s::vector AS dist
+            FROM documents
+            ORDER BY embedding <=> %s::vector
+            LIMIT %s
+            """
+            with self.conn.cursor() as cur:
+                cur.execute(dense_sql, (qvec, qvec, candidate_k))
+                dense_raw = cur.fetchall()
         # Sort on (distance, external_id): distance first so the channel's
         # ranking semantics are untouched, `external_id` only to settle exact
         # ties. Python's sort is stable, so rows the database already separated
