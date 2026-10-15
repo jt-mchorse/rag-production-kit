@@ -3758,3 +3758,22 @@ context_for_next_session:
   - HERE_THE_REPO_NAME_EQUALS_THE_DIST_NAME_so_the_lock_cuts_the_args_at_from_or_in_before_matching_otherwise_from_the_rag_production_kit_checkout_trips_it
 followups: []
 ---
+
+---
+session: 2026-10-15T07:19Z
+duration_min: 12   # approx: plan comment -> PR
+issue: 342
+branch: session/2026-10-15-0719-issue-342
+focus: PRICETABLE_CONSTRUCTOR_COPIED_ITS_MAPPING_UNCHECKED_A_JSON_LOADED_TABLE_BUILT_AND_FAILED_ON_THE_FIRST_REQUEST_AS_ATTRIBUTEERROR_ADD_VALIDATES_THE_SAME_ENTRY
+phase: shipped
+delta:
+  files_changed: 2
+  tests_added: 11
+  suite: "2423 passed, 2 skipped (not pg, rebased on 8bfb422); ruff check + format clean"
+decisions_made: []
+measured: "main e2f79e0: PriceTable({'m': (5.0, 25.0)}) / dict-of-rates / 5.0 -> built, known_models() lists 'm', cost() AttributeError naming no model. Revert: 6 of 11 new red (5 non-ModelPrice values + int key); 5 controls green (None, empty, two-model README table, pairs, add())."
+context_for_next_session:
+  - A_WRITE_SEAM_THAT_VALIDATES_THROUGH_A_CONSTRUCTOR_LEAVES_ITS_BULK_TWIN_UNCHECKED_add_built_ModelPrice_init_copied_the_dict
+  - PRICE_SWEEP_AFTER_341_ONLY_README_AND_THE_PRICETABLE_DOCSTRING_CARRY_PRICES_model_ids_opus_4_7_and_sonnet_4_6_are_current
+followups: []
+---

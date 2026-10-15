@@ -3443,3 +3443,12 @@ command fails, and anyone could register the name later. They now say
 if any tracked file tells the reader to install this project's name from an
 index. Tonight the same mistake was fixed in llm-eval-harness and
 vector-search-at-scale, where the name on PyPI already belongs to someone else.
+
+## 2026-10-15 — A price table checks its entries when it is built (#342)
+
+`PriceTable.add()` refused a bad price straight away, but building a table from
+a dict, as the README shows, accepted anything. A table loaded from a JSON
+config file, where a price is a list like `[5.0, 25.0]` or a plain dict, was
+created without complaint and then crashed on the first request with an error
+that did not say which model was wrong. The constructor now checks every entry
+and refuses anything that isn't a `ModelPrice`, naming the model.
