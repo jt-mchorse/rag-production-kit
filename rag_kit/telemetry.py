@@ -110,6 +110,20 @@ class PriceTable:
 
     def __init__(self, prices: Mapping[str, ModelPrice] | None = None) -> None:
         self._prices: dict[str, ModelPrice] = dict(prices or {})
+        # Each entry is checked here, as `add()` checks its own by building the
+        # `ModelPrice` (#342). The mapping used to be copied as given, so a table
+        # loaded from config (`{"m": [5.0, 25.0]}`, or a dict of the two rates)
+        # built fine and failed on the first request, inside `CostRecord.build`,
+        # as an AttributeError naming neither the model nor the field. A key
+        # that is not a `str` can never match a model id, so it is refused too.
+        for model, entry in self._prices.items():
+            if not isinstance(model, str):
+                raise ValueError(f"price table model ids must be str; got {model!r}")
+            if not isinstance(entry, ModelPrice):
+                raise ValueError(
+                    f"price for model {model!r} must be a ModelPrice; "
+                    f"got {type(entry).__name__} {entry!r}"
+                )
 
     def add(self, model: str, prompt_per_million: float, completion_per_million: float) -> None:
         self._prices[model] = ModelPrice(prompt_per_million, completion_per_million)
