@@ -3796,3 +3796,23 @@ context_for_next_session:
   - SCOPED_IPV6_fe80_1_PERCENT_lo0_IS_PINNED_UNENCODED_BY_THE_291_TEST_RFC_6874_WANTS_PERCENT25_not_touched
 followups: []
 ---
+
+---
+session: 2026-10-15T08:00Z
+issue: 346
+branch: session/2026-10-15-0800-issue-346
+focus: RETRIEVER_SEARCH_LEFT_THE_CONNECTION_IDLE_IN_TRANSACTION_SO_A_SECOND_CONNECTIONS_TRUNCATE_WAITED_FOREVER_AND_ONE_SERVER_ERROR_POISONED_EVERY_LATER_SEARCH
+phase: shipped
+delta:
+  files_changed: 2
+  tests_added: 6
+  suite: "pytest not-pg 2414 passed, 2 skipped; pg 16 passed (local PG 17.6, stub vector domain: no pgvector on this host); ruff check + format clean"
+decisions_made: []
+measured: "main 8bfb422 on PG 17.6: after search() conn status INTRANS; second connection Indexer.clear() -> LockNotAvailable under lock_timeout 3s (waits forever without it); 20,000-word query -> StatementTooComplex, next search -> InFailedSqlTransaction. Fixed: IDLE, clear ok, next search works, caller's open transaction survives as a SAVEPOINT. Revert: 5 of 6 new red; cursor-only-fake control green."
+context_for_next_session:
+  - THE_KIT_COMMITS_ITS_OWN_WRITES_IN_Indexer_BUT_NEVER_ENDED_ITS_READS_db_connect_LEAVES_AUTOCOMMIT_OFF
+  - DUCK_TYPED_FAKES_ACROSS_THE_SUITE_HAVE_ONLY_cursor_so_the_scope_falls_back_to_nullcontext
+  - NOT_FIXED_a_NUL_or_lone_surrogate_QUERY_raises_psycopg_DataError_or_UnicodeEncodeError_client_side_after_the_embed_no_longer_poisons_the_connection
+  - LOCAL_PG_17_HAS_NO_PGVECTOR_a_DOMAIN_vector_AS_text_plus_a_stub_lt_eq_gt_OPERATOR_runs_the_pg_suite_with_init_sql_swapped_and_restored
+followups: []
+---

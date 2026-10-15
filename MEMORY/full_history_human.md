@@ -3461,3 +3461,16 @@ and browsers refuse that URL. The dashboard now prints the address it actually
 bound, `http://0.0.0.0:8766/`, the same as Python's own `http.server` and the
 same as `--host 0.0.0.0`. The fix for #291 had noted this and set it aside
 without opening an issue for it.
+
+## 2026-10-15 — a search no longer leaves its connection mid-transaction (#346)
+
+`Retriever.search` ran its two queries on the caller's connection and never
+finished the transaction they started (`rag_kit.db.connect()` has autocommit
+off). After the first search the connection held a lock on `documents`. A
+re-index on a second connection (`Indexer.clear()`) then waited forever. And
+once one query failed on the server (a 20,000-word query is enough), every
+later search on that connection failed too, until the caller rolled back by
+hand. The two queries now run inside `conn.transaction()`. On an idle
+connection that is a short transaction that ends with the search. Inside a
+transaction the caller already has open, it is a savepoint, so the caller's
+work is neither committed nor aborted by a search.
