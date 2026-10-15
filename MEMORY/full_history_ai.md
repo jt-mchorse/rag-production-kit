@@ -3777,3 +3777,22 @@ context_for_next_session:
   - PRICE_SWEEP_AFTER_341_ONLY_README_AND_THE_PRICETABLE_DOCSTRING_CARRY_PRICES_model_ids_opus_4_7_and_sonnet_4_6_are_current
 followups: []
 ---
+
+---
+session: 2026-10-15T07:38Z
+issue: 344
+branch: session/2026-10-15-0738-issue-344
+focus: DASHBOARD_BANNER_FOR_HOST_EMPTY_STRING_PRINTED_http_COLON_PORT_WITH_NO_HOST_291_DEFERRED_IT_IN_ITS_PLAN_AND_NEVER_FILED
+phase: shipped
+delta:
+  files_changed: 2
+  tests_added: 2
+  suite: "pytest -m 'not pg' 2414 passed, 2 skipped; ruff check + format clean"
+decisions_made: []
+measured: "main 8bfb422: --host '' --port 0 -> 'serving http://:56497/'; curl 'No host part in the URL', WHATWG new URL() ERR_INVALID_URL (urllib alone accepts it). Revert probe: 2 of 2 new tests red."
+context_for_next_session:
+  - THE_BANNER_HAS_THREE_PARTS_268_FIXED_THE_PORT_291_THE_IPV6_BRACKETS_THIS_THE_EMPTY_HOST_now_reads_server_address_0_only_when_host_is_blank_so_localhost_stays_localhost
+  - URLLIB_OPENS_http_COLON_PORT_SO_A_PYTHON_ONLY_FOLLOW_THE_BANNER_TEST_CANNOT_SEE_IT_assert_urlsplit_hostname
+  - SCOPED_IPV6_fe80_1_PERCENT_lo0_IS_PINNED_UNENCODED_BY_THE_291_TEST_RFC_6874_WANTS_PERCENT25_not_touched
+followups: []
+---

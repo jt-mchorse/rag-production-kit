@@ -3452,3 +3452,12 @@ config file, where a price is a list like `[5.0, 25.0]` or a plain dict, was
 created without complaint and then crashed on the first request with an error
 that did not say which model was wrong. The constructor now checks every entry
 and refuses anything that isn't a `ModelPrice`, naming the model.
+
+## 2026-10-15 — the dashboard banner names a host for `--host ""` (#344)
+
+Starting the telemetry dashboard with `--host ""` listens on every interface,
+but the line it printed was `serving http://:8766/`, which has no host. curl
+and browsers refuse that URL. The dashboard now prints the address it actually
+bound, `http://0.0.0.0:8766/`, the same as Python's own `http.server` and the
+same as `--host 0.0.0.0`. The fix for #291 had noted this and set it aside
+without opening an issue for it.
