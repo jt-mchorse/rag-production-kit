@@ -8,7 +8,8 @@ the FTS configuration colocated with the schema.
 from __future__ import annotations
 
 import json
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable, Iterator, Sequence
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -143,6 +144,42 @@ def _require_storable_tree(value: Any, where: str) -> None:
             _require_storable_tree(item, f"{where}[{i}]")
 
 
+@contextmanager
+def _write_scope(conn: Any) -> Iterator[None]:
+    """The transaction scope an indexer write runs in (#348).
+
+    The writes used to run bare and then call ``conn.commit()``. That broke in
+    two ways. psycopg forbids ``commit()`` inside a ``conn.transaction()``
+    block, so the wrapping ``add_documents`` documents raised
+    ``ProgrammingError`` and the block rolled the write back. And nothing
+    rolled back a failed statement, so one server error (a tsvector over
+    1 MiB, a ``lock_timeout``) left the connection ``INERROR``: every later
+    write and search on it failed with ``InFailedSqlTransaction``.
+
+    ``conn.transaction()`` is ``BEGIN ... COMMIT`` on an idle connection and
+    a ``SAVEPOINT`` inside a transaction the caller already has open. Either
+    way it is rolled back on error, so only the failed write is undone and
+    the connection stays usable. After a successful write the connection is
+    committed as before, so a transaction the caller left open implicitly
+    is still committed. The one exception is a ``transaction()`` block the
+    caller is inside: that commit is the caller's. psycopg tracks the block
+    depth only in ``_num_transactions``, the counter its own ``commit()``
+    guard reads.
+
+    A duck-typed connection that only offers ``cursor()`` and ``commit()``
+    (the unit-test fakes) keeps the old cursor-then-commit path.
+    """
+    transaction = getattr(conn, "transaction", None)
+    if not callable(transaction):
+        yield
+        conn.commit()
+        return
+    with transaction():
+        yield
+    if not getattr(conn, "_num_transactions", 0):
+        conn.commit()
+
+
 class Indexer:
     """Writes documents to the corpus table.
 
@@ -158,9 +195,11 @@ class Indexer:
         """Insert (or upsert by external_id) the given documents.
 
         Returns the number of rows written. Embeddings are computed in the
-        caller's process — batching is the embedder's concern. Each row
-        commits inside one transaction; the caller can wrap the call in
-        ``with conn.transaction(): ...`` for stricter atomicity.
+        caller's process — batching is the embedder's concern. The batch is
+        written in one transaction and committed. Inside a
+        ``with conn.transaction(): ...`` block the batch is a savepoint
+        instead, and the caller's block commits it. A failed batch is rolled
+        back and leaves the connection usable (#348).
         """
         docs_list: Sequence[Document] = list(docs)
         if not docs_list:
@@ -186,13 +225,11 @@ class Indexer:
                 embedding = EXCLUDED.embedding,
                 metadata = EXCLUDED.metadata
         """
-        with self.conn.cursor() as cur:
+        with _write_scope(self.conn), self.conn.cursor() as cur:
             cur.executemany(sql, rows)
-        self.conn.commit()
         return len(rows)
 
     def clear(self) -> None:
         """Truncate the corpus. Useful in test setup; never call in prod."""
-        with self.conn.cursor() as cur:
+        with _write_scope(self.conn), self.conn.cursor() as cur:
             cur.execute("TRUNCATE TABLE documents RESTART IDENTITY")
-        self.conn.commit()
