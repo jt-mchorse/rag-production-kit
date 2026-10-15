@@ -3474,3 +3474,18 @@ hand. The two queries now run inside `conn.transaction()`. On an idle
 connection that is a short transaction that ends with the search. Inside a
 transaction the caller already has open, it is a savepoint, so the caller's
 work is neither committed nor aborted by a search.
+
+## 2026-10-15 — the indexer joins the caller's transaction and survives its own failure (#348)
+
+`Indexer.add_documents` told callers they could wrap it in
+`with conn.transaction():` to make it atomic. That never worked. The method
+always called `commit()`, psycopg forbids that inside a transaction block,
+and so the call raised and the block threw the rows away. `clear()` had the
+same problem. The indexer also never rolled back a failed write. A chunk too
+big for the full-text index, or a lock timeout during `clear()`, left the
+connection stuck in an aborted transaction, and every later write or search
+on it failed. This is the write-side twin of the search fix in #346. Both
+methods now run their statement inside `conn.transaction()`. Inside a
+caller's block that is a savepoint, which the caller's block commits.
+Otherwise the write commits as before. In both cases a failure undoes only
+the write, and the connection can still be used.

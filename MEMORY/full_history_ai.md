@@ -3765,6 +3765,13 @@ duration_min: 12   # approx: plan comment -> PR
 issue: 342
 branch: session/2026-10-15-0719-issue-342
 focus: PRICETABLE_CONSTRUCTOR_COPIED_ITS_MAPPING_UNCHECKED_A_JSON_LOADED_TABLE_BUILT_AND_FAILED_ON_THE_FIRST_REQUEST_AS_ATTRIBUTEERROR_ADD_VALIDATES_THE_SAME_ENTRY
+---
+
+---
+session: 2026-10-15T08:12Z
+issue: 348
+branch: session/2026-10-15-0812-issue-348
+focus: INDEXER_COMMITTED_UNCONDITIONALLY_SO_ITS_OWN_DOCUMENTED_conn_transaction_WRAPPING_RAISED_AND_WROTE_NOTHING_AND_ONE_FAILED_WRITE_POISONED_THE_CONNECTION
 phase: shipped
 delta:
   files_changed: 2
@@ -3814,5 +3821,16 @@ context_for_next_session:
   - DUCK_TYPED_FAKES_ACROSS_THE_SUITE_HAVE_ONLY_cursor_so_the_scope_falls_back_to_nullcontext
   - NOT_FIXED_a_NUL_or_lone_surrogate_QUERY_raises_psycopg_DataError_or_UnicodeEncodeError_client_side_after_the_embed_no_longer_poisons_the_connection
   - LOCAL_PG_17_HAS_NO_PGVECTOR_a_DOMAIN_vector_AS_text_plus_a_stub_lt_eq_gt_OPERATOR_runs_the_pg_suite_with_init_sql_swapped_and_restored
+followups: []
+---
+
+---
+  suite: "pytest not-pg 2416 passed, 2 skipped; pg 19 passed (local PG 17.6, stub vector domain: no pgvector on this host); ruff check + format clean"
+decisions_made: []
+measured: "main 8bfb422 on PG 17.6: add_documents inside conn.transaction() -> ProgrammingError 'Explicit commit() forbidden within a Transaction context', 0 rows; clear() likewise; oversized-tsvector batch -> INERROR, next add_documents and search -> InFailedSqlTransaction; clear() under lock_timeout -> INERROR, retry -> InFailedSqlTransaction. Fixed: all succeed, connection IDLE after each failure. Revert: 10 of 11 new red (idle-connection commit control green)."
+context_for_next_session:
+  - SIBLING_OF_346_rag_kit_HAS_THREE_POSTGRES_SITES_search_add_documents_clear_TELEMETRY_IS_SQLITE_AND_THE_DASHBOARD_OPENS_A_FRESH_STORE_PER_REQUEST_SO_NO_STALE_SNAPSHOT
+  - _write_scope_COMMITS_AFTER_THE_SCOPE_UNLESS_INSIDE_A_CALLER_transaction_BLOCK_read_from_psycopg_private__num_transactions_SO_AN_IMPLICIT_CALLER_TRANSACTION_IS_STILL_COMMITTED_AS_BEFORE
+  - NOT_FIXED_TelemetryStore_record_after_an_IntegrityError_leaves_sqlite_in_transaction_holding_RESERVED_until_the_next_record_by_design_single_writer_and_readers_unaffected
 followups: []
 ---
