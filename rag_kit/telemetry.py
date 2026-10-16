@@ -95,6 +95,20 @@ class ModelPrice:
         return prompt_usd, completion_usd
 
 
+def _checked_model_id(model: object) -> str:
+    """A price table key, refused unless it is a ``str`` (#342, #350).
+
+    A key that is not a ``str`` can never match a model id. It was refused by
+    ``PriceTable(...)`` only, so ``add(None, ...)`` stored one, and a
+    ``CostRecord.build(model=None)`` priced against it reached
+    ``TelemetryStore.record`` as a raw ``IntegrityError`` on the NOT NULL
+    ``model`` column. Both entry points call this, so they cannot disagree.
+    """
+    if not isinstance(model, str):
+        raise ValueError(f"price table model ids must be str; got {model!r}")
+    return model
+
+
 class PriceTable:
     """Operator-supplied mapping of model id → :class:`ModelPrice`.
 
@@ -110,15 +124,14 @@ class PriceTable:
 
     def __init__(self, prices: Mapping[str, ModelPrice] | None = None) -> None:
         self._prices: dict[str, ModelPrice] = dict(prices or {})
-        # Each entry is checked here, as `add()` checks its own by building the
-        # `ModelPrice` (#342). The mapping used to be copied as given, so a table
-        # loaded from config (`{"m": [5.0, 25.0]}`, or a dict of the two rates)
-        # built fine and failed on the first request, inside `CostRecord.build`,
-        # as an AttributeError naming neither the model nor the field. A key
-        # that is not a `str` can never match a model id, so it is refused too.
+        # Each entry is checked here (#342). The mapping used to be copied as
+        # given, so a table loaded from config (`{"m": [5.0, 25.0]}`, or a dict
+        # of the two rates) built fine and failed on the first request, inside
+        # `CostRecord.build`, as an AttributeError naming neither the model nor
+        # the field. `add()` checks its price by building the `ModelPrice`, and
+        # its key through the same `_checked_model_id` as here (#350).
         for model, entry in self._prices.items():
-            if not isinstance(model, str):
-                raise ValueError(f"price table model ids must be str; got {model!r}")
+            _checked_model_id(model)
             if not isinstance(entry, ModelPrice):
                 raise ValueError(
                     f"price for model {model!r} must be a ModelPrice; "
@@ -126,7 +139,9 @@ class PriceTable:
                 )
 
     def add(self, model: str, prompt_per_million: float, completion_per_million: float) -> None:
-        self._prices[model] = ModelPrice(prompt_per_million, completion_per_million)
+        self._prices[_checked_model_id(model)] = ModelPrice(
+            prompt_per_million, completion_per_million
+        )
 
     def cost(self, model: str, prompt_tokens: int, completion_tokens: int) -> tuple[float, float]:
         """Return ``(prompt_usd, completion_usd)``. Raises ``UnknownModelError`` for unconfigured models."""
