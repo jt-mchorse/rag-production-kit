@@ -3515,3 +3515,12 @@ threshold=0.0000", which looks false because both numbers print as zero. The
 number formatter stopped widening as soon as the text differed. It now keeps
 widening until the two numbers differ, the same fix the eval harness got
 today.
+
+## 2026-10-16 — Truly tied documents rank by id in hybrid search (#358)
+
+Reciprocal rank fusion adds up fractions like 1/63 and 1/140. Two documents
+can have exactly equal totals from different rank positions, but the
+floating-point sums came out a hair apart, so the intended alphabetical tie-break
+never ran and the top result depended on rounding. Scores are now summed as
+exact fractions, equal totals print equal, and ties are broken by document id
+as designed. The committed evaluation results don't change.
