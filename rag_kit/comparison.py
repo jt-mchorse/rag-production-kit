@@ -95,7 +95,12 @@ def render_comparison(value: float, other: float, *, places: int) -> tuple[str, 
     # call straight to `repr` — silently ignoring the width it asked for.
     for width in range(places, max(places, COMPARISON_MAX_PLACES) + 1):
         rendered = (f"{value:.{width}f}", f"{other:.{width}f}")
-        if rendered[0] != rendered[1]:
+        # Distinct as NUMBERS, not as strings (#356). `-0.0000` and `0.0000`
+        # differ as strings and both read back as zero, so a refusal said
+        # "top_score=-0.0000 below threshold=0.0000", false as written.
+        # Rounding is monotone, so two distinct values can only fail to
+        # separate by reading back equal.
+        if float(rendered[0]) != float(rendered[1]):
             return rendered
     # Two distinct floats no fixed-point width in the budget separates. Not
     # only a subnormal-scale corner here: see the module docstring.
