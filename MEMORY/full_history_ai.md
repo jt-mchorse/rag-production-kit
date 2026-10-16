@@ -3834,3 +3834,21 @@ context_for_next_session:
   - NOT_FIXED_TelemetryStore_record_after_an_IntegrityError_leaves_sqlite_in_transaction_holding_RESERVED_until_the_next_record_by_design_single_writer_and_readers_unaffected
 followups: []
 ---
+
+---
+session: 2026-10-16T07:45Z
+issue: 350
+branch: session/2026-10-16-0731-issue-350
+focus: 342_COMMENT_SAID_THE_CONSTRUCTOR_CHECKS_AS_ADD_CHECKS_ITS_OWN_BUT_ADD_NEVER_CHECKED_ITS_KEY_add_None_REACHED_A_RAW_IntegrityError
+phase: shipped
+delta:
+  files_changed: 2
+  tests_added: 12
+  suite: "2444 passed, 1 skipped, 23 deselected; ruff + format clean"
+decisions_made: []
+measured: "main: ctor refuses None, add(None)/add(123) stored, build(model=None) priced, record -> IntegrityError. After: add refuses with the ctor's message; build(model=None) -> UnknownModelError. Revert 9 of 12 red; 3 green are str controls + bad-rate."
+context_for_next_session:
+  - A_PARITY_CLAIM_IN_A_COMMENT_AS_X_DOES_IS_A_TEST_CASE_RUN_X_342_LISTED_add_AS_A_GREEN_CONTROL_WITH_A_STR_KEY_ONLY
+  - SIBLING_NOT_FIXED_build_AND_record_DO_NOT_TYPE_CHECK_query_OR_retrieved_count_A_BYTES_QUERY_IS_STORED_AS_A_BLOB_AND_BLANKS_BOTH_DASHBOARD_ENDPOINTS
+followups: []
+---
