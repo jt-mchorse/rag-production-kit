@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import math
 import random
+from fractions import Fraction
 
 import pytest
 
@@ -162,7 +163,8 @@ def _fuse_with(strategy: str, rankings: dict[str, list[str]], k: int = DEFAULT_K
     `"shipped"` is kept alongside the neighbours so this helper is checked
     against the real module below rather than being a second, drifting copy.
     """
-    scores: dict[str, float] = {}
+    # Exact rational sums, as the module computes them since #358.
+    scores: dict[str, Fraction] = {}
     ranks: dict[str, dict[str, int]] = {}
     for method, ids in rankings.items():
         seen: set[str] = set()
@@ -180,11 +182,10 @@ def _fuse_with(strategy: str, rankings: dict[str, list[str]], k: int = DEFAULT_K
                 score_rank, recorded_rank = accepted, raw_rank
             else:  # pragma: no cover - guard against a typo in a parametrize id
                 raise AssertionError(strategy)
-            scores[doc_id] = scores.get(doc_id, 0.0) + 1.0 / (k + score_rank)
+            scores[doc_id] = scores.get(doc_id, Fraction(0)) + Fraction(1, k + score_rank)
             ranks.setdefault(doc_id, {})[method] = recorded_rank
-    fused = [(d, scores[d], ranks[d]) for d in scores]
-    fused.sort(key=lambda row: (-row[1], row[0]))
-    return tuple(fused)
+    order = sorted(scores, key=lambda d: (-scores[d], d))
+    return tuple((d, float(scores[d]), ranks[d]) for d in order)
 
 
 def test_the_local_reimplementation_agrees_with_the_module() -> None:

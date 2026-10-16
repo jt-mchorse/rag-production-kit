@@ -177,16 +177,21 @@ def test_every_permutation_of_the_caller_dict_fuses_identically(index: int) -> N
 
 @pytest.mark.parametrize("index", range(0, len(_CORPUS), 8))
 def test_the_float_score_is_the_correctly_rounded_exact_score(index: int) -> None:
-    """Stronger than order-independence, and the reason `fsum` was chosen.
+    """Stronger than order-independence.
 
     Sorting each doc's terms before a running sum would also be
     order-independent, and would still be *wrong* — a different float from the
     exact answer. This pins the value, so that neighbour cannot pass.
+
+    Since #358 the value is the rational score rounded once (`_exact_scores`),
+    not `fsum` of the already-rounded float terms (`_exactly_rounded_scores`,
+    #205's oracle): two docs whose rational scores are equal must print equal,
+    and only the rational sum guarantees that across different rank pairs.
     """
     rankings = _CORPUS[index]
-    expected = _exactly_rounded_scores(rankings)
+    expected = _exact_scores(rankings)
     for doc, score, _ in reciprocal_rank_fusion(rankings):
-        assert score == expected[doc], doc
+        assert score == float(expected[doc]), doc
 
 
 # --- the plausible neighbouring fix, built and run -------------------------
