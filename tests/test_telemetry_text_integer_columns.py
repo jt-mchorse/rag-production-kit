@@ -161,7 +161,7 @@ def test_the_dashboard_renders_what_record_accepts(tmp_path: Path) -> None:
     spec.loader.exec_module(dashboard)
     with TelemetryStore(tmp_path / "t.db") as store:
         for bad in (b"raw bytes query", None):
-            with pytest.raises(ValueError):
+            with pytest.raises(ValueError, match="^query must be a str"):
                 store.record(_bare(query=bad))
         store.record(_build(query="what is <b>rrf</b>?"))
         records = store.since(0.0)
