@@ -9,8 +9,8 @@ Fusion outperforms Condorcet and Individual Rank Learning Methods."
 
 from __future__ import annotations
 
-import math
 from collections.abc import Iterable, Mapping
+from fractions import Fraction
 
 from .io_utils import refuse_bare_string
 
@@ -44,7 +44,8 @@ def reciprocal_rank_fusion(
     if not isinstance(k, int) or isinstance(k, bool) or k <= 0:
         raise ValueError(f"k must be a positive integer, got {k!r}")
 
-    # Terms are collected per doc and summed once at the end with `math.fsum`,
+    # Terms are collected per doc and summed once at the end -- with `math.fsum`
+    # since #205, as exact `Fraction`s since #358 --
     # rather than accumulated with `+=` as they are produced (#205). Floating-
     # point addition is not associative, and a running `+=` sums each doc's
     # terms in `rankings` iteration order — the caller's dict insertion order.
@@ -97,7 +98,7 @@ def reciprocal_rank_fusion(
                 continue
             seen_in_method.add(doc_id)
             rank += 1
-            terms.setdefault(doc_id, []).append(1.0 / (k + rank))
+            terms.setdefault(doc_id, []).append(Fraction(1, k + rank))
             ranks.setdefault(doc_id, {})[method] = rank
 
     # RRF ties are common: 1/(k+rank) sums collide for any symmetric rank
@@ -121,6 +122,16 @@ def reciprocal_rank_fusion(
     # order and 0.57% changed the top-1 document, with no visible cause -- the
     # per-method ranks a consumer would inspect are identical in both runs.
     # After: 0 of 4000. (`tests/test_fusion_caller_order_independence.py`.)
-    fused = [(doc_id, math.fsum(term_list), ranks[doc_id]) for doc_id, term_list in terms.items()]
-    fused.sort(key=lambda row: (-row[1], row[0]))
-    return fused
+    #
+    # And exact, not just correctly rounded (#358). `fsum` rounds the exact sum
+    # of the *float* terms, each already rounded from `1/(k+rank)`, so it only
+    # equalises docs whose terms are the same multiset. Two docs with different
+    # ranks whose exact scores are equal -- 1/63 + 1/140 == 1/84 + 1/90 at k=60
+    # -- still landed a ULP apart and the doc-id tie-break never ran: over
+    # ranks 1-300, 134 of 519 groups of exact ties were split by rounding,
+    # changing the top-1. `k` and every rank are integers, so each term is an
+    # exact `Fraction`; the order is decided on the exact sum and the published
+    # score is that sum rounded once, so equal scores print equal.
+    exact = {doc_id: sum(term_list, Fraction(0)) for doc_id, term_list in terms.items()}
+    order = sorted(exact, key=lambda doc_id: (-exact[doc_id], doc_id))
+    return [(doc_id, float(exact[doc_id]), ranks[doc_id]) for doc_id in order]
