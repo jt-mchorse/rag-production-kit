@@ -3489,3 +3489,12 @@ methods now run their statement inside `conn.transaction()`. Inside a
 caller's block that is a savepoint, which the caller's block commits.
 Otherwise the write commits as before. In both cases a failure undoes only
 the write, and the connection can still be used.
+
+## 2026-10-16 — Telemetry windows refuse a date string instead of returning nothing (#354)
+
+The telemetry store already refused a non-numeric timestamp on the way in.
+When reading a window, though, passing the start time as a date string, a
+`datetime` or NaN quietly returned an empty window, and a JSON export written
+that way looked exactly like a day with no spending. Those inputs are now
+refused with an error naming the parameter. Infinite bounds still work and
+mean "everything" or "nothing".
