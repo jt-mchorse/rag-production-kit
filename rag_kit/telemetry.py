@@ -207,6 +207,33 @@ def _checked_floor(value: Any, name: str) -> float:
 #: `_SCHEMA_SQL` and fails if this list misses one.
 _NAN_CHECKED_REAL_FIELDS = ("prompt_usd", "completion_usd", "total_usd", "total_latency_ms")
 
+#: The `TEXT NOT NULL` and `INTEGER NOT NULL` columns (#352). #245 checked the
+#: REAL ones only, and SQLite type affinity is a preference, not a constraint:
+#: a `bytes` query was stored as a BLOB and came back out of `since()` as
+#: `bytes`, which took down both dashboard endpoints (`html.escape` and
+#: `json.dumps` both refuse it), and a `None` escaped `record` as a raw
+#: `sqlite3.IntegrityError`. `per_phase_json` is TEXT too, but `record` writes
+#: it itself with `json.dumps`, so it is never a caller's value.
+#: `tests/test_telemetry_text_integer_columns.py` derives both lists from
+#: `_SCHEMA_SQL`.
+_TEXT_CHECKED_FIELDS = ("query", "model")
+_INTEGER_CHECKED_FIELDS = ("retrieved_count", "prompt_tokens", "completion_tokens")
+
+
+def _checked_columns(values: Mapping[str, Any]) -> None:
+    """Refuse a TEXT column that is not a ``str`` and an INTEGER column that is
+    not a non-negative ``int`` (#352). Shared by ``build`` and ``record``, so the
+    checked path and the bare constructor are refused in the same words."""
+    for name in _TEXT_CHECKED_FIELDS:
+        value = values[name]
+        if not isinstance(value, str):
+            raise ValueError(f"{name} must be a str; got {type(value).__name__} {value!r}")
+    for name in _INTEGER_CHECKED_FIELDS:
+        value = values[name]
+        # bool is an int subclass; a stray True must not pose as a count.
+        if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+            raise ValueError(f"{name} must be a non-negative int; got {value!r}")
+
 
 @dataclass(frozen=True)
 class CostRecord:
@@ -326,6 +353,15 @@ class CostRecord:
         # constructor skips this method, and `ts`'s harm happens inside SQL, so
         # the store's write seam is the only other place it can be closed.
         ts_value = _checked_ts(ts if ts is not None else time.time())
+        _checked_columns(
+            {
+                "query": query,
+                "model": model,
+                "retrieved_count": retrieved_count,
+                "prompt_tokens": prompt_tokens,
+                "completion_tokens": completion_tokens,
+            }
+        )
         # Finiteness guard (#38): NaN latency propagates through percentile()
         # which sorts a list with NaN — Python's sort is stable but NaN
         # comparisons are all false, so the returned percentile is implementation-
@@ -429,8 +465,9 @@ class TelemetryStore:
     def record(self, rec: CostRecord) -> int:
         """Insert one record; return its assigned id.
 
-        Raises ``ValueError`` for a ``ts`` outside ``CostRecord.build``'s rule
-        or a NaN in any other ``REAL`` column (#245). ``build`` already refuses
+        Raises ``ValueError`` for a ``ts`` outside ``CostRecord.build``'s rule,
+        a NaN in any other ``REAL`` column (#245), or a ``TEXT``/``INTEGER``
+        column of the wrong type (#352). ``build`` already refuses
         both; the bare constructor is public (`rag_kit.__all__`) and validates
         neither, and ``ts`` cannot be guarded at a read boundary the way
         ``aggregate`` guards latency: ``since()`` filters and orders on it in
@@ -440,6 +477,9 @@ class TelemetryStore:
         reading rows already written.
         """
         _checked_ts(rec.ts)
+        _checked_columns(
+            {name: getattr(rec, name) for name in _TEXT_CHECKED_FIELDS + _INTEGER_CHECKED_FIELDS}
+        )
         for name in _NAN_CHECKED_REAL_FIELDS:
             value = getattr(rec, name)
             if isinstance(value, float) and math.isnan(value):
