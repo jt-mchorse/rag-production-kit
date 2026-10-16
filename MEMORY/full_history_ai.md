@@ -3834,3 +3834,21 @@ context_for_next_session:
   - NOT_FIXED_TelemetryStore_record_after_an_IntegrityError_leaves_sqlite_in_transaction_holding_RESERVED_until_the_next_record_by_design_single_writer_and_readers_unaffected
 followups: []
 ---
+
+---
+session: 2026-10-16T12:30Z
+issue: 356
+branch: session/2026-10-16-0853-issue-356
+focus: RENDER_COMPARISON_STOPPED_WHEN_STRINGS_DIFFERED_REFUSAL_READ_TOP_SCORE_MINUS_0_0000_BELOW_THRESHOLD_0_0000
+phase: shipped
+delta:
+  files_changed: 2
+  tests_added: 7
+  suite: "2439 passed, 1 skipped, 23 deselected; ruff + format clean"
+decisions_made: []
+measured: "reranker length_penalty 1e-5 -> -9.6875e-06; generate(threshold=0.0) refusal '-0.0000 below 0.0000' on main; distinct after. Revert 6 of 7 red."
+context_for_next_session:
+  - SAME_FIX_AS_LEH_388_the_two_repos_carry_separate_copies_of_render_comparison
+  - NOT_FIXED_rrf_fsum_ties_134_of_519_exact_tie_groups_separated_by_float_rounding_docs_claim_fsum_equalises_mathematical_ties
+followups: []
+---
