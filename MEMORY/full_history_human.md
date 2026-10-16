@@ -3489,3 +3489,12 @@ methods now run their statement inside `conn.transaction()`. Inside a
 caller's block that is a savepoint, which the caller's block commits.
 Otherwise the write commits as before. In both cases a failure undoes only
 the write, and the connection can still be used.
+
+## 2026-10-16 — Truly tied documents rank by id in hybrid search (#358)
+
+Reciprocal rank fusion adds up fractions like 1/63 and 1/140. Two documents
+can have exactly equal totals from different rank positions, but the
+floating-point sums came out a hair apart, so the intended alphabetical tie-break
+never ran and the top result depended on rounding. Scores are now summed as
+exact fractions, equal totals print equal, and ties are broken by document id
+as designed. The committed evaluation results don't change.

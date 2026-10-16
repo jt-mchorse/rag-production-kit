@@ -3834,3 +3834,21 @@ context_for_next_session:
   - NOT_FIXED_TelemetryStore_record_after_an_IntegrityError_leaves_sqlite_in_transaction_holding_RESERVED_until_the_next_record_by_design_single_writer_and_readers_unaffected
 followups: []
 ---
+
+---
+session: 2026-10-16T13:20Z
+issue: 358
+branch: session/2026-10-16-0909-issue-358
+focus: FSUM_ROUNDED_THE_SUM_OF_ALREADY_ROUNDED_RRF_TERMS_SO_DOCS_EXACTLY_TIED_THROUGH_DIFFERENT_RANKS_LANDED_A_ULP_APART_AND_THE_TIE_BREAK_NEVER_RAN
+phase: shipped
+delta:
+  files_changed: 5
+  tests_added: 3
+  suite: "2435 passed, 1 skipped, 23 deselected; ruff + format clean; eval regen unchanged"
+decisions_made: []
+measured: "k=60 a(3,80) b(24,30) exactly tied: b ...017 over a ...014 on main; equal, a first after. Brute force 102 tie pairs ranks<=150 all equal + doc-id ordered. Revert: 2 new + 24 updated oracle arms red."
+context_for_next_session:
+  - CORRECTLY_ROUNDED_SUM_OF_ROUNDED_TERMS_IS_NOT_THE_ROUNDED_EXACT_SUM_when_terms_are_rationals_sum_Fractions
+  - A_TIE_BREAK_ONLY_RUNS_ON_EXACT_EQUALITY_memory_lens_held_again
+followups: []
+---
