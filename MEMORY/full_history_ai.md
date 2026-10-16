@@ -3852,3 +3852,21 @@ context_for_next_session:
   - SIBLING_NOT_FIXED_build_AND_record_DO_NOT_TYPE_CHECK_query_OR_retrieved_count_A_BYTES_QUERY_IS_STORED_AS_A_BLOB_AND_BLANKS_BOTH_DASHBOARD_ENDPOINTS
 followups: []
 ---
+
+---
+session: 2026-10-16T09:45Z
+issue: 354
+branch: session/2026-10-16-0818-issue-354
+focus: 184S_TS_RULE_NEVER_REACHED_THE_READ_SIDE_A_STR_DATETIME_OR_NAN_FLOOR_RETURNED_A_SILENT_EMPTY_WINDOW
+phase: shipped
+delta:
+  files_changed: 2
+  tests_added: 18
+  suite: "2432 -> 2450 passed; ruff + format clean"
+decisions_made: []
+measured: "main: since('2020-01-01') 0, since(datetime) 0, since(nan) 0, since(True) 3; dump since_ts str -> n 0. After: ValueError naming the param. Revert 16 of 18 red."
+context_for_next_session:
+  - A_WRITE_SIDE_TYPE_RULE_HAS_A_READ_SIDE_OPERAND_the_floor_is_the_same_kind_of_value_as_ts_BUT_INFINITY_MEANS_SOMETHING_THERE
+  - NOT_FIXED_streaming_generating_phase_includes_consumer_time_DESIGN_QUESTION_not_filed
+followups: []
+---

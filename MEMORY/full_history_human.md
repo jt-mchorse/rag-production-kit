@@ -3497,3 +3497,12 @@ text, and its comment said `add()` already did the same. It didn't, so a table
 built with `add(None, ...)` stored a `None` model, and a cost record priced
 against it failed later with a raw database error. Both paths now go through
 one check.
+
+## 2026-10-16 — Telemetry windows refuse a date string instead of returning nothing (#354)
+
+The telemetry store already refused a non-numeric timestamp on the way in.
+When reading a window, though, passing the start time as a date string, a
+`datetime` or NaN quietly returned an empty window, and a JSON export written
+that way looked exactly like a day with no spending. Those inputs are now
+refused with an error naming the parameter. Infinite bounds still work and
+mean "everything" or "nothing".
