@@ -102,8 +102,8 @@ that needs ranked candidates — rerank, generation, eval — reads from
   The fused list is a function of the data and not of how the caller
   assembled it, which takes **two** mechanisms and not one (#69, #205).
   The doc-id tie-break (#69) settles docs whose scores compare equal;
-  `math.fsum` is what makes two *mathematically* tied docs compare
-  equal in the first place. Floating-point addition is not
+  exact rational sums are what make two *mathematically* tied docs
+  compare equal in the first place. Floating-point addition is not
   associative, so a running `+=` summed each doc's terms in `rankings`
   iteration order — the caller's dict insertion order — and two docs
   carrying the same multiset of `1/(k+rank)` terms landed up to an ULP
@@ -112,11 +112,16 @@ that needs ranked candidates — rerank, generation, eval — reads from
   separated them. Measured over 4000 random rankings against every
   permutation of the caller's method dict: 0.75% fused into a
   different order and 0.57% changed the top-1 document; 0 of 4000
-  after. `fsum` returns the correctly-rounded value of the exact sum,
-  so a score depends on the multiset of terms and not their order —
-  which is strictly stronger than sorting the terms before a running
-  sum, the order-independent-but-wrong-valued neighbour
-  `tests/test_fusion_caller_order_independence.py` builds and runs.
+  after `math.fsum` (#205). `fsum` was not the whole answer: it rounds
+  the exact sum of the *float* terms, each already rounded, so it only
+  equalised identical term multisets, and two docs tied through
+  *different* ranks (`1/63 + 1/140 == 1/84 + 1/90` at k=60) still
+  landed a ULP apart — 134 of 519 such tie groups over ranks 1–300.
+  Since #358 each term is the exact `Fraction(1, k + rank)` (`k` and
+  every rank are integers), the order is decided on the exact sum, and
+  the published score is that sum rounded once, so equal scores print
+  equal. `tests/test_fusion_caller_order_independence.py` and
+  `tests/test_fusion_exact_ties.py` pin both halves.
 
 ---
 
