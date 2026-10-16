@@ -3489,3 +3489,13 @@ methods now run their statement inside `conn.transaction()`. Inside a
 caller's block that is a savepoint, which the caller's block commits.
 Otherwise the write commits as before. In both cases a failure undoes only
 the write, and the connection can still be used.
+
+## 2026-10-16 — A bad text or count field can no longer take the telemetry dashboard down (#352)
+
+The telemetry store checked timestamps and money and latency columns, but not
+the query text, the model name, or the counts. SQLite stores whatever it is
+given, so a query passed as bytes was saved as a binary blob, and both
+dashboard pages then crashed on that row and returned nothing. A missing count
+failed with a raw database error. Both the record builder and the store now
+refuse a wrong type with an error naming the field. Rows already saved still
+load, so an existing database keeps working.
