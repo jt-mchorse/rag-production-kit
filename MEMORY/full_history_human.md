@@ -3506,3 +3506,12 @@ When reading a window, though, passing the start time as a date string, a
 that way looked exactly like a day with no spending. Those inputs are now
 refused with an error naming the parameter. Infinite bounds still work and
 mean "everything" or "nothing".
+
+## 2026-10-16 — A refusal never says "-0.0000 below 0.0000" (#356)
+
+When the generator refused because the best score was just below a threshold
+of zero, its explanation could read "top_score=-0.0000 below
+threshold=0.0000", which looks false because both numbers print as zero. The
+number formatter stopped widening as soon as the text differed. It now keeps
+widening until the two numbers differ, the same fix the eval harness got
+today.
