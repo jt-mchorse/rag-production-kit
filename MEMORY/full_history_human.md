@@ -3489,3 +3489,11 @@ methods now run their statement inside `conn.transaction()`. Inside a
 caller's block that is a savepoint, which the caller's block commits.
 Otherwise the write commits as before. In both cases a failure undoes only
 the write, and the connection can still be used.
+
+## 2026-10-16 — Both ways of building a price table accept the same model ids (#350)
+
+Yesterday's #342 made the price-table constructor refuse a model id that isn't
+text, and its comment said `add()` already did the same. It didn't, so a table
+built with `add(None, ...)` stored a `None` model, and a cost record priced
+against it failed later with a raw database error. Both paths now go through
+one check.
