@@ -163,17 +163,41 @@ class PriceTable:
 # ----------------------------------------------------------------------
 
 
-def _checked_ts(ts_value: Any) -> float:
-    """``ts`` as ``build`` and ``TelemetryStore.record`` both require it (#184, #245)."""
+def _checked_ts(ts_value: Any, name: str = "ts") -> float:
+    """``ts`` as ``build`` and ``TelemetryStore.record`` both require it (#184, #245).
+
+    Also ``last_24h``'s ``now`` (#354), which is the same kind of value.
+    """
     if isinstance(ts_value, bool) or not isinstance(ts_value, (int, float)):
         raise ValueError(
-            f"ts must be a finite number of seconds since the Unix epoch (UTC); got {ts_value!r}"
+            f"{name} must be a finite number of seconds since the Unix epoch (UTC); "
+            f"got {ts_value!r}"
         )
     if not math.isfinite(ts_value):
         raise ValueError(
-            f"ts must be a finite number of seconds since the Unix epoch (UTC); got {ts_value}"
+            f"{name} must be a finite number of seconds since the Unix epoch (UTC); got {ts_value}"
         )
     return ts_value
+
+
+def _checked_floor(value: Any, name: str) -> float:
+    """A window floor for ``since`` / ``dump_aggregate_json`` (#354).
+
+    #184's reason for ``ts`` applies to the read-side operand too: an ISO-8601
+    string, a ``datetime`` or NaN was bound into ``WHERE ts >= ?``, where SQLite
+    sorts every REAL below every TEXT and binds NaN as NULL, so each came back as
+    a well-formed EMPTY window -- a zero-spend aggregate, indistinguishable from
+    a quiet day. ``True`` read as 1970. Unlike a stored ``ts``, an infinite
+    floor means what it says (``-inf`` everything, ``inf`` nothing), so it is
+    allowed; NaN is not a floor at all.
+    """
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise ValueError(
+            f"{name} must be a number of seconds since the Unix epoch (UTC); got {value!r}"
+        )
+    if math.isnan(value):
+        raise ValueError(f"{name} must not be NaN; it matches no row, so the window is empty")
+    return value
 
 
 #: The `REAL NOT NULL` columns other than `ts`, which `record` checks for NaN
@@ -448,7 +472,12 @@ class TelemetryStore:
         return int(cur.lastrowid or 0)
 
     def since(self, ts_floor: float) -> list[CostRecord]:
-        """Return all records with ``ts >= ts_floor`` in chronological order."""
+        """Return all records with ``ts >= ts_floor`` in chronological order.
+
+        Raises ``ValueError`` for a floor that is not a real number or is NaN
+        (#354); ``-inf`` and ``inf`` are accepted.
+        """
+        _checked_floor(ts_floor, "ts_floor")
         cur = self._conn.execute(
             """
             SELECT ts, query, model, retrieved_count, prompt_tokens, completion_tokens,
@@ -485,7 +514,7 @@ class TelemetryStore:
         return out
 
     def last_24h(self, now: float | None = None) -> list[CostRecord]:
-        cutoff = (now if now is not None else time.time()) - 24 * 3600
+        cutoff = (_checked_ts(now, "now") if now is not None else time.time()) - 24 * 3600
         return self.since(cutoff)
 
     def dump_aggregate_json(self, path: str | Path, *, since_ts: float | None = None) -> None:
@@ -511,7 +540,11 @@ class TelemetryStore:
         ``dump_stats_json`` so one log-parsing config consumes all
         portfolio observability artifacts.
         """
-        floor = since_ts if since_ts is not None else (time.time() - 24 * 3600)
+        floor = (
+            _checked_floor(since_ts, "since_ts")
+            if since_ts is not None
+            else (time.time() - 24 * 3600)
+        )
         records = self.since(floor)
         agg = aggregate(records)
         payload = json.dumps(agg.to_dict(), sort_keys=True, indent=2) + "\n"
