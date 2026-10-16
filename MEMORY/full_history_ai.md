@@ -3906,3 +3906,22 @@ context_for_next_session:
   - A_TIE_BREAK_ONLY_RUNS_ON_EXACT_EQUALITY_memory_lens_held_again
 followups: []
 ---
+
+---
+session: 2026-10-16T08:20Z
+issue: 352
+branch: session/2026-10-16-0743-issue-352
+focus: 245_CHECKED_THE_REAL_COLUMNS_ONLY_THE_TEXT_AND_INTEGER_COLUMNS_TOOK_ANYTHING_A_BYTES_QUERY_STORED_AS_A_BLOB_BLANKED_BOTH_DASHBOARD_ENDPOINTS
+phase: shipped
+delta:
+  files_changed: 3
+  tests_added: 28
+  suite: "2432 -> 2460 passed; ruff + format clean"
+decisions_made: []
+measured: "main: bytes query via build -> typeof blob, dashboard curl rc 52 both endpoints; retrieved_count=None -> IntegrityError. After: ValueError naming the field at build and record. Revert 25 of 28 red, 0 errors."
+context_for_next_session:
+  - MY_FIRST_REVERT_PROBE_WAS_1_ERROR_0_FAILED_the_test_module_read_the_new_constants_at_COLLECTION_spell_parametrize_lists_out_in_the_test_and_getattr_the_module_ones
+  - THE_LATENCY_DOMAIN_INVENTORY_LOCK_FIRED_on_the_new_non_negative_guard_as_designed_answered_in_a_comment
+  - DEFERRED_dashboard_outcome_guard_for_an_already_stored_blob_row
+followups: []
+---

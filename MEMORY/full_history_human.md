@@ -3524,3 +3524,13 @@ floating-point sums came out a hair apart, so the intended alphabetical tie-brea
 never ran and the top result depended on rounding. Scores are now summed as
 exact fractions, equal totals print equal, and ties are broken by document id
 as designed. The committed evaluation results don't change.
+
+## 2026-10-16 — A bad text or count field can no longer take the telemetry dashboard down (#352)
+
+The telemetry store checked timestamps and money and latency columns, but not
+the query text, the model name, or the counts. SQLite stores whatever it is
+given, so a query passed as bytes was saved as a binary blob, and both
+dashboard pages then crashed on that row and returned nothing. A missing count
+failed with a raw database error. Both the record builder and the store now
+refuse a wrong type with an error naming the field. Rows already saved still
+load, so an existing database keeps working.
