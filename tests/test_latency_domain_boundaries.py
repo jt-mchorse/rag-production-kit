@@ -428,6 +428,11 @@ def test_every_non_negative_guard_is_accounted_for() -> None:
         "streaming.record",
         "telemetry.build",
         "telemetry.cost",
+        # #352: the INTEGER columns at `build` and `record`. Its read boundary
+        # for the token counts is `telemetry.aggregate` below, which already
+        # refuses a negative count; `retrieved_count` is not aggregated or
+        # rendered as a number anywhere, so it has no read boundary to agree.
+        "telemetry._checked_columns",
         # read / metric boundaries (#213). `telemetry.aggregate` carries two
         # clauses -- latency and token counts -- and the second of those is the
         # site THIS LOCK FOUND: #213 opened with a hand-written list of three
