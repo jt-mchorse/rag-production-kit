@@ -3574,3 +3574,17 @@ got a raw `DataError` or `UnicodeEncodeError`. `search` now refuses such a
 query, and any such rewriter sub-query, with a `ValueError` that names the
 character and its index, before anything is called. It uses the same check
 #308 added for documents.
+
+## 2026-10-19 — The telemetry store checks the type of its cost and latency columns (#368)
+
+`TelemetryStore.record` checked the four cost/latency columns for NaN and
+nothing else. SQLite will store a string in a number column, so a record with
+`total_usd="0.03 USD"` was saved, and after that the HTML dashboard crashed on
+every request for as long as the row stayed in the 24-hour window. `None` or a
+`Decimal` failed with a raw database error, and `True` was saved as 1.0. The
+store now refuses anything that is not an int or float with a `ValueError`
+that names the column. Infinite and negative values are still saved, because
+the dashboard's read side handles them on purpose. The same check now also
+refuses a query or model name with a lone surrogate, which SQLite can't
+encode. It uses the surrogate scan the indexer already had. A NUL is still
+allowed, because SQLite stores it fine.

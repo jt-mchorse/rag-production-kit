@@ -3998,3 +3998,22 @@ context_for_next_session:
   - "THE_SHARED_venv311_rag_HAS_AN_EDITABLE_INSTALL_OF_ANOTHER_CLONE_scripts_outside_the_repo_need_PYTHONPATH"
 followups: []
 ---
+
+---
+session: 2026-10-19T08:13Z
+issue: 368
+branch: session/2026-10-19-0813-issue-368
+focus: RECORD_CHECKED_ONLY_NAN_IN_THE_REAL_COLUMNS_SO_A_STR_TOTAL_USD_WAS_STORED_BY_AFFINITY_AND_THE_HTML_DASHBOARD_RAISED_ON_EVERY_REQUEST_AND_A_LONE_SURROGATE_TEXT_ESCAPED_AS_UnicodeEncodeError
+phase: shipped
+delta:
+  files_changed: 4
+  tests_added: 48
+  suite: "2589 passed, 2 skipped, 23 deselected (py3.12); ruff check + format clean"
+decisions_made: []
+measured: "main 77cdd0e, bare CostRecord into record: total_usd='abc' stored typeof text then aggregate TypeError; total_usd=b'x' stored as blob; total_usd=None -> sqlite3.IntegrityError; Decimal -> sqlite3.ProgrammingError; prompt_usd=True stored as 1.0; HTML / raised TypeError with one such row in the window. build(query='caf'+chr(0xD800)) accepted, record -> UnicodeEncodeError. After: ValueError naming the field for all. Revert 27 of 48 new red; the 21 green are the int/0/-1/inf/0.03 still-stored controls and the NUL + astral round-trip control."
+context_for_next_session:
+  - "SURROGATE_SCAN_FACTORED_OUT_OF_indexer._unstorable_AS__lone_surrogate_TELEMETRY_DOES_NOT_REFUSE_NUL_BECAUSE_SQLITE_STORES_IT_INTACT"
+  - "NOT_FIXED_bare_record_per_phase_ms_values_unchecked_bytes_raw_TypeError_NaN_writes_an_invalid_JSON_token"
+  - "NOT_FIXED_an_int_REAL_value_above_2_to_the_63_still_escapes_record_as_OverflowError"
+followups: []
+---
