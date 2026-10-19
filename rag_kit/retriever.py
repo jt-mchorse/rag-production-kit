@@ -31,8 +31,28 @@ from typing import Any
 from .db import to_pgvector
 from .embedder import Embedder
 from .fusion import DEFAULT_K, reciprocal_rank_fusion
+from .indexer import _unstorable
 from .reranker import Candidate, Reranker
 from .rewriter import Rewriter
+
+
+def _require_sendable(text: str, where: str) -> None:
+    """Refuse a query Postgres cannot take as a text parameter (#366).
+
+    A NUL or a lone surrogate failed in psycopg's parameter adaptation as a
+    `DataError` / `UnicodeEncodeError` -- after the rewriter and the embedder
+    had already been paid for. The predicate is #308's, which refuses the same
+    characters in a `Document` before any embedding. A non-`str` is left to the
+    code that already handles it; this check is about characters, not types.
+    """
+    if not isinstance(text, str):
+        return
+    reason = _unstorable(text)
+    if reason is not None:
+        raise ValueError(
+            f"{where} contains {reason}, which Postgres cannot take as a text parameter"
+        )
+
 
 # How many candidates each channel pulls before fusion. Tuned to keep
 # fusion meaningful (RRF needs distinct ranks) without overfetching.
@@ -106,6 +126,9 @@ class Retriever:
             raise ValueError(f"k must be a positive integer, got {k!r}")
         if not query:
             raise ValueError("query must be non-empty")
+        # Before the rewriter and the embedder, both of which may be paid
+        # calls: this query cannot reach the lexical channel either way (#366).
+        _require_sendable(query, "query")
 
         if rewriter is None:
             return self._hybrid_search(query, k, reranker=reranker)
@@ -114,6 +137,10 @@ class Retriever:
         sub_queries = rewrite_result.sub_queries
         if not sub_queries:
             raise ValueError("rewriter returned empty sub_queries")
+        # All of them before the first is embedded: the multi-hop path embeds
+        # one sub-query at a time, so a bad second one cost the first (#366).
+        for idx, sq in enumerate(sub_queries):
+            _require_sendable(sq, f"rewriter sub_queries[{idx}]")
         if len(sub_queries) == 1:
             # Single-sub-query rewrites collapse to the existing single-shot path
             # using the (possibly normalized) rewritten query for *retrieval*, but
