@@ -475,3 +475,65 @@ def test_template_rewriter_compare_does_not_mangle_internal_decimal():
     out = TemplateRewriter().rewrite("Compare 3.5 with 4.0")
     assert out.reasoning == "compare_pattern"
     assert out.sub_queries == ("What is 3.5?", "What is 4.0?")
+
+
+# --- #364: a compare entity never spans a sentence boundary -----------------
+
+
+@pytest.mark.parametrize(
+    ("query", "expected", "reasoning"),
+    [
+        pytest.param(
+            "Compare BM25 with dense retrieval. Then explain which is faster.",
+            ("Compare BM25 with dense retrieval.", "explain which is faster."),
+            "sequential_then_pattern",
+            id="compare-dot-then",
+        ),
+        pytest.param(
+            "Compare BM25 with dense retrieval! Then explain which is faster.",
+            ("Compare BM25 with dense retrieval!", "explain which is faster."),
+            "sequential_then_pattern",
+            id="compare-bang-then",
+        ),
+        pytest.param(
+            "Compare Postgres to MySQL? Which one is cheaper to host?",
+            ("Compare Postgres to MySQL? Which one is cheaper to host?",),
+            "no_decomposition",
+            id="compare-question-then-question",
+        ),
+        pytest.param(
+            "Compare Postgres to MySQL？ Which one is cheaper to host?",
+            ("Compare Postgres to MySQL？ Which one is cheaper to host?",),
+            "no_decomposition",
+            id="compare-fullwidth-question",
+        ),
+        pytest.param(
+            "Compare Cohere with Mistral",
+            ("What is Cohere?", "What is Mistral?"),
+            "compare_pattern",
+            id="control-bench-query",
+        ),
+        pytest.param(
+            "Compare Cohere vs. Mistral",
+            ("What is Cohere?", "What is Mistral?"),
+            "compare_pattern",
+            id="control-vs-dot-separator",
+        ),
+        pytest.param(
+            "Compare St. Louis with Chicago",
+            ("What is St. Louis?", "What is Chicago?"),
+            "compare_pattern",
+            id="control-abbreviation",
+        ),
+        pytest.param(
+            "Compare Python 3.5 with Java 21!",
+            ("What is Python 3.5?", "What is Java 21?"),
+            "compare_pattern",
+            id="control-decimal-and-trailing-bang",
+        ),
+    ],
+)
+def test_template_rewriter_compare_entity_never_spans_a_sentence(query, expected, reasoning):
+    result = TemplateRewriter().rewrite(query)
+    assert result.sub_queries == expected
+    assert result.reasoning == reasoning

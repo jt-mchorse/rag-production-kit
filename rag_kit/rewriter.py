@@ -132,6 +132,13 @@ _ENDS_A_SENTENCE = re.compile(
 )
 
 
+# A sentence end followed by more text, for the compare entities (#364). Every
+# terminator except the ASCII `.`, which is ambiguous with an abbreviation.
+_HARD_SENTENCE_GAP = re.compile(
+    rf"[{re.escape(_SENTENCE_TERMINATORS.replace('.', ''))}][{re.escape(_SENTENCE_CLOSERS)}]*\s+\S"
+)
+
+
 def _then_parts(query: str) -> list[str]:
     """`query` split at every `then` that follows a sentence end (and its closers)."""
     parts: list[str] = []
@@ -263,9 +270,23 @@ def _split_compare(query: str) -> list[str] | None:
     match = _COMPARE_RE.match(query)
     if not match:
         return None
+    # An entity never spans a sentence boundary (#364). `_COMPARE_RE` is
+    # anchored `^...$` with a lazy `b`, and compare runs before the Then-split,
+    # so "Compare BM25 with dense retrieval. Then explain which is faster."
+    # became ('What is BM25?', 'What is dense retrieval. Then explain which is
+    # faster?') and the `Then` step was lost. Compare stays first for a single
+    # sentence; a query the Then-split decomposes goes to the Then-split.
+    if len(_then_parts(query)) > 1:
+        return None
     a = _norm(match.group("a"))
     b = _norm(match.group("b"))
     if not a or not b:
+        return None
+    # And an unambiguous sentence end inside an entity ("MySQL? Which one is
+    # cheaper to host") refuses the match too. A bare ASCII `.` is left out:
+    # it also ends abbreviations ("Compare St. Louis with Chicago"), and the
+    # `.`-then-`Then` case is the one the check above already handles.
+    if _HARD_SENTENCE_GAP.search(a) or _HARD_SENTENCE_GAP.search(b):
         return None
     # Synthesize independent sub-queries about each entity. We don't try
     # to invent an attribute axis — that's the rewriter's caller's job.
@@ -325,7 +346,9 @@ class TemplateRewriter:
 
     Patterns (in priority order):
 
-    1. `compare X with Y` / `compare X and Y` → `[What is X?, What is Y?]`.
+    1. `compare X with Y` / `compare X and Y` → `[What is X?, What is Y?]`,
+       on a single sentence: a query the Then-split decomposes goes to it,
+       and an entity never spans a `?`/`!`-style sentence end (#364).
     2. `A. Then B.` (sequential-step) → `[A, B]` with the leading "Then "
        stripped from B so each part is independently readable.
     3. `Who is X and where did Y work?` (multi-question conjunction) →
