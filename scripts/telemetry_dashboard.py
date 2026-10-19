@@ -28,6 +28,7 @@ import argparse
 import html
 import http.server
 import json
+import math
 import socket
 import sqlite3
 import sys
@@ -183,7 +184,14 @@ def _render_chart_svg(records: Sequence[CostRecord], width: int = 720, height: i
     # `1 - lat / lat_max` read inverted (#213). Floor at 0 first, then apply the
     # zero-replacement, so an all-negative window scales against 1.0 rather than
     # against a negative.
-    lat_max = max(max((r.total_latency_ms for r in records), default=1.0), 0.0) or 1.0
+    #
+    # Over the *finite* latencies only (#360). `TelemetryStore.record` refuses a
+    # NaN but stores `+inf`, and one `+inf` here made `lat_max = inf`: every real
+    # point became `1 - lat/inf` (flattened onto the 0 ms baseline), the `+inf`
+    # point became `inf/inf = NaN` (which the range clamp passes through, so the
+    # polyline carried a literal `nan`), and the axis label read `infms`.
+    finite = [r.total_latency_ms for r in records if math.isfinite(r.total_latency_ms)]
+    lat_max = max(max(finite, default=1.0), 0.0) or 1.0
     margin_l, margin_r, margin_t, margin_b = 40, 16, 16, 28
     plot_w = width - margin_l - margin_r
     plot_h = height - margin_t - margin_b
@@ -202,11 +210,10 @@ def _render_chart_svg(records: Sequence[CostRecord], width: int = 720, height: i
         # the `/json` payload, so the chart staying in bounds never becomes the
         # only account of what happened. That is #135's posture -- sanitize at
         # the presentation boundary -- applied to the other clause of the same
-        # sentence. A NaN is not reachable here (`math.isnan` comparisons are all
-        # False, so a clamp would pass it through); #135 already maps non-finite
-        # to `null` on the `/json` side and the axis-label path below renders it
-        # as text, which is why this function guards the *range* and not the
-        # *finiteness*.
+        # sentence. With `lat_max` finite (#360), a `+inf`/`-inf` latency clamps
+        # to the top/bottom edge here. A NaN would pass straight through (every
+        # comparison with NaN is False), so NaN points are dropped before
+        # plotting instead.
         return lo if value < lo else hi if value > hi else value
 
     def x(ts: float) -> float:
@@ -217,7 +224,14 @@ def _render_chart_svg(records: Sequence[CostRecord], width: int = 720, height: i
         raw = margin_t + plot_h * (1 - lat / lat_max)
         return _clamp(raw, float(margin_t), float(margin_t + plot_h))
 
-    points = " ".join(f"{x(r.ts):.1f},{y(r.total_latency_ms):.1f}" for r in records)
+    # A NaN latency (reachable on a directly-built record; `record()` refuses it)
+    # has no position on the axis, so it is skipped rather than emitted as `nan`
+    # (#360). The table row still shows the raw value.
+    points = " ".join(
+        f"{x(r.ts):.1f},{y(r.total_latency_ms):.1f}"
+        for r in records
+        if not math.isnan(r.total_latency_ms)
+    )
     # Axis labels: latency max, 0; time start, time end.
     return (
         f'<svg width="{width}" height="{height}" xmlns="http://www.w3.org/2000/svg" '

@@ -311,6 +311,12 @@ _CHART_CASES = [
     pytest.param([0.0, 0.0, 0.0], id="all-zero-falsy-lat-max"),
     pytest.param([-1.0], id="single-negative"),
     pytest.param([1e12, 1.0], id="huge-and-small"),
+    # #360: `TelemetryStore.record` refuses NaN but stores `+inf`; one `+inf`
+    # made `lat_max = inf` and put `inf/inf = nan` in the polyline.
+    pytest.param([120.0, math.inf, 95.0], id="pos-inf-among-real"),
+    pytest.param([120.0, -math.inf, 95.0], id="neg-inf-among-real"),
+    pytest.param([120.0, math.nan, 95.0], id="nan-among-real"),
+    pytest.param([math.inf, math.inf], id="all-pos-inf"),
 ]
 
 
@@ -373,6 +379,44 @@ def test_the_chart_clamp_does_not_flatten_a_real_window() -> None:
     assert len(ys) >= 5, f"a real window must not be flattened by the clamp; got {ys}"
 
 
+_NON_FINITE_AMONG_REAL = [
+    pytest.param(math.inf, id="pos-inf"),
+    pytest.param(-math.inf, id="neg-inf"),
+    pytest.param(math.nan, id="nan"),
+    pytest.param(150.0, id="control-finite"),
+]
+
+
+@pytest.mark.parametrize("odd", _NON_FINITE_AMONG_REAL)
+def test_a_non_finite_latency_neither_flattens_the_real_points_nor_emits_nan(odd: float) -> None:
+    """#360: the scale is taken over the finite latencies only.
+
+    One `+inf` among real points used to divide every real latency by `inf`, so
+    all of them landed on the 0 ms baseline, the odd point itself became `nan`,
+    and the axis label read `infms` -- while the "Summary unavailable" banner
+    told the reader the chart was unaffected.
+    """
+    reals = [90.0 + 3 * i for i in range(6)]
+    latencies = reals[:3] + [odd] + reals[3:]
+    records = [_rec(v, ts=1000.0 + i) for i, v in enumerate(latencies)]
+    svg = _render_chart_svg(records, width=_CHART_WIDTH, height=_CHART_HEIGHT)
+    points = _POINTS.search(svg).group(1)
+    assert "nan" not in points.lower(), points
+    assert "inf" not in points.lower(), points
+    ys = [float(p.split(",")[1]) for p in points.split()]
+    real_ys = {
+        y
+        for y, v in zip(ys, [v for v in latencies if not math.isnan(v)], strict=True)
+        if math.isfinite(v)
+    }
+    n_finite = sum(1 for v in latencies if math.isfinite(v))
+    assert len(real_ys) == n_finite, (
+        f"real points flattened by a non-finite scale: {sorted(real_ys)}"
+    )
+    labels = re.findall(r">([^<]*)ms</text>", svg)
+    assert all(math.isfinite(float(label)) for label in labels), labels
+
+
 def test_the_raw_value_is_still_reported_somewhere() -> None:
     """The clamp is geometry only.
 
@@ -387,6 +431,14 @@ def test_the_raw_value_is_still_reported_somewhere() -> None:
         "the unclamped latency must remain visible in the table, or the clamp "
         "becomes the only account of what happened"
     )
+
+
+def test_an_inf_latency_stays_raw_in_the_table() -> None:
+    """#360's chart fix is geometry only: the table row keeps `infms`."""
+    from scripts.telemetry_dashboard import _render_dashboard_html
+
+    page = _render_dashboard_html([_rec(120.0, ts=1000.0), _rec(math.inf, ts=1001.0)])
+    assert "<td>infms</td>" in page
 
 
 # --- the discovered-population lock -----------------------------------------
