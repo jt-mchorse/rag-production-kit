@@ -112,6 +112,38 @@ def test_build_and_record_refuse_it_in_the_same_words(
     assert str(via_build.value) == str(via_record.value)
 
 
+SURROGATES = {"high": "caf" + chr(0xD800), "low": chr(0xDFFF) + "x", "escaped-byte": chr(0xDC80)}
+
+
+@pytest.mark.parametrize("label", list(SURROGATES))
+@pytest.mark.parametrize("field", TEXT_FIELDS)
+def test_a_lone_surrogate_is_refused_by_build_and_record_alike(
+    tmp_path: Path, field: str, label: str
+) -> None:
+    """#368: build accepted it and record raised a raw UnicodeEncodeError
+    (SQLite binds text as UTF-8). Codepoints built with chr(), so the source
+    holds no literal surrogate."""
+    value = SURROGATES[label]
+    pattern = rf"^{field} must be a str SQLite can store; it contains a lone surrogate"
+    with pytest.raises(ValueError, match=pattern) as via_build:
+        _build(**{field: value})
+    with TelemetryStore(tmp_path / "t.db") as store:
+        with pytest.raises(ValueError, match=pattern) as via_record:
+            store.record(_bare(**{field: value}))
+        assert store.since(0.0) == []
+    assert str(via_build.value) == str(via_record.value)
+
+
+def test_a_nul_and_non_bmp_text_still_round_trip(tmp_path: Path) -> None:
+    """Control: SQLite stores a NUL and an astral character intact, so the
+    surrogate rule must not grow into the indexer's NUL rule."""
+    query = "a" + chr(0) + "b " + chr(0x1F600)
+    with TelemetryStore(tmp_path / "t.db") as store:
+        store.record(_bare(query=query))
+        (back,) = store.since(0.0)
+    assert back.query == query
+
+
 def test_a_bytes_query_never_reaches_the_database(tmp_path: Path) -> None:
     db = tmp_path / "t.db"
     with TelemetryStore(db) as store:

@@ -119,6 +119,13 @@ def _unstorable(text: str) -> str | None:
     """Why Postgres cannot store `text`, or None (#308)."""
     if "\x00" in text:
         return f"a NUL (\\x00) at index {text.index(chr(0))}"
+    return _lone_surrogate(text)
+
+
+def _lone_surrogate(text: str) -> str | None:
+    """Where `text` holds a lone surrogate, or None. UTF-8 cannot encode one,
+    so no text sink can store it; `telemetry` refuses it on the same scan
+    (#368)."""
     for i, ch in enumerate(text):
         if "\ud800" <= ch <= "\udfff":
             return f"a lone surrogate (U+{ord(ch):04X}) at index {i}"

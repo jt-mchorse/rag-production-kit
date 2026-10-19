@@ -18,9 +18,11 @@ in SQL, before any Python sees the row.
 
 from __future__ import annotations
 
+import importlib.util
 import math
 import re
 import sqlite3
+from decimal import Decimal
 from pathlib import Path
 from typing import Any
 
@@ -29,6 +31,7 @@ import pytest
 from rag_kit import CostRecord, TelemetryStore, telemetry
 from rag_kit.telemetry import ModelPrice, PriceTable
 
+ROOT = Path(__file__).resolve().parent.parent
 GOOD_TS = 1_700_000_000.0
 
 
@@ -137,6 +140,67 @@ def test_only_nan_is_refused_in_the_other_columns(tmp_path: Path, value: float) 
         store.record(_bare(total_latency_ms=value))
         (row,) = store.since(0.0)
         assert row.total_latency_ms == value
+
+
+# ----------------------------------------------------------------------
+# The REAL columns' type, not only their NaN (#368)
+# ----------------------------------------------------------------------
+
+# Spelled out rather than read from `telemetry`, so the population lock above
+# covers drift and these arms stay meaningful against any tree.
+REAL_FIELDS = ("prompt_usd", "completion_usd", "total_usd", "total_latency_ms")
+BAD_REAL = {
+    "str": "0.03 USD",
+    "bytes": b"\x00",
+    "none": None,
+    "decimal": Decimal("0.03"),
+    "bool": True,
+}
+
+
+@pytest.mark.parametrize("label", list(BAD_REAL))
+@pytest.mark.parametrize("field", REAL_FIELDS)
+def test_a_wrong_typed_real_column_is_a_value_error_naming_the_field(
+    tmp_path: Path, field: str, label: str
+) -> None:
+    """Measured on main: a str/bytes was stored (affinity is a preference),
+    True was stored as 1.0, None/Decimal escaped as raw sqlite3 errors."""
+    with TelemetryStore(tmp_path / "t.sqlite") as store:
+        with pytest.raises(ValueError, match=rf"^{field} must be a real number; got "):
+            store.record(_bare(**{field: BAD_REAL[label]}))
+        assert store.since(-1e300) == []
+
+
+@pytest.mark.parametrize("value", [3, 0, -1, math.inf, 0.03])
+@pytest.mark.parametrize("field", REAL_FIELDS)
+def test_every_real_number_is_still_stored(tmp_path: Path, field: str, value: float) -> None:
+    """Control: an int, a negative and an infinity are real numbers; `aggregate`
+    owns their meaning on read (#80, #213)."""
+    with TelemetryStore(tmp_path / "t.sqlite") as store:
+        store.record(_bare(**{field: value}))
+        (row,) = store.since(0.0)
+        assert getattr(row, field) == value
+
+
+def test_the_dashboard_renders_whatever_record_accepted(tmp_path: Path) -> None:
+    """The outcome the issue measured: a stored str `total_usd` raised a
+    TypeError in the HTML renderer on every request for the whole window."""
+    spec = importlib.util.spec_from_file_location(
+        "telemetry_dashboard", ROOT / "scripts" / "telemetry_dashboard.py"
+    )
+    assert spec is not None
+    assert spec.loader is not None
+    dashboard = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(dashboard)
+    with TelemetryStore(tmp_path / "t.sqlite") as store:
+        store.record(_bare())
+        for field, bad in (("total_usd", "0.03 USD"), ("total_latency_ms", "12ms")):
+            with pytest.raises(ValueError, match=f"^{field} must be a real number"):
+                store.record(_bare(**{field: bad}))
+        records = store.since(0.0)
+    assert len(records) == 1
+    assert "<html" in dashboard._render_dashboard_html(records).lower()
+    assert dashboard._json_response_body(records)
 
 
 # ----------------------------------------------------------------------

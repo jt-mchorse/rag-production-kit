@@ -29,6 +29,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from rag_kit.indexer import _lone_surrogate
 from rag_kit.io_utils import atomic_write_text
 
 # ----------------------------------------------------------------------
@@ -203,8 +204,11 @@ def _checked_floor(value: Any, name: str) -> float:
 #: The `REAL NOT NULL` columns other than `ts`, which `record` checks for NaN
 #: (#245). SQLite stores a NaN as NULL, so one of these reached the NOT NULL
 #: constraint and escaped `record` as a raw `sqlite3.IntegrityError` naming a
-#: column. `tests/test_telemetry_record_seam.py` derives the REAL columns from
-#: `_SCHEMA_SQL` and fails if this list misses one.
+#: column. Since #368 `record` checks their type too: affinity is a
+#: preference, so a str `total_usd` was stored as TEXT and the HTML dashboard
+#: then raised a TypeError on every request, and `None`/`Decimal` escaped as
+#: raw `IntegrityError`/`ProgrammingError`. `tests/test_telemetry_record_seam.py`
+#: derives the REAL columns from `_SCHEMA_SQL` and fails if this list misses one.
 _NAN_CHECKED_REAL_FIELDS = ("prompt_usd", "completion_usd", "total_usd", "total_latency_ms")
 
 #: The `TEXT NOT NULL` and `INTEGER NOT NULL` columns (#352). #245 checked the
@@ -223,11 +227,18 @@ _INTEGER_CHECKED_FIELDS = ("retrieved_count", "prompt_tokens", "completion_token
 def _checked_columns(values: Mapping[str, Any]) -> None:
     """Refuse a TEXT column that is not a ``str`` and an INTEGER column that is
     not a non-negative ``int`` (#352). Shared by ``build`` and ``record``, so the
-    checked path and the bare constructor are refused in the same words."""
+    checked path and the bare constructor are refused in the same words.
+
+    A ``str`` holding a lone surrogate is refused too (#368): SQLite binds text
+    as UTF-8, which cannot encode one, so it escaped ``record`` as a raw
+    ``UnicodeEncodeError``. A NUL is not refused -- SQLite stores it intact."""
     for name in _TEXT_CHECKED_FIELDS:
         value = values[name]
         if not isinstance(value, str):
             raise ValueError(f"{name} must be a str; got {type(value).__name__} {value!r}")
+        reason = _lone_surrogate(value)
+        if reason is not None:
+            raise ValueError(f"{name} must be a str SQLite can store; it contains {reason}")
     for name in _INTEGER_CHECKED_FIELDS:
         value = values[name]
         # bool is an int subclass; a stray True must not pose as a count.
@@ -466,9 +477,10 @@ class TelemetryStore:
         """Insert one record; return its assigned id.
 
         Raises ``ValueError`` for a ``ts`` outside ``CostRecord.build``'s rule,
-        a NaN in any other ``REAL`` column (#245), or a ``TEXT``/``INTEGER``
-        column of the wrong type (#352). ``build`` already refuses
-        both; the bare constructor is public (`rag_kit.__all__`) and validates
+        any other ``REAL`` column that is not a non-``bool`` ``int``/``float``
+        or is NaN (#245, #368), or a ``TEXT``/``INTEGER`` column of the wrong
+        type or a ``TEXT`` one holding a lone surrogate (#352, #368). ``build``
+        already refuses them; the bare constructor is public (`rag_kit.__all__`) and validates
         neither, and ``ts`` cannot be guarded at a read boundary the way
         ``aggregate`` guards latency: ``since()`` filters and orders on it in
         SQL, so an ``inf`` was in every ``last_24h()`` window and a ``-inf`` in
@@ -482,6 +494,11 @@ class TelemetryStore:
         )
         for name in _NAN_CHECKED_REAL_FIELDS:
             value = getattr(rec, name)
+            # bool is an int subclass; a stray True must not pose as 1.0 USD.
+            if isinstance(value, bool) or not isinstance(value, (int, float)):
+                raise ValueError(
+                    f"{name} must be a real number; got {type(value).__name__} {value!r}"
+                )
             if isinstance(value, float) and math.isnan(value):
                 raise ValueError(
                     f"{name} must not be NaN; SQLite stores NaN as NULL, which the "
