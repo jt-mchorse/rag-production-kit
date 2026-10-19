@@ -3563,3 +3563,14 @@ Then explain which is faster?", and the second step was lost. Now a query the
 "Then" rule can split is split that way, and a compared item can no longer
 run past a `?` or `!` into the next sentence. Single-sentence comparisons,
 including the benchmark's, decompose exactly as before.
+
+## 2026-10-19 — A query Postgres cannot take is refused before it costs anything (#366)
+
+`Retriever.search` only checked that the query was non-empty. A query with a
+NUL character or a lone surrogate cannot be sent to Postgres, but the
+retriever found that out from psycopg, after the rewriter and the embedder
+had already run (with `AnthropicRewriter`, that's a paid call), and the caller
+got a raw `DataError` or `UnicodeEncodeError`. `search` now refuses such a
+query, and any such rewriter sub-query, with a `ValueError` that names the
+character and its index, before anything is called. It uses the same check
+#308 added for documents.

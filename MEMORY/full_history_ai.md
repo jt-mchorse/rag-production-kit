@@ -3979,3 +3979,22 @@ context_for_next_session:
   - "NOT_FIXED_a_CJK_stop_with_no_following_space_is_not_a_gap_here_or_in_the_Then_split_both_require_whitespace"
 followups: []
 ---
+
+---
+session: 2026-10-19T07:45Z
+issue: 366
+branch: session/2026-10-19-0745-issue-366
+focus: A_NUL_OR_LONE_SURROGATE_QUERY_PAID_THE_REWRITER_AND_THE_EMBEDDER_BEFORE_PSYCOPG_REFUSED_IT_AS_A_RAW_DataError_OR_UnicodeEncodeError
+phase: shipped
+delta:
+  files_changed: 2
+  tests_added: 16
+  suite: "pytest not-pg 2533 passed, 2 skipped; pg 23 passed (local PG 17.6, stub vector domain, init.sql swapped and restored); ruff check + format clean"
+decisions_made: []
+measured: "main aa57aaf on PG 17.6, counting embedder: 'hel\\x00lo' -> 1 embed call then psycopg.DataError; 'hel\\ud800lo' -> 1 embed call then UnicodeEncodeError; connection IDLE both times. After: 0 embed calls, ValueError naming the char and index; rewriter sub-queries all checked before the first is embedded. Revert 10 of 16 new red; the 6 green are the plain/U+D7FF/U+E000 controls."
+context_for_next_session:
+  - "REUSED_indexer._unstorable_FROM_308_RATHER_THAN_A_SECOND_PREDICATE_non_str_queries_left_to_the_existing_paths"
+  - "SEED_rag_streaming_except_str_e_WAS_ALREADY_FIXED_AS_251_AND_SEED_rewriter_stop_reason_FAILS_LOUD_ON_A_TRUNCATED_JSON_REPLY_so_neither_filed"
+  - "THE_SHARED_venv311_rag_HAS_AN_EDITABLE_INSTALL_OF_ANOTHER_CLONE_scripts_outside_the_repo_need_PYTHONPATH"
+followups: []
+---
