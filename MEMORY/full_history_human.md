@@ -3553,3 +3553,13 @@ comment said bool was allowed on purpose, to match the cost-record check. That
 check started refusing bools in #303, so the reason no longer held. Both
 `record` and the percentile read check now refuse bools and non-numbers with
 the usual "finite non-negative number" error.
+
+## 2026-10-19 — "Compare X with Y. Then ..." keeps its second step (#364)
+
+The template rewriter tries the "compare X with Y" pattern first, and that
+pattern ran to the end of the query. "Compare BM25 with dense retrieval. Then
+explain which is faster." became "What is BM25?" and "What is dense retrieval.
+Then explain which is faster?", and the second step was lost. Now a query the
+"Then" rule can split is split that way, and a compared item can no longer
+run past a `?` or `!` into the next sentence. Single-sentence comparisons,
+including the benchmark's, decompose exactly as before.

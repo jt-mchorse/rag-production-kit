@@ -3961,3 +3961,21 @@ context_for_next_session:
   - "NOT_FIXED_telemetry_percentile_does_not_type_check_values_general_Sequence_float_helper_deliberately_looser"
 followups: []
 ---
+
+---
+session: 2026-10-19T07:36Z
+issue: 364
+branch: session/2026-10-19-0736-issue-364
+focus: THE_ANCHORED_COMPARE_PATTERN_RAN_BEFORE_THE_THEN_SPLIT_SO_ITS_LAZY_B_GROUP_SWALLOWED_EVERY_LATER_SENTENCE_INTO_THE_SECOND_ENTITY
+phase: shipped
+delta:
+  files_changed: 2
+  tests_added: 8
+  suite: "2479 passed, 2 skipped, 23 deselected (py3.11); ruff check + format clean; bench_rewriter README table unchanged"
+decisions_made: []
+measured: "main: 'Compare BM25 with dense retrieval. Then explain which is faster.' -> compare ('What is BM25?', 'What is dense retrieval. Then explain which is faster?'); 'Compare Postgres to MySQL? Which one is cheaper to host?' -> entity 'MySQL? Which one ...'. After: Then-split ('Compare BM25 with dense retrieval.', 'explain which is faster.'); the second -> no_decomposition. Revert 4 of 8 new red; green are the 4 single-sentence controls (bench query, vs., St. Louis, Python 3.5)."
+context_for_next_session:
+  - "A_BARE_ASCII_DOT_IS_NOT_A_HARD_SENTENCE_END_FOR_COMPARE_ENTITIES_ABBREVIATIONS_LIKE_St_Louis_KEEP_DECOMPOSING_ONLY_THE_THEN_SPLIT_CONFIRMS_A_DOT_BOUNDARY"
+  - "NOT_FIXED_a_CJK_stop_with_no_following_space_is_not_a_gap_here_or_in_the_Then_split_both_require_whitespace"
+followups: []
+---
