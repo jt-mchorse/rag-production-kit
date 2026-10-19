@@ -3534,3 +3534,13 @@ dashboard pages then crashed on that row and returned nothing. A missing count
 failed with a raw database error. Both the record builder and the store now
 refuse a wrong type with an error naming the field. Rows already saved still
 load, so an existing database keeps working.
+
+## 2026-10-19 — One infinite latency no longer flattens the dashboard chart (#360)
+
+The telemetry store refuses a NaN latency but accepts an infinite one. When
+one was stored, the dashboard chart scaled everything against infinity: all
+the real requests were drawn on the 0 ms line, the infinite point was written
+into the SVG as `nan`, and the axis said `infms`, while the warning banner
+claimed the chart was unaffected. The chart now scales against the largest
+finite latency, pins an infinite point to the edge, and skips a NaN. The table
+still shows the raw value.

@@ -3925,3 +3925,21 @@ context_for_next_session:
   - DEFERRED_dashboard_outcome_guard_for_an_already_stored_blob_row
 followups: []
 ---
+
+---
+session: 2026-10-19T07:23Z
+issue: 360
+branch: session/2026-10-19-0723-issue-360
+focus: ONE_STORED_PLUS_INF_LATENCY_MADE_LAT_MAX_INF_SO_THE_CHART_FLATTENED_EVERY_REAL_POINT_TO_0_MS_AND_EMITTED_NAN_WHILE_THE_BANNER_SAID_THE_CHART_WAS_UNAFFECTED
+phase: shipped
+delta:
+  files_changed: 2
+  tests_added: 9
+  suite: "2477 passed, 2 skipped, 23 deselected (py3.11); ruff check + format clean"
+decisions_made: []
+measured: "main: record() stores inf; chart points '40.0,212.0 372.0,nan 704.0,212.0', axis label infms. After: '40.0,16.0 372.0,16.0 704.0,56.8', label 120ms, table still infms. Revert 5 of 9 new red; green are control-finite, the table-raw lock and both neg-inf arms (minus inf never reached lat_max on main)."
+context_for_next_session:
+  - "THE_CLAMP_COMMENT_SAID_A_NAN_IS_NOT_REACHABLE_HERE_BUT_INF_OVER_INF_MANUFACTURES_ONE_INSIDE_THE_FUNCTION"
+  - "NOT_FIXED_TelemetryStore_record_still_stores_plus_inf_write_side_policy_left_alone_the_renderer_copes"
+followups: []
+---
