@@ -3544,3 +3544,12 @@ into the SVG as `nan`, and the axis said `infms`, while the warning banner
 claimed the chart was unaffected. The chart now scales against the largest
 finite latency, pins an infinite point to the edge, and skips a NaN. The table
 still shows the raw value.
+
+## 2026-10-19 — Phase timings refuse `True` as a latency (#362)
+
+`PhaseTimings.record` accepted `True` as a latency, so the JSON summary could
+publish `"p50_ms": true`, and a string crashed with a raw TypeError. The code
+comment said bool was allowed on purpose, to match the cost-record check. That
+check started refusing bools in #303, so the reason no longer held. Both
+`record` and the percentile read check now refuse bools and non-numbers with
+the usual "finite non-negative number" error.

@@ -3943,3 +3943,21 @@ context_for_next_session:
   - "NOT_FIXED_TelemetryStore_record_still_stores_plus_inf_write_side_policy_left_alone_the_renderer_copes"
 followups: []
 ---
+
+---
+session: 2026-10-19T07:29Z
+issue: 362
+branch: session/2026-10-19-0729-issue-362
+focus: PHASETIMINGS_RECORD_KEPT_A_BOOL_ON_PURPOSE_FOR_PARITY_WITH_A_SIBLING_THAT_303_HAD_SINCE_TIGHTENED_SO_DUMP_SUMMARY_JSON_PUBLISHED_P50_MS_TRUE
+phase: shipped
+delta:
+  files_changed: 2
+  tests_added: 9
+  suite: "2477 passed, 2 skipped, 23 deselected (py3.11); ruff check + format clean"
+decisions_made: []
+measured: "main: record('total', True) accepted, dump_summary_json total {'n': 1, 'p50_ms': True, 'p95_ms': True}; record('total', '5.0') -> TypeError; PhaseTimings(total=[True]).percentile('total', 50) -> True. After: ValueError on record and on the percentile read boundary. Revert 9 of 9 new red; the pre-existing finite good_ms arms are the controls."
+context_for_next_session:
+  - "A_PARITY_REASON_IN_A_COMMENT_EXPIRES_WHEN_THE_SIBLING_CHANGES_303_TIGHTENED_CostRecord_build_AND_THIS_COMMENT_STILL_CITED_THE_OLD_BEHAVIOUR"
+  - "NOT_FIXED_telemetry_percentile_does_not_type_check_values_general_Sequence_float_helper_deliberately_looser"
+followups: []
+---
