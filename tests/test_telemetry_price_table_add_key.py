@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import pytest
 
-from rag_kit.telemetry import CostRecord, ModelPrice, PriceTable, UnknownModelError
+from rag_kit.telemetry import CostRecord, ModelPrice, PriceTable
 
 NON_STR_KEYS = {"none": None, "int": 123, "bytes": b"claude-x", "float": 1.5}
 
@@ -53,12 +53,13 @@ def test_add_still_refuses_a_bad_rate_for_a_good_key() -> None:
 
 def test_a_none_model_cannot_be_priced_through_a_table_built_by_add() -> None:
     # The end of the chain the issue measured: with `add(None, ...)` refused,
-    # `build(model=None)` is an unknown model, not a row headed for a NOT NULL
-    # column.
+    # `build(model=None)` never reaches a NOT NULL column. Since #352, build
+    # refuses a non-str model by its column type before any price lookup, so
+    # the refusal is that ValueError rather than UnknownModelError.
     table = PriceTable()
     with pytest.raises(ValueError, match="model ids must be str"):
         table.add(None, 3.0, 15.0)  # type: ignore[arg-type]
-    with pytest.raises(UnknownModelError):
+    with pytest.raises(ValueError, match="model must be a str"):
         CostRecord.build(
             ts=None,
             query="q",
