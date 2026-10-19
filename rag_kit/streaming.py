@@ -142,9 +142,16 @@ class PhaseTimings:
         # ms is otherwise appended silently and later poisons `percentile`
         # (sorting a list containing NaN is undefined — all NaN comparisons
         # are False), so the p50/p95/p99 read back silently wrong. Fail at the
-        # ingestion site instead. `bool` is intentionally not rejected here —
-        # the telemetry sibling accepts it (bool-is-int) and parity is the
-        # whole point of this guard.
+        # ingestion site instead.
+        #
+        # And its type half (#362). This comment used to say `bool` was left
+        # alone because the telemetry sibling accepted it and parity was the
+        # point; #303 then made `CostRecord.build` refuse bool and non-numbers,
+        # so the same parity now requires refusing them here. Unguarded, `True`
+        # was appended and `dump_summary_json` published `"p50_ms": true`, and a
+        # str escaped `math.isfinite` as a bare TypeError.
+        if isinstance(ms, bool) or not isinstance(ms, (int, float)):
+            raise ValueError(f"ms must be a finite non-negative number; got {ms!r}")
         if not math.isfinite(ms) or ms < 0:
             raise ValueError(f"ms must be a finite non-negative number; got {ms!r}")
         getattr(self, phase).append(ms)
@@ -205,8 +212,14 @@ class PhaseTimings:
         # so adding the negativity clause as a second guard changes no contract
         # and keeps the two diagnoses distinct -- a NaN duration is a broken
         # measurement, a negative one is a broken clock or a hand-built record.
+        #
+        # The type half too (#362), for the same reason: `PhaseTimings(total=[True])`
+        # never touches `record`, and returned `True` as its p50.
         raw = getattr(self, phase)
-        if any(not math.isfinite(v) or v < 0 for v in raw):
+        if any(
+            isinstance(v, bool) or not isinstance(v, (int, float)) or not math.isfinite(v) or v < 0
+            for v in raw
+        ):
             raise ValueError(f"values must all be finite non-negative numbers; got {list(raw)!r}")
         values = sorted(raw)
         if not values:

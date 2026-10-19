@@ -16,6 +16,7 @@ only, not bounded-range.
 
 from __future__ import annotations
 
+import json
 import math
 
 import pytest
@@ -202,6 +203,44 @@ def test_record_rejects_non_finite_or_negative_ms(bad_ms):
     t = PhaseTimings()
     with pytest.raises(ValueError, match="ms must be a finite non-negative number"):
         t.record("retrieving", bad_ms)
+
+
+# The type half (#362), parity with `CostRecord.build(total_latency_ms=...)`
+# since #303. `True` used to be appended and published as `"p50_ms": true`;
+# a str escaped `math.isfinite` as a bare TypeError.
+_NOT_A_NUMBER = [
+    pytest.param(True, id="true"),
+    pytest.param(False, id="false"),
+    pytest.param("5.0", id="str"),
+    pytest.param(None, id="none"),
+]
+
+
+@pytest.mark.parametrize("bad_ms", _NOT_A_NUMBER)
+def test_record_rejects_bool_and_non_numbers(bad_ms):
+    t = PhaseTimings()
+    with pytest.raises(ValueError, match="ms must be a finite non-negative number"):
+        t.record("total", bad_ms)
+    assert t.total == []
+
+
+@pytest.mark.parametrize("bad_ms", _NOT_A_NUMBER)
+def test_percentile_rejects_bool_and_non_numbers_that_bypassed_record(bad_ms):
+    # The constructor path skips `record`; the read boundary (#168/#213) is
+    # what covers it.
+    t = PhaseTimings(total=[10.0, bad_ms])
+    with pytest.raises(ValueError, match="values must all be finite non-negative numbers"):
+        t.percentile("total", 50)
+
+
+def test_summary_json_never_publishes_a_bool_latency(tmp_path):
+    t = PhaseTimings()
+    with pytest.raises(ValueError, match="ms must be a finite non-negative number"):
+        t.record("total", True)
+    t.record("total", 7.0)
+    out = tmp_path / "s.json"
+    t.dump_summary_json(str(out))
+    assert json.loads(out.read_text())["total"]["p50_ms"] == 7.0
 
 
 @pytest.mark.parametrize("good_ms", [0.0, 0, 1, 1.5, 12.0, 1_000_000.0])
