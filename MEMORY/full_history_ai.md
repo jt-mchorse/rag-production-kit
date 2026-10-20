@@ -4054,3 +4054,22 @@ context_for_next_session:
   - "A_NAN_FUSED_SCORE_SHADOWED_BY_A_FINITE_RERANK_SCORE_IS_STILL_ACCEPTED_ONLY_THE_SCORE_THE_GATE_READS_IS_CHECKED"
 followups: []
 ---
+
+---
+session: 2026-10-20T07:39Z
+issue: 373
+branch: session/2026-10-20-0806-issue-373
+focus: THE_AND_SPLIT_STILL_LET_A_CONJUNCT_SPAN_A_SENTENCE_AFTER_364_FIXED_ONLY_COMPARE_AND_HARD_SENTENCE_GAP_MISSED_AN_UNSPACED_CJK_STOP
+phase: shipped
+delta:
+  files_changed: 2
+  tests_added: 15
+  suite: "2607 passed, 26 deselected (py3.14); 2605 passed, 2 skipped, 26 deselected (py3.11 .[dev] venv); ruff check + format clean"
+decisions_made: []
+measured: "main 18c4586: 'What is RAG? What is BM25 and how does dense retrieval work?' -> and ('What is RAG? What is BM25?', ...); 'Who is X and where did Y work? What is Z and how does W work?' -> 3 subs, middle 'where did Y work? What is Z?'; 'Compare Postgres with MySQL？Which one is cheaper to host?' -> compare with entity 'MySQL？Which one ...'. After: all no_decomposition; single-sentence and, '? and', St. abbreviation, trailing ？！, 。」 controls unchanged. bench_rewriter md/json k=2/3/5 identical but for elapsed. Revert 9 of 15 new red (plus the edited #111 test, green both ways); partial reverts 4 (CJK alt) / 5 (and guard); neighbour fixes (?=\\S) and a whole-query guard each caught by one control."
+context_for_next_session:
+  - "DECLINED_RATHER_THAN_SPLIT_PER_SENTENCE_a_per_sentence_split_would_be_a_new_decomposition_pattern"
+  - "EXISTING_111_TEST_INPUT_the_。_rule_WAS_ALREADY_A_HARD_GAP_SO_IT_NOW_DECLINES_test_moved_to_an_unspaced_…_and_the_old_input_is_pinned_in_the_373_table"
+  - "NOT_FIXED_a_bare_ASCII_dot_between_two_questions_still_lets_an_and_conjunct_span_it_same_abbreviation_exclusion_as_364"
+followups: []
+---

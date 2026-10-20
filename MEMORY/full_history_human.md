@@ -3611,3 +3611,15 @@ keeps a NaN when it comes first, the answer also depended on the order of the
 chunks. `_top_score` now raises a `ValueError` that names the chunk and the
 field when the score the gate reads is NaN or infinite, the same way the
 threshold itself is checked (#78).
+
+## 2026-10-20 — No "and" half of a rewritten query spans two sentences (#373)
+
+#364 stopped a compared item from running past a `?` or `!` into the next
+sentence, but the "and" split had the same problem and wasn't changed. "What is
+RAG? What is BM25 and how does dense retrieval work?" was split at the "and",
+so one sub-query was "What is RAG? What is BM25?", two questions searched as
+one. The "and" split now declines such a query, as compare does. A Chinese or
+Japanese `？`, `！` or `。` with no space after it also counts as a sentence
+end now, as it already did in the answer generator (#262), so `MySQL？Which
+one ...` no longer becomes one compared item. Single-sentence queries split
+exactly as before, and the rewriter benchmark numbers are unchanged.
