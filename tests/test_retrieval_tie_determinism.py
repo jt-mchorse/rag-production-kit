@@ -107,9 +107,26 @@ class TestTheSqlCarriesATiebreak:
         lexical_sql = next(s for s, _p in conn.query_log if "TS_RANK_CD" in s.upper())
         normalized = " ".join(lexical_sql.split()).upper()
         assert "ORDER BY TS_RANK_CD" in normalized
-        assert normalized.index("EXTERNAL_ID ASC") > normalized.index("ORDER BY"), (
+        assert "EXTERNAL_ID" in normalized[normalized.index("ORDER BY") :], (
             "the lexical ORDER BY must carry an external_id tiebreak; without it "
             "Postgres settles ties by physical row order"
+        )
+
+    def test_lexical_tiebreak_compares_code_points(self) -> None:
+        """A bare `external_id ASC` sorts in the database's collation (#370).
+
+        The dense and RRF tiebreaks sort in Python, which is code-point order,
+        so the lexical one must say `COLLATE "C"` or the three disagree about
+        what "ascending id" means on any non-C cluster.
+        """
+        conn = _TieConn(_rows(LEX_ORDERINGS[0]), _dense(ALL_DOCS[:3], [0.1, 0.2, 0.3]))
+        Retriever(conn, HashEmbedder()).search("refund policy", k=3)
+        lexical_sql = next(s for s, _p in conn.query_log if "TS_RANK_CD" in s.upper())
+        normalized = " ".join(lexical_sql.split()).upper()
+        order_by = normalized[normalized.index("ORDER BY") :]
+        assert 'EXTERNAL_ID COLLATE "C" ASC' in order_by, (
+            "the lexical tiebreak must compare code points like the dense and RRF "
+            f"tiebreaks do; got {order_by!r}"
         )
 
     def test_dense_order_by_is_left_index_friendly(self) -> None:
@@ -237,7 +254,7 @@ def test_lexical_membership_survives_row_rewrites(pg_conn) -> None:
     sql = """
     SELECT external_id FROM documents
     WHERE tsv @@ plainto_tsquery('english', %s)
-    ORDER BY ts_rank_cd(tsv, plainto_tsquery('english', %s)) DESC, external_id ASC
+    ORDER BY ts_rank_cd(tsv, plainto_tsquery('english', %s)) DESC, external_id COLLATE "C" ASC
     LIMIT 3
     """
 
@@ -260,3 +277,72 @@ def test_lexical_membership_survives_row_rewrites(pg_conn) -> None:
         )
 
     assert first == ["doc-alpha", "doc-bravo", "doc-charlie"]
+
+
+# ----------------------------------------------------------------------
+# #370: the lexical tiebreak sorted in the database's collation.
+# ----------------------------------------------------------------------
+
+# Ids that differ only in case and `-`/`_`, which is where a linguistic
+# collation and code-point order part ways. Measured on PostgreSQL 17.6:
+#
+#   C                  DOC-G, Doc-B, Doc-D, doc-a, doc-c, doc-f, doc-h, doc_e
+#   en_US (libc, ICU)  doc_e, doc-a, Doc-B, doc-c, Doc-D, doc-f, DOC-G, doc-h
+#
+# CI's `pgvector/pgvector:pg16` service initialises en_US.utf8, so the pre-fix
+# SQL returned the second ordering there. Against a C database these tests
+# cannot tell fixed from unfixed; they still pin the contract.
+MIXED_IDS = ["doc-a", "Doc-B", "doc-c", "Doc-D", "doc_e", "doc-f", "DOC-G", "doc-h"]
+
+
+def _seed_tied(conn, ids: list[str]) -> None:
+    from rag_kit import Document, Indexer
+
+    indexer = Indexer(conn, HashEmbedder())
+    indexer.clear()
+    # One text for every row: ts_rank_cd ties exactly, and so does the dense
+    # distance, which makes the dense channel's (code-point) tiebreak decide
+    # its order too.
+    indexer.add_documents(Document(ext, "Refund policy boilerplate section.") for ext in ids)
+    conn.commit()
+
+
+def _lexical_ranking(results) -> list[str]:
+    return [r.external_id for r in sorted(results, key=lambda r: r.ranks["lexical"])]
+
+
+@pytest.mark.pg
+def test_lexical_ties_rank_by_code_point(pg_conn) -> None:
+    """The lexical channel's ranking among tied rows is `sorted(ids)` (#370)."""
+    _seed_tied(pg_conn, MIXED_IDS)
+    out = Retriever(pg_conn, HashEmbedder()).search("refund policy", k=len(MIXED_IDS))
+    assert len(out) == len(MIXED_IDS)
+    assert _lexical_ranking(out) == sorted(MIXED_IDS), (
+        "the lexical tiebreak sorted in the database collation, not by code point"
+    )
+
+
+@pytest.mark.pg
+def test_lexical_and_dense_agree_on_tied_rows(pg_conn) -> None:
+    """With both channels tied, fusion must return the ids in code-point order.
+
+    Pre-fix, on en_US the lexical channel said `doc_e` first and the dense
+    channel `DOC-G`, so the fused top-2 was decided by the locale.
+    """
+    _seed_tied(pg_conn, MIXED_IDS)
+    out = Retriever(pg_conn, HashEmbedder()).search("refund policy", k=2)
+    assert [r.external_id for r in out] == sorted(MIXED_IDS)[:2]
+    for r in out:
+        assert r.ranks["lexical"] == r.ranks["dense"], r
+
+
+@pytest.mark.pg
+def test_ids_every_collation_agrees_on_still_rank_ascending(pg_conn) -> None:
+    """Control: lowercase-alphabetic ids sort the same under C and en_US.
+
+    Green before and after #370 -- it separates "the tiebreak is gone" from
+    "the tiebreak uses the wrong collation".
+    """
+    _seed_tied(pg_conn, ALL_DOCS)
+    out = Retriever(pg_conn, HashEmbedder()).search("refund policy", k=len(ALL_DOCS))
+    assert _lexical_ranking(out) == ALL_DOCS

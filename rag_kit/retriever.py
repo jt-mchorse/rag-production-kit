@@ -228,11 +228,22 @@ class Retriever:
             # computed expression no index can order by, so this query already
             # sorts, and `external_id` only extends the existing sort key. Same
             # plan, same Seq Scan.
+            #
+            # `COLLATE "C"` (#370): a bare `external_id ASC` sorts in the
+            # database's collation, while the dense tiebreak below and RRF's
+            # both sort in Python, by code point. On an en_US cluster (CI's
+            # pgvector image is one) ids differing only in case or `-`/`_`
+            # came back `doc_e, doc-a, Doc-B` here against `DOC-G, Doc-B,
+            # doc-a` on C, and the fused top-1 changed with the locale. "C"
+            # orders by byte, which for UTF-8 is code-point order -- what
+            # Python's `sorted` uses. Still free: it changes the comparison,
+            # not the plan.
             lexical_sql = """
             SELECT external_id, text, metadata
             FROM documents
             WHERE tsv @@ plainto_tsquery('english', %s)
-            ORDER BY ts_rank_cd(tsv, plainto_tsquery('english', %s)) DESC, external_id ASC
+            ORDER BY ts_rank_cd(tsv, plainto_tsquery('english', %s)) DESC,
+                     external_id COLLATE "C" ASC
             LIMIT %s
             """
             # NFC, because the trigger builds `tsv` from the NFC form (#324): FTS
