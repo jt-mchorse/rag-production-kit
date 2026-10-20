@@ -643,3 +643,65 @@ def test_template_rewriter_no_sub_query_spans_a_sentence(query, expected, reason
     result = TemplateRewriter().rewrite(query)
     assert result.sub_queries == expected
     assert result.reasoning == reasoning
+
+
+# --- #376: a `!` or `…` inside one sentence does not stop the "and" split
+
+
+@pytest.mark.parametrize(
+    ("query", "expected", "reasoning"),
+    [
+        pytest.param(
+            "Who is the CEO of Yahoo! Japan and where is it headquartered?",
+            ("Who is the CEO of Yahoo! Japan?", "where is it headquartered?"),
+            "multi_question_and_pattern",
+            id="and-bang-in-a-name",
+        ),
+        pytest.param(
+            "Who hosts Jeopardy! today and when did it first air?",
+            ("Who hosts Jeopardy! today?", "when did it first air?"),
+            "multi_question_and_pattern",
+            id="and-bang-then-lowercase",
+        ),
+        pytest.param(
+            'What does "Help!" mean and who wrote it?',
+            ('What does "Help!" mean?', "who wrote it?"),
+            "multi_question_and_pattern",
+            id="and-bang-in-a-quoted-title",
+        ),
+        pytest.param(
+            "Who sings 'Wait… What' and when was it released?",
+            ("Who sings 'Wait… What'?", "when was it released?"),
+            "multi_question_and_pattern",
+            id="and-ellipsis-in-a-quoted-title",
+        ),
+        pytest.param(
+            "What is RAG! What is BM25 and how does dense retrieval work?",
+            ("What is RAG! What is BM25 and how does dense retrieval work?",),
+            "no_decomposition",
+            id="control-and-bang-before-a-question",
+        ),
+        pytest.param(
+            "What is RAG… What is BM25 and how does dense retrieval work?",
+            ("What is RAG… What is BM25 and how does dense retrieval work?",),
+            "no_decomposition",
+            id="control-and-ellipsis-before-a-question",
+        ),
+        pytest.param(
+            'What is "RAG!" What is BM25 and how does dense retrieval work?',
+            ('What is "RAG!" What is BM25 and how does dense retrieval work?',),
+            "no_decomposition",
+            id="control-and-bang-and-closer-before-a-question",
+        ),
+        pytest.param(
+            "Compare Yahoo! Japan with Google",
+            ("Compare Yahoo! Japan with Google",),
+            "no_decomposition",
+            id="control-compare-keeps-the-364-rule",
+        ),
+    ],
+)
+def test_template_rewriter_and_split_bang_inside_a_sentence(query, expected, reasoning):
+    result = TemplateRewriter().rewrite(query)
+    assert result.sub_queries == expected
+    assert result.reasoning == reasoning
