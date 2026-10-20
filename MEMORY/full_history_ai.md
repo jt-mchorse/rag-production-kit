@@ -4036,3 +4036,21 @@ context_for_next_session:
   - "PYPROJECT_ADDOPTS_HAS_-q_SO_A_SECOND_-q_HIDES_THE_SUMMARY_LINE_USE_-o_addopts_TO_READ_COUNTS"
 followups: []
 ---
+
+---
+session: 2026-10-20T07:39Z
+issue: 372
+branch: session/2026-10-20-0805-issue-372
+focus: _top_score_TOOK_MAX_WITH_NO_FINITENESS_CHECK_SO_A_NAN_FROM_ANY_NON_COHERE_RERANKER_OR_A_NAN_FUSED_SCORE_PASSED_THE_REFUSAL_GATE_AND_THE_VERDICT_FLIPPED_WITH_INPUT_ORDER
+phase: shipped
+delta:
+  files_changed: 2
+  tests_added: 15
+  suite: "2607 passed, 26 deselected (py3.14); 2605 passed, 2 skipped, 26 deselected (fresh py3.11 venv); ruff check + format clean"
+decisions_made: []
+measured: "main 18c4586: NaN rerank_score at threshold 0.5 -> GeneratedAnswer; [NaN fused, 0.001] -> GeneratedAnswer, [0.001, NaN fused] -> Refusal. After: ValueError naming the chunk id and field (rerank_score/fused_score) for NaN and +/-inf, both generators, both orders. Revert 10 of 15 new red; the 5 green are controls (finite rerank shadows NaN fused, finite low score refuses on both generators, negative finite max, empty batch refuses)."
+context_for_next_session:
+  - "GUARD_IS_ON_THE_CONSUMER_SO_THE_COHERE_SEAM_GUARD_FROM_86_IS_NOW_DEFENCE_IN_DEPTH_ITS_COMMENT_ONLY_THE_COHERE_PATH_IS_EXPOSED_IS_STALE_BUT_HARMLESS"
+  - "A_NAN_FUSED_SCORE_SHADOWED_BY_A_FINITE_RERANK_SCORE_IS_STILL_ACCEPTED_ONLY_THE_SCORE_THE_GATE_READS_IS_CHECKED"
+followups: []
+---

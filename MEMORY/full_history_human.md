@@ -3599,3 +3599,15 @@ different order than on a C database, and the top results of a search changed
 with the server's locale. The tiebreak is now `external_id COLLATE "C"`, so all
 three tiebreaks agree on what "ascending" means. The query plan is the same as
 before. No published eval or benchmark number goes through this path.
+
+## 2026-10-20 — A NaN score refuses loudly instead of slipping past the refusal check (#372)
+
+The generators decide whether to refuse by taking the highest chunk score and
+comparing it to the threshold. Nothing checked that score for NaN. #86 only
+guarded the Cohere reranker, but anyone can plug in their own reranker, and a
+NaN from one of those (or a NaN fused score) made `top < threshold` False, so
+both generators answered when they should have refused. Because `max()` only
+keeps a NaN when it comes first, the answer also depended on the order of the
+chunks. `_top_score` now raises a `ValueError` that names the chunk and the
+field when the score the gate reads is NaN or infinite, the same way the
+threshold itself is checked (#78).
