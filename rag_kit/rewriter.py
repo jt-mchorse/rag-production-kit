@@ -132,10 +132,17 @@ _ENDS_A_SENTENCE = re.compile(
 )
 
 
-# A sentence end followed by more text, for the compare entities (#364). Every
-# terminator except the ASCII `.`, which is ambiguous with an abbreviation.
+# A sentence end followed by more text, for the compare entities and the "and"
+# conjuncts (#364, #373). Every terminator except the ASCII `.`, which is
+# ambiguous with an abbreviation. Chinese and Japanese put no space after
+# `。！？`, so the first form missed `MySQL？Which one ...` (#373). The second
+# form is the generator's unspaced CJK boundary (#262): a CJK stop and then a
+# character that is not whitespace, a closer or another terminator, so a
+# trailing `？！` or `。」` is not a gap.
+_CJK_TERMINATORS = "。！？｡"
 _HARD_SENTENCE_GAP = re.compile(
     rf"[{re.escape(_SENTENCE_TERMINATORS.replace('.', ''))}][{re.escape(_SENTENCE_CLOSERS)}]*\s+\S"
+    rf"|[{_CJK_TERMINATORS}](?=[^\s{re.escape(_SENTENCE_CLOSERS + _SENTENCE_TERMINATORS)}])"
 )
 
 
@@ -322,6 +329,13 @@ def _split_question_and(query: str) -> list[str] | None:
             return None
         if not _looks_like_question(s):
             return None
+        # A conjunct never spans a sentence (#373, the rule #364 gave compare).
+        # "What is RAG? What is BM25 and how does ..." split into 'What is RAG?
+        # What is BM25?', two questions searched as one. Decline, as compare
+        # does; a `?` right before the "and" ("Who is X? and where ...") ends
+        # its own conjunct and still splits.
+        if _HARD_SENTENCE_GAP.search(s):
+            return None
         # Re-append the question mark we stripped above so each sub-query
         # is a well-formed question. Strip any trailing sentence terminator
         # first: a conjunct that already ends in `.` or `!` (e.g. "What is the
@@ -353,7 +367,7 @@ class TemplateRewriter:
        stripped from B so each part is independently readable.
     3. `Who is X and where did Y work?` (multi-question conjunction) →
        split on `" and "` only if *both* halves look like questions
-       (start with `who/what/where/...`).
+       (start with `who/what/where/...`) and neither spans a sentence (#373).
     4. Fallthrough: return `(query,)` with reasoning ``"no_decomposition"``.
 
     Not a substitute for an LLM-based rewriter. Use it for CI and offline

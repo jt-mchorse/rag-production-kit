@@ -264,10 +264,12 @@ def test_template_rewriter_and_split_non_ascii_terminator_is_well_formed(ender):
 
 def test_template_rewriter_and_split_non_ascii_does_not_mangle_internal_char():
     """The broadened terminator strip must only touch *trailing* terminators:
-    a non-ASCII terminator that sits mid-conjunct is left untouched (#111)."""
-    out = TemplateRewriter().rewrite("What is the 。 rule and is it worth it?")
+    a non-ASCII terminator that sits mid-conjunct is left untouched (#111).
+    This used `the 。 rule`, but a spaced `。` is a sentence gap, and a conjunct
+    that spans one is declined (#373), so an unspaced `…` holds the property."""
+    out = TemplateRewriter().rewrite("What is the 3…5 rule and is it worth it?")
     assert out.reasoning == "multi_question_and_pattern"
-    assert out.sub_queries == ("What is the 。 rule?", "is it worth it?")
+    assert out.sub_queries == ("What is the 3…5 rule?", "is it worth it?")
 
 
 def test_template_rewriter_rejects_empty_query():
@@ -534,6 +536,110 @@ def test_template_rewriter_compare_does_not_mangle_internal_decimal():
     ],
 )
 def test_template_rewriter_compare_entity_never_spans_a_sentence(query, expected, reasoning):
+    result = TemplateRewriter().rewrite(query)
+    assert result.sub_queries == expected
+    assert result.reasoning == reasoning
+
+
+# --- #373: an "and" conjunct never spans a sentence; an unspaced CJK stop is a gap
+
+
+@pytest.mark.parametrize(
+    ("query", "expected", "reasoning"),
+    [
+        pytest.param(
+            "What is RAG? What is BM25 and how does dense retrieval work?",
+            ("What is RAG? What is BM25 and how does dense retrieval work?",),
+            "no_decomposition",
+            id="and-first-conjunct-spans-question",
+        ),
+        pytest.param(
+            "Who is X and where did Y work? What is Z and how does W work?",
+            ("Who is X and where did Y work? What is Z and how does W work?",),
+            "no_decomposition",
+            id="and-middle-conjunct-spans-question",
+        ),
+        pytest.param(
+            "What is RAG! What is BM25 and how does dense retrieval work?",
+            ("What is RAG! What is BM25 and how does dense retrieval work?",),
+            "no_decomposition",
+            id="and-conjunct-spans-bang",
+        ),
+        pytest.param(
+            'What is "RAG?" What is BM25 and how does dense retrieval work?',
+            ('What is "RAG?" What is BM25 and how does dense retrieval work?',),
+            "no_decomposition",
+            id="and-conjunct-spans-question-and-closer",
+        ),
+        pytest.param(
+            "What is RAG？What is BM25 and how does dense retrieval work?",
+            ("What is RAG？What is BM25 and how does dense retrieval work?",),
+            "no_decomposition",
+            id="and-conjunct-spans-unspaced-fullwidth-question",
+        ),
+        pytest.param(
+            "What is the 。 rule and is it worth it?",
+            ("What is the 。 rule and is it worth it?",),
+            "no_decomposition",
+            id="and-conjunct-spans-spaced-ideographic-stop",
+        ),
+        pytest.param(
+            "Compare Postgres with MySQL？Which one is cheaper to host?",
+            ("Compare Postgres with MySQL？Which one is cheaper to host?",),
+            "no_decomposition",
+            id="compare-unspaced-fullwidth-question",
+        ),
+        pytest.param(
+            "Compare Postgres with MySQL。Which one is cheaper to host?",
+            ("Compare Postgres with MySQL。Which one is cheaper to host?",),
+            "no_decomposition",
+            id="compare-unspaced-ideographic-stop",
+        ),
+        pytest.param(
+            "Compare Postgres with MySQL！Which one is cheaper to host?",
+            ("Compare Postgres with MySQL！Which one is cheaper to host?",),
+            "no_decomposition",
+            id="compare-unspaced-fullwidth-bang",
+        ),
+        pytest.param(
+            "Who is X and where did Y work?",
+            ("Who is X?", "where did Y work?"),
+            "multi_question_and_pattern",
+            id="control-single-sentence-and",
+        ),
+        pytest.param(
+            "Who is X? and where did Y work?",
+            ("Who is X?", "where did Y work?"),
+            "multi_question_and_pattern",
+            id="control-question-mark-before-and",
+        ),
+        pytest.param(
+            "Who is St. Louis named after and where is Chicago?",
+            ("Who is St. Louis named after?", "where is Chicago?"),
+            "multi_question_and_pattern",
+            id="control-and-abbreviation",
+        ),
+        pytest.param(
+            "Who is X and where did Y work？！",
+            ("Who is X?", "where did Y work?"),
+            "multi_question_and_pattern",
+            id="control-and-trailing-fullwidth-run",
+        ),
+        pytest.param(
+            "Compare Postgres with MySQL？",
+            ("What is Postgres?", "What is MySQL?"),
+            "compare_pattern",
+            id="control-compare-trailing-fullwidth-question",
+        ),
+        pytest.param(
+            "Compare 「Postgres。」 with MySQL",
+            ("What is 「Postgres」?", "What is MySQL?"),
+            "compare_pattern",
+            id="control-compare-cjk-stop-then-closer",
+        ),
+    ],
+)
+def test_template_rewriter_no_sub_query_spans_a_sentence(query, expected, reasoning):
     result = TemplateRewriter().rewrite(query)
     assert result.sub_queries == expected
     assert result.reasoning == reasoning
