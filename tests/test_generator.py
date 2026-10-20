@@ -886,3 +886,80 @@ class TestAnthropicGenerator:
         gen = AnthropicGenerator(client=_DictClient())
         result = gen.generate("?", retrieved, threshold=0.05)
         assert isinstance(result, GeneratedAnswer)
+
+
+_NAN = float("nan")
+_INF = float("inf")
+
+
+def _nan_rerank_batch() -> list[RetrievalResult]:
+    # The issue's repro: a custom `Reranker` hands back a NaN rerank_score.
+    return [_result("a", "Unrelated text.", fused=0.001, rerank=_NAN)]
+
+
+def _generators() -> list[object]:
+    return [TemplateGenerator(), AnthropicGenerator(client=_CopyingClient())]
+
+
+class TestNonFiniteScoreRejected:
+    """A non-finite score from any producer fails loud at `_top_score` (#372).
+
+    #86 guarded only the Cohere seam. `max()` keeps a NaN only when it comes
+    first and `NaN < threshold` is False, so a NaN batch answered (or refused)
+    depending on input order. Both generators share the gate.
+    """
+
+    @pytest.mark.parametrize("gen", _generators(), ids=["template", "anthropic"])
+    def test_nan_rerank_score_raises(self, gen: object) -> None:
+        with pytest.raises(ValueError, match=r"'a' has a non-finite rerank_score \(nan\)"):
+            gen.generate("q", _nan_rerank_batch(), threshold=0.5)  # type: ignore[attr-defined]
+
+    @pytest.mark.parametrize("gen", _generators(), ids=["template", "anthropic"])
+    @pytest.mark.parametrize("nan_first", [True, False], ids=["nan-first", "nan-last"])
+    def test_nan_fused_score_raises_in_either_order(self, gen: object, nan_first: bool) -> None:
+        bad = _result("a", "A.", fused=_NAN)
+        ok = _result("b", "B.", fused=0.9)
+        batch = [bad, ok] if nan_first else [ok, bad]
+        with pytest.raises(ValueError, match=r"'a' has a non-finite fused_score \(nan\)"):
+            gen.generate("q", batch, threshold=0.05)  # type: ignore[attr-defined]
+
+    @pytest.mark.parametrize("nan_first", [True, False], ids=["nan-first", "nan-last"])
+    def test_nan_rerank_score_raises_in_either_order(self, nan_first: bool) -> None:
+        bad = _result("a", "A.", rerank=_NAN)
+        ok = _result("b", "B.", rerank=0.9)
+        batch = [bad, ok] if nan_first else [ok, bad]
+        with pytest.raises(ValueError, match="non-finite rerank_score"):
+            TemplateGenerator().generate("q", batch, threshold=0.05)
+
+    @pytest.mark.parametrize("score", [_INF, -_INF], ids=["+inf", "-inf"])
+    def test_infinite_score_raises(self, score: float) -> None:
+        # +inf passes every finite threshold — the same silent answer as NaN.
+        with pytest.raises(ValueError, match="non-finite rerank_score"):
+            _top_score([_result("a", "A.", rerank=score)])
+
+    # Controls: finite scores keep their existing verdicts.
+
+    def test_control_finite_rerank_shadows_nan_fused(self) -> None:
+        # rerank_score is the signal used when present; a NaN fused score it
+        # replaces never reaches the gate.
+        result = TemplateGenerator().generate(
+            "q", [_result("a", "A.", fused=_NAN, rerank=0.9)], threshold=0.5
+        )
+        assert isinstance(result, GeneratedAnswer)
+
+    @pytest.mark.parametrize("gen", _generators(), ids=["template", "anthropic"])
+    def test_control_finite_low_score_still_refuses(self, gen: object) -> None:
+        result = gen.generate(  # type: ignore[attr-defined]
+            "q", [_result("a", "A.", fused=0.001, rerank=0.01)], threshold=0.5
+        )
+        assert isinstance(result, Refusal)
+        assert result.top_score == pytest.approx(0.01)
+
+    def test_control_negative_finite_max_unchanged(self) -> None:
+        assert _top_score([_result("a", "A.", rerank=-0.3), _result("b", "B.", rerank=-0.2)]) == (
+            pytest.approx(-0.2)
+        )
+
+    def test_control_empty_batch_still_refuses(self) -> None:
+        result = TemplateGenerator().generate("q", [], threshold=0.5)
+        assert isinstance(result, Refusal)

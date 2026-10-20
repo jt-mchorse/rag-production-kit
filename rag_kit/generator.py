@@ -381,7 +381,23 @@ def _top_score(retrieved: Sequence[RetrievalResult]) -> float:
     # all-negative set used to report top_score=0.0 in the refusal and, at a
     # non-positive `threshold`, pass the `top < threshold` gate and answer
     # from chunks that should have been refused as insufficient context.
-    return max(r.rerank_score if r.rerank_score is not None else r.fused_score for r in retrieved)
+    scores = [r.rerank_score if r.rerank_score is not None else r.fused_score for r in retrieved]
+    # Guard the consumer, not one producer (#372). #86 rejected a non-finite
+    # Cohere score at its seam, but `Reranker` is a public protocol and
+    # `Retriever.search(reranker=...)` passes any custom `rerank_score` (or a
+    # NaN fused score) straight here. `max()` keeps a NaN only when it comes
+    # first, and `NaN < threshold` is False, so the verdict flipped with input
+    # order and a NaN batch answered when it should refuse. `+inf` would pass
+    # every threshold too. Fail loud, like `_validate_threshold` (#78).
+    for r, score in zip(retrieved, scores, strict=True):
+        if not math.isfinite(score):
+            field = "rerank_score" if r.rerank_score is not None else "fused_score"
+            raise ValueError(
+                f"chunk {r.external_id!r} has a non-finite {field} ({score!r}); "
+                "a NaN/Inf score would poison the refusal gate "
+                "(top < threshold is False for NaN, answering when it should refuse)"
+            )
+    return max(scores)
 
 
 def _ends_with_abbreviation(fragment: str, following: str = "") -> bool:
