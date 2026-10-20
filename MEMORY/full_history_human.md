@@ -3588,3 +3588,14 @@ the dashboard's read side handles them on purpose. The same check now also
 refuses a query or model name with a lone surrogate, which SQLite can't
 encode. It uses the surrogate scan the indexer already had. A NUL is still
 allowed, because SQLite stores it fine.
+
+## 2026-10-20 — Lexical ties sort by code point, whatever the database locale (#370)
+
+The lexical channel broke score ties with `external_id ASC`, and Postgres sorts
+that in the database's collation. The dense channel and the fusion step break
+ties in Python, by code point. On an en_US database, which is what CI's
+Postgres image creates, ids that differ only in case or `-`/`_` came back in a
+different order than on a C database, and the top results of a search changed
+with the server's locale. The tiebreak is now `external_id COLLATE "C"`, so all
+three tiebreaks agree on what "ascending" means. The query plan is the same as
+before. No published eval or benchmark number goes through this path.

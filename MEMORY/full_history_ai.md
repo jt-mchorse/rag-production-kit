@@ -4017,3 +4017,22 @@ context_for_next_session:
   - "NOT_FIXED_an_int_REAL_value_above_2_to_the_63_still_escapes_record_as_OverflowError"
 followups: []
 ---
+
+---
+session: 2026-10-20T07:22Z
+issue: 370
+branch: session/2026-10-20-0725-issue-370
+focus: THE_LEXICAL_EXTERNAL_ID_TIEBREAK_SORTED_IN_THE_DATABASE_COLLATION_WHILE_DENSE_AND_RRF_SORT_BY_CODE_POINT_SO_TOP_K_DEPENDED_ON_datcollate
+phase: shipped
+delta:
+  files_changed: 2
+  tests_added: 4
+  suite: "2592 passed, 26 deselected (py3.14); pg 26 passed (local PG 17.6 + pgvector, libc en_US.UTF-8 db; tie file pg arms also green on an ICU en-US db); ruff check + format clean"
+decisions_made: []
+measured: "main 1a8f902 on PG 17.6, eight tied docs with ids differing in case and -/_: C db lexical DOC-G, Doc-B, Doc-D, doc-a, doc-c, doc-f, doc-h, doc_e (== sorted), top-2 [DOC-G, Doc-D]; ICU en-US and libc en_US.UTF-8 lexical doc_e, doc-a, Doc-B, doc-c, Doc-D, doc-f, DOC-G, doc-h, top-2 [Doc-D, doc-a]. After COLLATE \"C\": all three == sorted, top-2 [DOC-G, Doc-D]. EXPLAIN plan unchanged (Seq Scan -> Sort -> Limit). Revert 3 of 4 new red; the green one is the lowercase-id control."
+context_for_next_session:
+  - "MACOS_LIBC_en_US_UTF8_DOES_COLLATE_NON_C_ON_PG17_HOMEBREW_SO_A_LOCAL_initdb_REPRODUCES_CI_ORDERING_pg_ctl_NEEDS_LC_ALL_SET_OR_IT_DIES_postmaster_became_multithreaded"
+  - "THE_EXISTING_LOCK_index_EXTERNAL_ID_GT_index_ORDER_BY_WOULD_HAVE_MATCHED_THE_SELECT_LIST_IF_LOOSENED_NOW_SEARCHES_THE_ORDER_BY_SLICE"
+  - "PYPROJECT_ADDOPTS_HAS_-q_SO_A_SECOND_-q_HIDES_THE_SUMMARY_LINE_USE_-o_addopts_TO_READ_COUNTS"
+followups: []
+---
