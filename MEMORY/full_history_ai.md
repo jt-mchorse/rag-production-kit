@@ -4073,3 +4073,22 @@ context_for_next_session:
   - "NOT_FIXED_a_bare_ASCII_dot_between_two_questions_still_lets_an_and_conjunct_span_it_same_abbreviation_exclusion_as_364"
 followups: []
 ---
+
+---
+session: 2026-10-20T08:08Z
+issue: 376
+branch: session/2026-10-20-0817-issue-376
+focus: 375_HARD_SENTENCE_GAP_COUNTED_A_BANG_OR_ELLIPSIS_INSIDE_ONE_SENTENCE_YAHOO_JEOPARDY_HELP_SO_THE_AND_SPLIT_DECLINED_SINGLE_SENTENCE_QUESTIONS
+phase: shipped
+delta:
+  files_changed: 2
+  tests_added: 8
+  suite: "2628 passed, 2 skipped, 26 deselected (fresh py3.12 venv); 2628 passed, 2 skipped, 26 deselected (fresh py3.11 venv); ruff check + format clean"
+decisions_made: []
+measured: "main a196c0a: the four issue queries (Yahoo! Japan, Jeopardy! today, \"Help!\" mean, 'Wait… What') -> no_decomposition. After: each splits as on 1616d93; RAG! / RAG… / \"RAG!\" before 'What is' still no_decomposition; compare 'Yahoo! Japan' still declines (#364 rule kept). bench_rewriter md k=2/3/5 identical but for elapsed. Revert 4 of 8 new red; the 4 green are controls. Neighbour fix (drop !/… from the gap) caught by 3 new controls + the #373 and-conjunct-spans-bang case."
+context_for_next_session:
+  - "AND_SPLIT_NOW_USES_spans_a_sentence_BANG_AND_ELLIPSIS_ARE_A_GAP_ONLY_BEFORE_A_CAPITALISED_QUESTION_WORD_COMPARE_STILL_USES_HARD_SENTENCE_GAP"
+  - "OPEN_CALL_compare_could_share_the_rule_one_line_swap_noted_in_PR_377"
+  - "NOT_HANDLED_a_CJK_question_after_a_bang_looks_like_question_is_English_only"
+followups: []
+---

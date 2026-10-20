@@ -3623,3 +3623,15 @@ Japanese `？`, `！` or `。` with no space after it also counts as a sentence
 end now, as it already did in the answer generator (#262), so `MySQL？Which
 one ...` no longer becomes one compared item. Single-sentence queries split
 exactly as before, and the rewriter benchmark numbers are unchanged.
+
+## 2026-10-20 — A "!" or "…" inside one question no longer stops the "and" split (#376)
+
+The #373 fix made the "and" split decline when one half held a sentence end,
+and it counted every `!` and `…` as one. Names and titles use them mid-sentence,
+so "Who is the CEO of Yahoo! Japan and where is it headquartered?" stopped
+splitting, as did "Jeopardy! today", "Help!" and 'Wait… What'. A `!` or `…` now
+counts as a sentence end for the "and" split only when a new capitalised
+question follows it ("What is RAG! What is BM25 and ..."). Those two-question
+queries are still declined. The compare pattern keeps its stricter rule for
+now (it still declines "Compare Yahoo! Japan with Google"); whether to relax it
+is a separate call. The rewriter benchmark numbers are unchanged.
