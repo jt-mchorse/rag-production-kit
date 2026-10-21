@@ -3635,3 +3635,15 @@ question follows it ("What is RAG! What is BM25 and ..."). Those two-question
 queries are still declined. The compare pattern keeps its stricter rule for
 now (it still declines "Compare Yahoo! Japan with Google"); whether to relax it
 is a separate call. The rewriter benchmark numbers are unchanged.
+
+## 2026-10-21 — A "?" ending a quoted title no longer stops the "and" split (#378)
+
+The #376 fix let a `!` or `…` sit inside one question, but it still counted
+every `?` as a sentence end. So a question naming a title that ends in `?`
+stopped splitting: 'When was "Who Framed Roger Rabbit?" released and who
+directed it?' came back whole. A `?` now counts as inside the sentence when a
+closing quote or bracket follows it and the sentence goes on in lowercase, as
+it does in a title. Any other `?` is still a sentence end. That includes one
+before a capitalised word, like "What is RAG? Tell me about BM25 and ...", so
+two-sentence queries are still declined. This is stricter than the `!` rule on
+purpose. The rewriter benchmark numbers are unchanged.

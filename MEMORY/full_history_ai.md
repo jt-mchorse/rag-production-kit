@@ -4092,3 +4092,22 @@ context_for_next_session:
   - "NOT_HANDLED_a_CJK_question_after_a_bang_looks_like_question_is_English_only"
 followups: []
 ---
+
+---
+session: 2026-10-21T07:20Z
+issue: 378
+branch: session/2026-10-21-0720-issue-378
+focus: 376_KEPT_ASCII_QUESTION_MARK_HARD_SO_A_QUOTED_TITLE_ENDING_IN_QUESTION_MARK_ROGER_RABBIT_BLOCKED_THE_AND_SPLIT
+phase: shipped
+delta:
+  files_changed: 2
+  tests_added: 8
+  suite: "2636 passed, 2 skipped, 26 deselected (fresh py3.12 uv venv); ruff check + format clean"
+decisions_made: []
+measured: "main 3759f5d: the four issue queries (\"Who Framed Roger Rabbit?\" released, \"Why Not Me?\" about, \"Quo Vadis?\" about, \"Where Is My Mind?\" live) -> no_decomposition. After: each splits; 'What is RAG? What is BM25 and ...' (#373), 'RAG? Tell me ...', '\"RAG?\" Tell me ...' and bare 'RAG? what is ...' still no_decomposition. bench_rewriter json k=2/3/5 identical but for elapsed. Revert 4 of 8 new red; the 4 green are controls. Neighbour fix (add ? to _SOFT_TERMINATORS, the issue's literal fix shape) caught by 3 controls."
+context_for_next_session:
+  - "AND_SPLIT_ASCII_QUESTION_MARK_IS_A_GAP_UNLESS_CLOSERS_THEN_WHITESPACE_THEN_LOWERCASE_FOLLOW_STRICTER_THAN_THE_BANG_RULE_ON_PURPOSE"
+  - "SESSION_PLAN_COMMENT_WAS_POSTED_AFTER_THE_FIX_WAS_DRAFTED_NOT_BEFORE"
+  - "NOT_HANDLED_fullwidth_and_arabic_question_marks_stay_hard_compare_still_uses_HARD_SENTENCE_GAP"
+followups: []
+---
