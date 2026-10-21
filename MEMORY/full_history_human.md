@@ -3646,5 +3646,7 @@ refused a 0.5 answer, a `True` rerank score passed as 1.0, and
 `TypeError` that named nothing. The threshold's own docstring claimed it matched
 the `fusion.k` and `max_chunks` checks, and both of those refuse `True`. All
 three now raise a `ValueError`, as the telemetry checks have since #303. The
-score error names the chunk and the field. Plain ints and floats behave exactly
-as before.
+score error names the chunk and the field. Any other real number is still
+accepted and converted to a plain float. That includes the `numpy.float32`
+scores a sentence-transformers cross-encoder returns, which a first draft of
+this fix wrongly refused. Plain ints and floats behave exactly as before.

@@ -4101,13 +4101,14 @@ focus: REFUSAL_GATE_NUMERIC_GUARDS_CHECKED_FINITENESS_ONLY_SO_BOOL_PASSED_AS_1_O
 phase: shipped
 delta:
   files_changed: 3
-  tests_added: 26
-  suite: "2654 passed, 2 skipped, 26 deselected (fresh py3.12 venv); 2654 passed, 2 skipped, 26 deselected (fresh py3.11 venv); ruff check + format clean"
+  tests_added: 35
+  suite: "2658 passed, 7 skipped, 26 deselected (fresh py3.12 venv and fresh py3.11 venv); 2663 passed, 2 skipped with numpy installed; ruff check + format clean"
 decisions_made: []
-measured: "main 3759f5d: threshold=True -> Refusal used_threshold=True on a 0.5 top score; threshold=False -> GeneratedAnswer; threshold '0.5'/None -> raw TypeError; rerank_score True/False -> GeneratedAnswer/Refusal; fused_score True -> GeneratedAnswer; '0.5' score -> raw TypeError; length_penalty True/False accepted, '0.5'/None raw TypeError. After: ValueError at all three sites (score error names chunk + field); float/int controls unchanged. Revert 19 of 26 new red; the 7 green are controls (float/int threshold, float/int rerank score, None rerank falls back to fused, float/int length_penalty)."
+measured: "main 3759f5d: threshold=True -> Refusal used_threshold=True on a 0.5 top score; threshold=False -> GeneratedAnswer; threshold '0.5'/None -> raw TypeError; rerank_score True/False -> GeneratedAnswer/Refusal; fused_score True -> GeneratedAnswer; '0.5' score -> raw TypeError; length_penalty True/False accepted, '0.5'/None raw TypeError. After: ValueError at all three sites (score error names chunk + field); float/int controls unchanged; Fraction and numpy.float32 accepted and stored as float. Revert (numpy venv) 28 of 35 new red; the 7 green are controls (float/int threshold, float/int rerank score, None rerank falls back to fused, float/int length_penalty). Against the first int-or-float cut, the 9 Real/numpy/overflow arms go red."
 context_for_next_session:
-  - "TYPE_CHECK_IS_INT_OR_FLOAT_NOT_NUMBERS_REAL_a_Fraction_top_score_would_reach_render_comparison_and_Fraction_format_f_is_3_12_plus"
-  - "NUMPY_FLOAT32_SCORE_FROM_A_CUSTOM_RERANKER_IS_NOW_REFUSED_float64_still_accepted_numpy_is_not_a_dependency"
+  - "AMENDED_SAME_PR_ANY_NON_BOOL_numbers_Real_IS_ACCEPTED_AND_COERCED_TO_float_BEFORE_isfinite_AND_FORMATTING_the_first_int_or_float_cut_refused_numpy_float32_which_CrossEncoder_predict_returns"
+  - "OVERFLOW_a_real_too_big_for_a_double_10_to_400_now_raises_ValueError_not_a_bare_OverflowError"
+  - "NUMPY_ARMS_importorskip_numpy_is_not_in_dev_so_CI_skips_5_verified_in_a_scratch_venv_numpy_2_5_4"
   - "COHERE_SEAM_STILL_COERCES_relevance_score_VIA_float_SO_IT_NEVER_REACHES_THE_TYPE_ARM"
 followups: []
 ---
