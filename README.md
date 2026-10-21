@@ -372,13 +372,21 @@ retriever the eval suite uses). Real, reproducible numbers; not LLM-backed:
 
 | k | mean recall (baseline) | mean recall (rewriter) | improvements / regressions |
 |---|---:|---:|---:|
+| 1 | 0.438 | 0.375 | 0 / 1 |
 | 2 | 0.625 | 0.688 | 1 / 0 |
 | 3 | 0.625 | 0.812 | 3 / 0 |
+| 4 | 0.750 | 0.938 | 3 / 0 |
 | 5 | 0.875 | 0.938 | 1 / 0 |
 
-The gap is largest at k=3, where the candidate budget is tight relative
-to the two distinct facts each multi-hop query needs. No query regresses
-on this fixture; running it on your own corpus is two lines:
+The gap is largest at k=3 and k=4 (+0.188 each), where the candidate
+budget is tight relative to the two distinct facts each multi-hop query
+needs; from k=6 both paths reach 1.000. At k=2–5 no query regresses. At
+k=1 one does: `Where is Anthropic headquartered and who founded it?`
+drops from 0.50 to 0.00. The rewriter splits it into `who founded it?`,
+a sub-query with no antecedent, whose top hit is `founder-cohere`; that
+ties `hq-anthropic` in the fusion and wins the id tie-break. The
+template rewriter does not carry a subject into a pronoun-bearing
+second conjunct (#379). Running it on your own corpus is two lines:
 `python -m scripts.bench_rewriter --k 3 --output md`.
 `AnthropicRewriter` numbers are pending an operator-triggered run (the
 script wires it but the bench fixture above is `TemplateRewriter`-only
