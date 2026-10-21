@@ -705,3 +705,66 @@ def test_template_rewriter_and_split_bang_inside_a_sentence(query, expected, rea
     result = TemplateRewriter().rewrite(query)
     assert result.sub_queries == expected
     assert result.reasoning == reasoning
+
+
+# --- #378: a `?` that ends a quoted title inside one sentence does not stop the
+# "and" split; a `?` before a capitalised word, or bare, still does
+
+
+@pytest.mark.parametrize(
+    ("query", "expected", "reasoning"),
+    [
+        pytest.param(
+            'When was "Who Framed Roger Rabbit?" released and who directed it?',
+            ('When was "Who Framed Roger Rabbit?" released?', "who directed it?"),
+            "multi_question_and_pattern",
+            id="and-question-mark-in-a-quoted-title",
+        ),
+        pytest.param(
+            'What is "Why Not Me?" about and who wrote it?',
+            ('What is "Why Not Me?" about?', "who wrote it?"),
+            "multi_question_and_pattern",
+            id="and-question-mark-in-a-quoted-title-about",
+        ),
+        pytest.param(
+            'What is the movie "Quo Vadis?" about and who directed it?',
+            ('What is the movie "Quo Vadis?" about?', "who directed it?"),
+            "multi_question_and_pattern",
+            id="and-question-mark-in-a-quoted-movie-title",
+        ),
+        pytest.param(
+            'Who sang "Where Is My Mind?" live and when did they tour?',
+            ('Who sang "Where Is My Mind?" live?', "when did they tour?"),
+            "multi_question_and_pattern",
+            id="and-question-mark-in-a-quoted-song-title",
+        ),
+        pytest.param(
+            "What is RAG? What is BM25 and how does dense retrieval work?",
+            ("What is RAG? What is BM25 and how does dense retrieval work?",),
+            "no_decomposition",
+            id="control-373-two-questions",
+        ),
+        pytest.param(
+            "What is RAG? Tell me about BM25 and how does dense retrieval work?",
+            ("What is RAG? Tell me about BM25 and how does dense retrieval work?",),
+            "no_decomposition",
+            id="control-question-mark-before-a-capitalised-non-question",
+        ),
+        pytest.param(
+            'What is "RAG?" Tell me about BM25 and how does dense retrieval work?',
+            ('What is "RAG?" Tell me about BM25 and how does dense retrieval work?',),
+            "no_decomposition",
+            id="control-question-mark-and-closer-before-a-capitalised-word",
+        ),
+        pytest.param(
+            "What is RAG? what is BM25 and how does dense retrieval work?",
+            ("What is RAG? what is BM25 and how does dense retrieval work?",),
+            "no_decomposition",
+            id="control-bare-question-mark-before-a-lowercase-word",
+        ),
+    ],
+)
+def test_template_rewriter_and_split_question_mark_in_a_quoted_title(query, expected, reasoning):
+    result = TemplateRewriter().rewrite(query)
+    assert result.sub_queries == expected
+    assert result.reasoning == reasoning
