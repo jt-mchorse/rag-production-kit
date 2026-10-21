@@ -6,9 +6,15 @@
 refused a 0.5 top score -- and a str or `None` escaped as a bare TypeError
 instead of the ValueError every sibling guard raises. #303/#362 closed the same
 split for telemetry and `PhaseTimings`.
+
+Any other `numbers.Real` is accepted and coerced to `float`:
+sentence-transformers' `CrossEncoder.predict` returns `numpy.float32`, which
+is not a `float` subclass, and it is the usual custom reranker.
 """
 
 from __future__ import annotations
+
+from fractions import Fraction
 
 import pytest
 
@@ -24,6 +30,11 @@ from rag_kit.retriever import RetrievalResult
 
 _BAD = [True, False, "0.5", None]
 _BAD_IDS = ["true", "false", "str", "none"]
+
+
+def _np_float32(value: float) -> object:
+    np = pytest.importorskip("numpy")
+    return np.float32(value)
 
 
 def _result(*, fused: object = 0.5, rerank: object = None) -> RetrievalResult:
@@ -72,6 +83,30 @@ class TestThresholdType:
         assert isinstance(result, Refusal)
         assert result.used_threshold == 1
 
+    # Other reals are accepted and stored as float.
+
+    def test_fraction_threshold_stored_as_float(self) -> None:
+        # Also pins the refusal detail: `format(Fraction, ".4f")` raises on 3.11.
+        result = TemplateGenerator().generate(
+            "refund window", [_result()], threshold=Fraction(3, 4)
+        )
+        assert isinstance(result, Refusal)
+        assert type(result.used_threshold) is float
+        assert result.used_threshold == 0.75
+        assert "threshold=0.7500" in result.detail
+
+    def test_numpy_float32_threshold_stored_as_float(self) -> None:
+        result = TemplateGenerator().generate(
+            "refund window", [_result()], threshold=_np_float32(0.75)
+        )
+        assert isinstance(result, Refusal)
+        assert type(result.used_threshold) is float
+        assert result.used_threshold == 0.75
+
+    def test_int_threshold_too_large_for_a_double_rejected(self) -> None:
+        with pytest.raises(ValueError, match=r"threshold must be a finite number"):
+            TemplateGenerator().generate("refund window", [_result()], threshold=10**400)
+
 
 class TestScoreType:
     @pytest.mark.parametrize("score", _BAD[:3], ids=_BAD_IDS[:3])
@@ -95,6 +130,31 @@ class TestScoreType:
     def test_control_none_rerank_falls_back_to_fused(self) -> None:
         assert _top_score([_result(fused=0.25, rerank=None)]) == 0.25
 
+    # Other reals are accepted and come back as float.
+
+    def test_fraction_rerank_score_is_float(self) -> None:
+        top = _top_score([_result(rerank=Fraction(1, 4))])
+        assert type(top) is float
+        assert top == 0.25
+
+    def test_numpy_float32_rerank_score_is_float(self) -> None:
+        # The CrossEncoder.predict shape: a float32 per chunk.
+        top = _top_score([_result(rerank=_np_float32(0.25)), _result(rerank=_np_float32(0.5))])
+        assert type(top) is float
+        assert top == 0.5
+
+    def test_numpy_float32_score_refusal_detail_renders(self) -> None:
+        result = TemplateGenerator().generate(
+            "refund window", [_result(rerank=_np_float32(0.25))], threshold=0.5
+        )
+        assert isinstance(result, Refusal)
+        assert type(result.top_score) is float
+        assert "top_score=0.2500 below threshold=0.5000" in result.detail
+
+    def test_numpy_float32_nan_score_still_rejected(self) -> None:
+        with pytest.raises(ValueError, match=r"non-finite rerank_score \(nan\)"):
+            _top_score([_result(rerank=_np_float32(float("nan")))])
+
 
 class TestLengthPenaltyType:
     @pytest.mark.parametrize("penalty", _BAD, ids=_BAD_IDS)
@@ -105,3 +165,13 @@ class TestLengthPenaltyType:
     @pytest.mark.parametrize("penalty", [0.001, 0], ids=["float", "int"])
     def test_control_numeric_accepted(self, penalty: float) -> None:
         assert LexicalOverlapReranker(length_penalty=penalty).length_penalty == penalty
+
+    def test_fraction_stored_as_float(self) -> None:
+        stored = LexicalOverlapReranker(length_penalty=Fraction(1, 1000)).length_penalty
+        assert type(stored) is float
+        assert stored == 0.001
+
+    def test_numpy_float32_stored_as_float(self) -> None:
+        stored = LexicalOverlapReranker(length_penalty=_np_float32(0.5)).length_penalty
+        assert type(stored) is float
+        assert stored == 0.5

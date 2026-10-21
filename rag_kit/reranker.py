@@ -23,6 +23,7 @@ hybrid-only behavior.
 from __future__ import annotations
 
 import math
+import numbers
 import os
 from collections.abc import Sequence
 from dataclasses import dataclass
@@ -139,14 +140,21 @@ class LexicalOverlapReranker:
         # silently not surfaced first. Mirrors the finiteness sweep already
         # applied to fusion's `k`, `telemetry.ModelPrice`, and latency.
         # And their type half (#380): `True` was accepted as a 1.0 penalty and
-        # a str escaped `math.isfinite` as a bare TypeError.
-        if isinstance(length_penalty, bool) or not isinstance(length_penalty, (int, float)):
+        # a str escaped `math.isfinite` as a bare TypeError. Any other
+        # `numbers.Real` (`numpy.float32`, `Fraction`) is accepted and stored
+        # as a `float`, so every score it feeds is a plain float.
+        if isinstance(length_penalty, bool) or not isinstance(length_penalty, numbers.Real):
             raise ValueError(
                 f"length_penalty must be a finite number >= 0.0; got {length_penalty!r}"
             )
-        if not math.isfinite(length_penalty) or length_penalty < 0:
-            raise ValueError(f"length_penalty must be a finite number >= 0.0; got {length_penalty}")
-        self.length_penalty = length_penalty
+        try:
+            penalty = float(length_penalty)
+        except OverflowError:
+            # `10**400`: fail the finiteness check below, not as an OverflowError.
+            penalty = math.inf if length_penalty > 0 else -math.inf
+        if not math.isfinite(penalty) or penalty < 0:
+            raise ValueError(f"length_penalty must be a finite number >= 0.0; got {penalty}")
+        self.length_penalty = penalty
 
     def rerank(self, query: str, candidates: Sequence[Candidate]) -> list[ScoredCandidate]:
         if not query:
