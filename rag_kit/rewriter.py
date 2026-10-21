@@ -153,21 +153,34 @@ _HARD_SENTENCE_GAP = re.compile(
 # question follow them ("What is RAG! What is BM25 ..."). Every other
 # terminator is a gap as it is above. The compare entities (#364) still use
 # `_HARD_SENTENCE_GAP`.
+#
+# An ASCII `?` sits inside one sentence too, at the end of a quoted title:
+# 'When was "Who Framed Roger Rabbit?" released and ...' (#378). #376 kept `?`
+# hard, so those stopped splitting. A `?` is not a gap when one or more
+# closers, whitespace and a lowercase letter follow it. Any other `?` still
+# is: before a capitalised word of any kind ('What is RAG? Tell me ...'), and
+# a bare `?` before a lowercase word ('What is RAG? what is BM25 ...'), where
+# no closer says the `?` belongs to a quotation.
 _SOFT_TERMINATORS = "!…"
 _AND_HARD_GAP = re.compile(
-    rf"[{re.escape(_SENTENCE_TERMINATORS.replace('.', '').replace('!', '').replace('…', ''))}]"
+    rf"[{re.escape(_SENTENCE_TERMINATORS.replace('.', '').replace('!', '').replace('…', '').replace('?', ''))}]"
     rf"[{re.escape(_SENTENCE_CLOSERS)}]*\s+\S"
     rf"|[{_CJK_TERMINATORS}](?=[^\s{re.escape(_SENTENCE_CLOSERS + _SENTENCE_TERMINATORS)}])"
 )
 _AND_SOFT_GAP = re.compile(
     rf"[{re.escape(_SOFT_TERMINATORS)}][{re.escape(_SENTENCE_CLOSERS)}]*\s+(?=\S)"
 )
+_AND_QUESTION_GAP = re.compile(rf"\?([{re.escape(_SENTENCE_CLOSERS)}]*)\s+(?=\S)")
 
 
 def _spans_a_sentence(conjunct: str) -> bool:
-    """Whether an "and" conjunct holds a sentence end with more text after it (#373, #376)."""
+    """Whether an "and" conjunct holds a sentence end with more text after it (#373, #376, #378)."""
     if _AND_HARD_GAP.search(conjunct):
         return True
+    for gap in _AND_QUESTION_GAP.finditer(conjunct):
+        # A quoted title's `?`: a closer, then the sentence goes on in lowercase.
+        if not (gap.group(1) and conjunct[gap.end()].islower()):
+            return True
     for gap in _AND_SOFT_GAP.finditer(conjunct):
         rest = conjunct[gap.end() :]
         if rest[0].isupper() and _looks_like_question(rest):
@@ -363,7 +376,8 @@ def _split_question_and(query: str) -> list[str] | None:
         # What is BM25?', two questions searched as one. Decline, as compare
         # does; a `?` right before the "and" ("Who is X? and where ...") ends
         # its own conjunct and still splits. A `!` or `…` counts only before a
-        # new question, so "Yahoo! Japan" stays one sentence (#376).
+        # new question, so "Yahoo! Japan" stays one sentence (#376), and a `?`
+        # with a closer before a lowercase word is a quoted title's (#378).
         if _spans_a_sentence(s):
             return None
         # Re-append the question mark we stripped above so each sub-query
