@@ -4109,5 +4109,20 @@ context_for_next_session:
   - "AND_SPLIT_ASCII_QUESTION_MARK_IS_A_GAP_UNLESS_CLOSERS_THEN_WHITESPACE_THEN_LOWERCASE_FOLLOW_STRICTER_THAN_THE_BANG_RULE_ON_PURPOSE"
   - "SESSION_PLAN_COMMENT_WAS_POSTED_AFTER_THE_FIX_WAS_DRAFTED_NOT_BEFORE"
   - "NOT_HANDLED_fullwidth_and_arabic_question_marks_stay_hard_compare_still_uses_HARD_SENTENCE_GAP"
+session: 2026-10-21T07:24Z
+issue: 379
+branch: session/2026-10-21-0720-issue-379
+focus: README_REWRITER_BENCH_SAID_NO_QUERY_REGRESSES_BUT_AT_K_1_ONE_DOES_AND_K_4_TIES_K_3_FOR_THE_LARGEST_GAP
+phase: shipped
+delta:
+  files_changed: 2
+  tests_added: 10
+  suite: "2638 passed, 2 skipped, 26 deselected (fresh py3.11 .[dev] worktree venv); ruff check + format clean"
+decisions_made: []
+measured: "main 3759f5d: k=1 0.438 -> 0.375 (0 / 1), 'Where is Anthropic headquartered and who founded it?' 0.50 -> 0.00; sub-query 'who founded it?' top-1 founder-cohere ties hq-anthropic in RRF at 1/61 and wins the id tie-break. k=4 0.750 -> 0.938 (3 / 0) ties k=3 gap 0.1875; k>=6 1.000 both. After: README table k=1..5 + scoped prose; snapshot lock k=1..5 + bench-driven prose checks. Revert (README only) 6 of 14 red; 8 green controls (rows k=2/3/5, regressing-query k=2..6 vacuous)."
+context_for_next_session:
+  - "REWRITER_UNCHANGED_antecedent_carry_over_for_a_pronoun_second_conjunct_is_a_separate_feature_not_filed"
+  - "SNAPSHOT_TOLERANCE_WAS_EXACTLY_AT_THE_HALF_ROUND_BOUND_0_4375_VS_0_438_float_landed_above_5e-4_now_5e-4_plus_1e-9"
+  - "PROSE_LOCK_COLLAPSES_WHITESPACE_the_old_claim_was_split_across_a_hard_wrap_and_a_naive_substring_test_was_green_against_it"
 followups: []
 ---

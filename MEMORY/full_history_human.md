@@ -3647,3 +3647,15 @@ it does in a title. Any other `?` is still a sentence end. That includes one
 before a capitalised word, like "What is RAG? Tell me about BM25 and ...", so
 two-sentence queries are still declined. This is stricter than the `!` rule on
 purpose. The rewriter benchmark numbers are unchanged.
+## 2026-10-21 — The README now states the k=1 rewriter regression (#379)
+
+Under the rewriter benchmark table, the README said "No query regresses on this
+fixture", but the table only showed k=2, 3 and 5. At k=1 one query gets worse:
+"Where is Anthropic headquartered and who founded it?" drops from 0.50 to 0.00.
+The rewriter splits off "who founded it?", which doesn't say who "it" is. That
+sub-query's top hit is Cohere's founder, which ties with Anthropic's HQ chunk
+when the two result lists are merged and wins the tie on its id. The table now
+has k=1 and k=4 rows (k=4 ties k=3 for the biggest gain). The text names the
+regression and its cause, and the snapshot test checks every k from 1 to 6, so
+a future regression has to be named in the README. The rewriter itself is
+unchanged; carrying the subject into the second half is a separate feature.
