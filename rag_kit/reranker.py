@@ -138,6 +138,12 @@ class LexicalOverlapReranker:
         # sort as a no-op (NaN comparisons are false), so the relevant chunk is
         # silently not surfaced first. Mirrors the finiteness sweep already
         # applied to fusion's `k`, `telemetry.ModelPrice`, and latency.
+        # And their type half (#380): `True` was accepted as a 1.0 penalty and
+        # a str escaped `math.isfinite` as a bare TypeError.
+        if isinstance(length_penalty, bool) or not isinstance(length_penalty, (int, float)):
+            raise ValueError(
+                f"length_penalty must be a finite number >= 0.0; got {length_penalty!r}"
+            )
         if not math.isfinite(length_penalty) or length_penalty < 0:
             raise ValueError(f"length_penalty must be a finite number >= 0.0; got {length_penalty}")
         self.length_penalty = length_penalty

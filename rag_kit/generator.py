@@ -390,8 +390,15 @@ def _top_score(retrieved: Sequence[RetrievalResult]) -> float:
     # order and a NaN batch answered when it should refuse. `+inf` would pass
     # every threshold too. Fail loud, like `_validate_threshold` (#78).
     for r, score in zip(retrieved, scores, strict=True):
+        field = "rerank_score" if r.rerank_score is not None else "fused_score"
+        # The type half (#380): `True` passed the finiteness gate as 1.0 and a
+        # str escaped `math.isfinite` as a bare TypeError naming no chunk.
+        if isinstance(score, bool) or not isinstance(score, (int, float)):
+            raise ValueError(
+                f"chunk {r.external_id!r} has a non-numeric {field} ({score!r}); "
+                "the refusal gate compares it against a numeric threshold"
+            )
         if not math.isfinite(score):
-            field = "rerank_score" if r.rerank_score is not None else "fused_score"
             raise ValueError(
                 f"chunk {r.external_id!r} has a non-finite {field} ({score!r}); "
                 "a NaN/Inf score would poison the refusal gate "
@@ -756,7 +763,15 @@ def _validate_threshold(threshold: float) -> None:
     (#75), and `max_chunks` (#41). A *finite* negative threshold stays
     valid: `_top_score` can be genuinely negative (#69), so a negative floor
     is a legitimate "accept low-overlap chunks" configuration.
+
+    And the type half (#380). Two of the three guards named above refuse a
+    `bool`; this one checked finiteness only, so `threshold=True` was a 1.0
+    floor (refusing a 0.5 top score) and `False` a 0.0 one, while a str or
+    `None` escaped `math.isfinite` as a bare TypeError -- the same split
+    #303/#362 closed for telemetry and `PhaseTimings`.
     """
+    if isinstance(threshold, bool) or not isinstance(threshold, (int, float)):
+        raise ValueError(f"threshold must be a finite number; got {threshold!r}")
     if not math.isfinite(threshold):
         raise ValueError(f"threshold must be a finite number; got {threshold!r}")
 
