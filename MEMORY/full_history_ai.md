@@ -4092,3 +4092,22 @@ context_for_next_session:
   - "NOT_HANDLED_a_CJK_question_after_a_bang_looks_like_question_is_English_only"
 followups: []
 ---
+
+---
+session: 2026-10-21T07:23Z
+issue: 380
+branch: session/2026-10-21-0720-issue-380
+focus: REFUSAL_GATE_NUMERIC_GUARDS_CHECKED_FINITENESS_ONLY_SO_BOOL_PASSED_AS_1_OR_0_AND_STR_NONE_ESCAPED_AS_RAW_TYPEERROR_THE_TYPE_HALF_OF_303_362_APPLIED_TO_78_372_75
+phase: shipped
+delta:
+  files_changed: 3
+  tests_added: 26
+  suite: "2654 passed, 2 skipped, 26 deselected (fresh py3.12 venv); 2654 passed, 2 skipped, 26 deselected (fresh py3.11 venv); ruff check + format clean"
+decisions_made: []
+measured: "main 3759f5d: threshold=True -> Refusal used_threshold=True on a 0.5 top score; threshold=False -> GeneratedAnswer; threshold '0.5'/None -> raw TypeError; rerank_score True/False -> GeneratedAnswer/Refusal; fused_score True -> GeneratedAnswer; '0.5' score -> raw TypeError; length_penalty True/False accepted, '0.5'/None raw TypeError. After: ValueError at all three sites (score error names chunk + field); float/int controls unchanged. Revert 19 of 26 new red; the 7 green are controls (float/int threshold, float/int rerank score, None rerank falls back to fused, float/int length_penalty)."
+context_for_next_session:
+  - "TYPE_CHECK_IS_INT_OR_FLOAT_NOT_NUMBERS_REAL_a_Fraction_top_score_would_reach_render_comparison_and_Fraction_format_f_is_3_12_plus"
+  - "NUMPY_FLOAT32_SCORE_FROM_A_CUSTOM_RERANKER_IS_NOW_REFUSED_float64_still_accepted_numpy_is_not_a_dependency"
+  - "COHERE_SEAM_STILL_COERCES_relevance_score_VIA_float_SO_IT_NEVER_REACHES_THE_TYPE_ARM"
+followups: []
+---

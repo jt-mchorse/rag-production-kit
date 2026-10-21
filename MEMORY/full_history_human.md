@@ -3635,3 +3635,16 @@ question follows it ("What is RAG! What is BM25 and ..."). Those two-question
 queries are still declined. The compare pattern keeps its stricter rule for
 now (it still declines "Compare Yahoo! Japan with Google"); whether to relax it
 is a separate call. The rewriter benchmark numbers are unchanged.
+
+## 2026-10-21 — A true/false or text threshold, score or length penalty fails with a clear error (#380)
+
+The refusal threshold, the chunk score the refusal check reads, and the lexical
+reranker's `length_penalty` were only checked for NaN and infinity. Python
+counts `True` as a finite number, so `threshold=True` worked as a 1.0 floor and
+refused a 0.5 answer, a `True` rerank score passed as 1.0, and
+`length_penalty=True` was accepted. A string or `None` failed with a bare
+`TypeError` that named nothing. The threshold's own docstring claimed it matched
+the `fusion.k` and `max_chunks` checks, and both of those refuse `True`. All
+three now raise a `ValueError`, as the telemetry checks have since #303. The
+score error names the chunk and the field. Plain ints and floats behave exactly
+as before.
