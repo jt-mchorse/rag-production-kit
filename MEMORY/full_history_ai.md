@@ -4109,6 +4109,10 @@ context_for_next_session:
   - "AND_SPLIT_ASCII_QUESTION_MARK_IS_A_GAP_UNLESS_CLOSERS_THEN_WHITESPACE_THEN_LOWERCASE_FOLLOW_STRICTER_THAN_THE_BANG_RULE_ON_PURPOSE"
   - "SESSION_PLAN_COMMENT_WAS_POSTED_AFTER_THE_FIX_WAS_DRAFTED_NOT_BEFORE"
   - "NOT_HANDLED_fullwidth_and_arabic_question_marks_stay_hard_compare_still_uses_HARD_SENTENCE_GAP"
+followups: []
+---
+
+---
 session: 2026-10-21T07:24Z
 issue: 379
 branch: session/2026-10-21-0720-issue-379

@@ -3647,6 +3647,7 @@ it does in a title. Any other `?` is still a sentence end. That includes one
 before a capitalised word, like "What is RAG? Tell me about BM25 and ...", so
 two-sentence queries are still declined. This is stricter than the `!` rule on
 purpose. The rewriter benchmark numbers are unchanged.
+
 ## 2026-10-21 — The README now states the k=1 rewriter regression (#379)
 
 Under the rewriter benchmark table, the README said "No query regresses on this
