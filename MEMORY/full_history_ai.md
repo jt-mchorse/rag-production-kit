@@ -3765,13 +3765,6 @@ duration_min: 12   # approx: plan comment -> PR
 issue: 342
 branch: session/2026-10-15-0719-issue-342
 focus: PRICETABLE_CONSTRUCTOR_COPIED_ITS_MAPPING_UNCHECKED_A_JSON_LOADED_TABLE_BUILT_AND_FAILED_ON_THE_FIRST_REQUEST_AS_ATTRIBUTEERROR_ADD_VALIDATES_THE_SAME_ENTRY
----
-
----
-session: 2026-10-15T08:12Z
-issue: 348
-branch: session/2026-10-15-0812-issue-348
-focus: INDEXER_COMMITTED_UNCONDITIONALLY_SO_ITS_OWN_DOCUMENTED_conn_transaction_WRAPPING_RAISED_AND_WROTE_NOTHING_AND_ONE_FAILED_WRITE_POISONED_THE_CONNECTION
 phase: shipped
 delta:
   files_changed: 2
@@ -3825,6 +3818,14 @@ followups: []
 ---
 
 ---
+session: 2026-10-15T08:12Z
+issue: 348
+branch: session/2026-10-15-0812-issue-348
+focus: INDEXER_COMMITTED_UNCONDITIONALLY_SO_ITS_OWN_DOCUMENTED_conn_transaction_WRAPPING_RAISED_AND_WROTE_NOTHING_AND_ONE_FAILED_WRITE_POISONED_THE_CONNECTION
+phase: shipped
+delta:
+  files_changed: 2
+  tests_added: 11
   suite: "pytest not-pg 2416 passed, 2 skipped; pg 19 passed (local PG 17.6, stub vector domain: no pgvector on this host); ruff check + format clean"
 decisions_made: []
 measured: "main 8bfb422 on PG 17.6: add_documents inside conn.transaction() -> ProgrammingError 'Explicit commit() forbidden within a Transaction context', 0 rows; clear() likewise; oversized-tsvector batch -> INERROR, next add_documents and search -> InFailedSqlTransaction; clear() under lock_timeout -> INERROR, retry -> InFailedSqlTransaction. Fixed: all succeed, connection IDLE after each failure. Revert: 10 of 11 new red (idle-connection commit control green)."
