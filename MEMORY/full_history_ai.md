@@ -4189,3 +4189,22 @@ context_for_next_session:
   - "REAL_COLUMNS_STORE_AN_INT_AS_ITS_FLOAT_ts_2_63_minus_1_reads_back_as_9_223372036854776e18_parity_test_compares_float_value"
 followups: []
 ---
+
+---
+session: 2026-10-22T08:06Z
+issue: 391
+branch: session/2026-10-22-0806-issue-391
+focus: CRLF_BLANK_LINE_AND_BLOCKQUOTE_PARAGRAPH_BREAK_WERE_NOT_STRUCTURAL_BREAKS_SO_AN_UNCITED_PARAGRAPH_STILL_RODE_THE_NEXT_CITE_MARKER_385_SIBLINGS
+phase: shipped
+delta:
+  files_changed: 2
+  tests_added: 24
+  suite: "2789 passed, 7 skipped, 26 deselected (fresh py3.11 .[dev] venv, ruff 0.17.1); repo venv py3.14 green; ruff check + format clean; eval diff 0 flagged all 3 suites; pg job not run locally (no Postgres)"
+decisions_made: []
+measured: "main 1ff10c8, AnthropicGenerator fake end_turn, chunk pg-tuning: 'U\\r\\n\\r\\nC', 'U\\r\\rC', '> U\\n>\\n> C', '> U\\n> - C' -> GeneratedAnswer, 1 sentence each; fully cited '> 1. a\\n> 2. b' -> Refusal on the '> 1.' fragment. After: all four Refusal naming U; quoted numbered list GeneratedAnswer; hard-wrapped quoted/CRLF sentence still 1 sentence. Revert (generator.py only, pycache cleared) 12 of 24 red; 12 green controls (CRLF list item + CRLF heading were already boundaries on main, 7 cited CRLF/quote answers, 3 hard-wrapped). Partial fix without quote-aware lead-in/heading/ordered-marker checks turned 3 controls red."
+context_for_next_session:
+  - "BOUNDARIES_FOUND_ON_A_SAME_LENGTH_COPY_crlf_to_space_lf_and_cr_to_lf_parts_sliced_from_original_so_a_crlf_part_keeps_a_trailing_cr"
+  - "CRLF_LIST_ITEM_AND_HEADING_ALREADY_SPLIT_ON_MAIN_because_the_lf_of_crlf_is_still_followed_by_the_marker_only_blank_lines_were_missed"
+  - "NOT_HANDLED_u2028_u0085_formfeed_line_separators_and_setext_or_fenced_blocks_inside_a_quote_389_class"
+followups: []
+---

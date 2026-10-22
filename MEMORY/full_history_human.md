@@ -3705,3 +3705,18 @@ so a record made directly with the constructor gets the same error at
 `record()`. Values at the exact 64-bit limits, and large float timestamps, are
 still stored. A new test checks that every edge value `build` accepts comes
 back out of the store unchanged.
+
+## 2026-10-22 — Windows line endings and blockquote paragraph breaks now end a sentence (#391)
+
+The #385 fix taught the citation check that a blank line, a list item or a
+heading ends a sentence, but it only recognised a blank line written with plain
+`\n` line endings. With Windows-style `\r\n` endings, or inside a `>`
+blockquote where the blank line is written as a bare `>`, two paragraphs still
+read as one sentence. An uncited first paragraph then passed on the second
+paragraph's citation. The splitter now looks for breaks on a copy of the text
+where every line ending is a plain newline, and it looks past a `>` prefix, so
+these answers are refused like their plain-text versions. Sentences are still
+cut from the original text. Inside a quote, a fully cited list under a heading
+or a `:` lead-in is still accepted. So is a numbered list, which used to be
+refused because its `1.` was read as a sentence of its own. A hard-wrapped
+quoted sentence stays one sentence.
