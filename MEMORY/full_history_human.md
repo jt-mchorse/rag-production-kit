@@ -3690,3 +3690,18 @@ did before, so a fully cited list under one is still accepted. A claim written
 into such a lead-in still rides the first item's citation; separating it would
 need a way to tell a label from a claim. A fully cited numbered list used to be
 refused because its `1.` was read as a sentence of its own, and is now accepted.
+
+## 2026-10-22 — Telemetry refuses huge ints and non-text phase names before they reach SQLite (#387)
+
+`CostRecord.build` checked the type and sign of every number but not whether
+SQLite could hold it. SQLite stores integers in 64 bits, so a timestamp,
+latency or token count of `2**63` passed `build` and then crashed `record()`
+with a bare `OverflowError`. The per-phase latency map is meant to be keyed by
+phase-name strings, but nobody checked the keys: a tuple key crashed `record()`,
+`None` came back as the string `"null"`, and `{1: 5.0, "1": 6.0}` came back
+with the 5.0 quietly gone. `build` now refuses all of these with a clear
+`ValueError`. The size check lives in the helpers `build` and `record()` share,
+so a record made directly with the constructor gets the same error at
+`record()`. Values at the exact 64-bit limits, and large float timestamps, are
+still stored. A new test checks that every edge value `build` accepts comes
+back out of the store unchanged.

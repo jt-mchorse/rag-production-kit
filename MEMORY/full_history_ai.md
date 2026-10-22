@@ -4170,3 +4170,22 @@ context_for_next_session:
   - "NON_EDITABLE_VENV_FAILS_test_bench_streaming_subprocess_cwd_tmp_needs_PYTHONPATH_worktree_not_a_real_failure"
 followups: []
 ---
+
+---
+session: 2026-10-22T07:39Z
+issue: 387
+branch: session/2026-10-22-0738-issue-387
+focus: COSTRECORD_BUILD_ACCEPTED_INTS_PAST_SQLITE_INT64_AND_NON_STR_PER_PHASE_MS_KEYS_THAT_RECORD_RAISED_ON_RAW_OR_SILENTLY_MERGED
+phase: shipped
+delta:
+  files_changed: 2
+  tests_added: 61
+  suite: "2739 passed, 5 skipped, 26 deselected (repo venv py3.14); 2737 passed, 7 skipped, 26 deselected (fresh py3.11 .[dev] venv); ruff check + format clean"
+decisions_made: []
+measured: "main a2a3187: ts/total_latency_ms/retrieved_count/prompt_tokens/completion_tokens = 2**63 and ts = -2**63-1 -> record raw OverflowError; per_phase_ms {('a','b'):1.0} -> record raw TypeError; {1:5.0,'1':6.0} -> read back {'1':6.0}; {None:5.0} -> {'null':5.0}. After: ValueError at build for all; bare-constructor int 2**63 in any REAL/INTEGER column -> ValueError at record; exact bounds 2**63-1 / -2**63 and float ts 1e300 still stored. Revert (telemetry.py only, pycache cleared) 35 of 61 red; 26 green controls (bound round trips, str-key round trip, 18 already-storable parity rows)."
+context_for_next_session:
+  - "RANGE_CHECK_IS_IN_THE_SHARED_HELPERS_checked_ts_AND_checked_columns_PLUS_RECORDS_REAL_LOOP_SO_BUILD_AND_RECORD_REFUSE_IN_THE_SAME_WORDS_floats_never_range_checked"
+  - "NOT_HANDLED_record_still_does_not_check_per_phase_ms_keys_or_values_on_bare_constructor_records_never_has"
+  - "REAL_COLUMNS_STORE_AN_INT_AS_ITS_FLOAT_ts_2_63_minus_1_reads_back_as_9_223372036854776e18_parity_test_compares_float_value"
+followups: []
+---
