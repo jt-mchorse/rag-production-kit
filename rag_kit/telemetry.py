@@ -164,6 +164,22 @@ class PriceTable:
 # ----------------------------------------------------------------------
 
 
+#: SQLite's INTEGER range (#387). `sqlite3` binds every Python `int` as a
+#: signed 64-bit INTEGER -- even into a REAL column -- so an int outside it
+#: escaped `record` as a raw `OverflowError`, after `build` had accepted it.
+_SQLITE_INT_MIN = -(2**63)
+_SQLITE_INT_MAX = 2**63 - 1
+
+
+def _check_sqlite_int_range(value: Any, name: str) -> None:
+    """Refuse an ``int`` SQLite cannot bind (#387); a ``float`` is never one."""
+    if isinstance(value, int) and not _SQLITE_INT_MIN <= value <= _SQLITE_INT_MAX:
+        raise ValueError(
+            f"{name} must fit SQLite's signed 64-bit INTEGER range "
+            f"[{_SQLITE_INT_MIN}, {_SQLITE_INT_MAX}]; got {value}"
+        )
+
+
 def _checked_ts(ts_value: Any, name: str = "ts") -> float:
     """``ts`` as ``build`` and ``TelemetryStore.record`` both require it (#184, #245).
 
@@ -178,6 +194,7 @@ def _checked_ts(ts_value: Any, name: str = "ts") -> float:
         raise ValueError(
             f"{name} must be a finite number of seconds since the Unix epoch (UTC); got {ts_value}"
         )
+    _check_sqlite_int_range(ts_value, name)
     return ts_value
 
 
@@ -231,7 +248,8 @@ def _checked_columns(values: Mapping[str, Any]) -> None:
 
     A ``str`` holding a lone surrogate is refused too (#368): SQLite binds text
     as UTF-8, which cannot encode one, so it escaped ``record`` as a raw
-    ``UnicodeEncodeError``. A NUL is not refused -- SQLite stores it intact."""
+    ``UnicodeEncodeError``. A NUL is not refused -- SQLite stores it intact.
+    Nor is an INTEGER above ``2**63 - 1`` (#387): it escaped as ``OverflowError``."""
     for name in _TEXT_CHECKED_FIELDS:
         value = values[name]
         if not isinstance(value, str):
@@ -244,6 +262,7 @@ def _checked_columns(values: Mapping[str, Any]) -> None:
         # bool is an int subclass; a stray True must not pose as a count.
         if isinstance(value, bool) or not isinstance(value, int) or value < 0:
             raise ValueError(f"{name} must be a non-negative int; got {value!r}")
+        _check_sqlite_int_range(value, name)
 
 
 @dataclass(frozen=True)
@@ -387,6 +406,7 @@ class CostRecord:
             raise ValueError(
                 f"total_latency_ms must be a finite non-negative number; got {total_latency_ms}"
             )
+        _check_sqlite_int_range(total_latency_ms, "total_latency_ms")
         # Per-phase value guard (#108): the same finiteness/sign contract as
         # total_latency_ms above, applied to each per_phase_ms value. Without
         # it a non-finite phase value reaches TelemetryStore.record, which
@@ -395,7 +415,18 @@ class CostRecord:
         # whole row's phases on JSONDecodeError, silently dropping the data.
         # bool is an int subclass; reject it so a stray True/False can't pose
         # as a millisecond value.
+        #
+        # Keys must be `str`, as the annotation says (#387). `record` persists
+        # the map with `json.dumps`, which raised a raw TypeError for a tuple
+        # key and coerced the rest to strings: `{None: 5.0}` came back as
+        # `{"null": 5.0}`, and `{1: 5.0, "1": 6.0}` as `{"1": 6.0}`, the 5.0
+        # silently gone.
         for phase, value in (per_phase_ms or {}).items():
+            if not isinstance(phase, str):
+                raise ValueError(
+                    f"per_phase_ms keys must be str phase names; "
+                    f"got {type(phase).__name__} {phase!r}"
+                )
             if isinstance(value, bool) or not isinstance(value, (int, float)):
                 raise ValueError(
                     f"per_phase_ms[{phase!r}] must be a finite non-negative number; got {value!r}"
@@ -479,7 +510,8 @@ class TelemetryStore:
         Raises ``ValueError`` for a ``ts`` outside ``CostRecord.build``'s rule,
         any other ``REAL`` column that is not a non-``bool`` ``int``/``float``
         or is NaN (#245, #368), or a ``TEXT``/``INTEGER`` column of the wrong
-        type or a ``TEXT`` one holding a lone surrogate (#352, #368). ``build``
+        type or a ``TEXT`` one holding a lone surrogate (#352, #368), or an
+        ``int`` in any column outside SQLite's signed 64-bit range (#387). ``build``
         already refuses them; the bare constructor is public (`rag_kit.__all__`) and validates
         neither, and ``ts`` cannot be guarded at a read boundary the way
         ``aggregate`` guards latency: ``since()`` filters and orders on it in
@@ -504,6 +536,7 @@ class TelemetryStore:
                     f"{name} must not be NaN; SQLite stores NaN as NULL, which the "
                     f"NOT NULL column {name} refuses"
                 )
+            _check_sqlite_int_range(value, name)
         cur = self._conn.execute(
             """
             INSERT INTO cost_records (
