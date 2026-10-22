@@ -172,11 +172,19 @@ _SQLITE_INT_MAX = 2**63 - 1
 
 
 def _check_sqlite_int_range(value: Any, name: str) -> None:
-    """Refuse an ``int`` SQLite cannot bind (#387); a ``float`` is never one."""
+    """Refuse an ``int`` SQLite cannot bind (#387); a ``float`` is never one.
+
+    Call it BEFORE ``math.isfinite`` / ``math.isnan`` (#392): both convert an
+    ``int`` to ``float`` first, so one past float range (``10**400``) raised a
+    raw ``OverflowError`` from the finiteness check and never reached this one.
+    Such an int is named by its size, not its digits: past 4300 digits ``str()``
+    itself raises, and the message would lose the field name.
+    """
     if isinstance(value, int) and not _SQLITE_INT_MIN <= value <= _SQLITE_INT_MAX:
+        got = value if value.bit_length() <= 128 else f"an int of {value.bit_length()} bits"
         raise ValueError(
             f"{name} must fit SQLite's signed 64-bit INTEGER range "
-            f"[{_SQLITE_INT_MIN}, {_SQLITE_INT_MAX}]; got {value}"
+            f"[{_SQLITE_INT_MIN}, {_SQLITE_INT_MAX}]; got {got}"
         )
 
 
@@ -190,11 +198,11 @@ def _checked_ts(ts_value: Any, name: str = "ts") -> float:
             f"{name} must be a finite number of seconds since the Unix epoch (UTC); "
             f"got {ts_value!r}"
         )
+    _check_sqlite_int_range(ts_value, name)  # before isfinite (#392)
     if not math.isfinite(ts_value):
         raise ValueError(
             f"{name} must be a finite number of seconds since the Unix epoch (UTC); got {ts_value}"
         )
-    _check_sqlite_int_range(ts_value, name)
     return ts_value
 
 
@@ -208,11 +216,16 @@ def _checked_floor(value: Any, name: str) -> float:
     a quiet day. ``True`` read as 1970. Unlike a stored ``ts``, an infinite
     floor means what it says (``-inf`` everything, ``inf`` nothing), so it is
     allowed; NaN is not a floor at all.
+
+    An ``int`` floor must fit SQLite's INTEGER range, as a stored ``ts`` must
+    (#392): ``WHERE ts >= ?`` binds it, so ``2**63`` escaped as a raw
+    ``OverflowError`` -- and ``10**400`` already did so at ``math.isnan``.
     """
     if isinstance(value, bool) or not isinstance(value, (int, float)):
         raise ValueError(
             f"{name} must be a number of seconds since the Unix epoch (UTC); got {value!r}"
         )
+    _check_sqlite_int_range(value, name)  # before isnan (#392)
     if math.isnan(value):
         raise ValueError(f"{name} must not be NaN; it matches no row, so the window is empty")
     return value
@@ -402,11 +415,11 @@ class CostRecord:
             raise ValueError(
                 f"total_latency_ms must be a finite non-negative number; got {total_latency_ms!r}"
             )
+        _check_sqlite_int_range(total_latency_ms, "total_latency_ms")  # before isfinite (#392)
         if not math.isfinite(total_latency_ms) or total_latency_ms < 0:
             raise ValueError(
                 f"total_latency_ms must be a finite non-negative number; got {total_latency_ms}"
             )
-        _check_sqlite_int_range(total_latency_ms, "total_latency_ms")
         # Per-phase value guard (#108): the same finiteness/sign contract as
         # total_latency_ms above, applied to each per_phase_ms value. Without
         # it a non-finite phase value reaches TelemetryStore.record, which
@@ -431,6 +444,9 @@ class CostRecord:
                 raise ValueError(
                     f"per_phase_ms[{phase!r}] must be a finite non-negative number; got {value!r}"
                 )
+            # The same int range as `total_latency_ms` (#392). An int past float
+            # range made `math.isfinite` itself raise a raw OverflowError.
+            _check_sqlite_int_range(value, f"per_phase_ms[{phase!r}]")
             if not math.isfinite(value) or value < 0:
                 raise ValueError(
                     f"per_phase_ms[{phase!r}] must be a finite non-negative number; got {value}"
@@ -604,7 +620,12 @@ class TelemetryStore:
         return out
 
     def last_24h(self, now: float | None = None) -> list[CostRecord]:
-        cutoff = (_checked_ts(now, "now") if now is not None else time.time()) - 24 * 3600
+        # `float(...)` (#392): an int `now` that `_checked_ts` accepts can still
+        # fall below SQLite's INTEGER range once the 24 hours are subtracted --
+        # `now=-2**63` is a `ts` that `record` stores, but the int cutoff escaped
+        # `since` as a raw OverflowError. `ts` is a REAL column, so a float
+        # cutoff is the comparison SQLite makes anyway.
+        cutoff = float(_checked_ts(now, "now") if now is not None else time.time()) - 24 * 3600
         return self.since(cutoff)
 
     def dump_aggregate_json(self, path: str | Path, *, since_ts: float | None = None) -> None:
