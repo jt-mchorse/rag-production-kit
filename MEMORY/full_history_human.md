@@ -3675,3 +3675,18 @@ score error names the chunk and the field. Any other real number is still
 accepted and converted to a plain float. That includes the `numpy.float32`
 scores a sentence-transformers cross-encoder returns, which a first draft of
 this fix wrongly refused. Plain ints and floats behave exactly as before.
+
+## 2026-10-22 — An uncited bullet or paragraph no longer rides the next sentence's citation (#385)
+
+The citation check split an answer into sentences only at `.`, `!`, `?` and
+similar marks. A markdown bullet or paragraph with no closing punctuation was
+merged into the sentence after it, so an uncited claim in a bullet list passed
+as long as the next bullet had a `[cite:...]` marker. A blank line, a new list
+item (`-`, `*`, `+`, `1.`, `1)`) and a `#` heading now each end a sentence. A
+plain line break inside a sentence does not: splitting there refused correctly
+cited hard-wrapped answers when measured. A heading, or a lead-in line ending in
+`:` such as "Key Postgres settings:", stays joined to what follows it, as it
+did before, so a fully cited list under one is still accepted. A claim written
+into such a lead-in still rides the first item's citation; separating it would
+need a way to tell a label from a claim. A fully cited numbered list used to be
+refused because its `1.` was read as a sentence of its own, and is now accepted.

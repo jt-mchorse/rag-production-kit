@@ -4150,3 +4150,22 @@ context_for_next_session:
   - "COHERE_SEAM_STILL_COERCES_relevance_score_VIA_float_SO_IT_NEVER_REACHES_THE_TYPE_ARM"
 followups: []
 ---
+
+---
+session: 2026-10-22T07:24Z
+issue: 385
+branch: session/2026-10-22-0724-issue-385
+focus: SPLIT_SENTENCES_CUT_ONLY_AFTER_A_TERMINATOR_SO_AN_UNTERMINATED_BULLET_OR_PARAGRAPH_RODE_THE_NEXT_SENTENCES_CITE_MARKER_BLANK_LINE_LIST_ITEM_HEADING_NOW_BOUNDARIES
+phase: shipped
+delta:
+  files_changed: 2
+  tests_added: 28
+  suite: "2706 passed, 5 skipped, 26 deselected (repo venv py3.14); 2704 passed, 7 skipped (fresh py3.11 venv); ruff check + format clean; pg job not run locally (no Postgres/Docker)"
+decisions_made: []
+measured: "main a2a3187, AnthropicGenerator fake end_turn, chunk pg-tuning: issue bullets (uncited middle) -> GeneratedAnswer, 1 sentence; issue paragraphs -> GeneratedAnswer, 1 sentence; fully cited '1. a\\n2. b' -> Refusal on the '1.' fragment. After: both bypasses Refusal naming the uncited item; cited numbered list GeneratedAnswer; cited list under ':' lead-in or '## heading' GeneratedAnswer; hard-wrapped cited sentence GeneratedAnswer. Bare-newline-split variant (monkeypatched) refused 2 of 2 hard-wrapped cited answers, so not shipped. Revert 17 of 28 new red; 11 green controls (9 cited structures, single-newline non-boundary, no split inside a marker). numbered-dot bypass row was green on the first probe (refused on '1.' not the claim) until the test asserted which sentence was refused."
+context_for_next_session:
+  - "LEAD_IN_AND_HEADING_STAY_ATTACHED_a_claim_written_into_a_colon_lead_in_or_heading_still_rides_the_first_items_marker_needs_a_claim_label_classifier_design_call"
+  - "TABLES_AND_FENCED_CODE_STILL_MERGE_rows_are_single_newline_separated_not_filed"
+  - "NON_EDITABLE_VENV_FAILS_test_bench_streaming_subprocess_cwd_tmp_needs_PYTHONPATH_worktree_not_a_real_failure"
+followups: []
+---
