@@ -113,7 +113,17 @@ _SENTENCE_SPLIT = re.compile(
 # (`-`, `*`, `+`, `1.`, `1)`), or an ATX heading (`#`..`######` then a space).
 # A bare single newline is not one: a hard-wrapped sentence would be cut in
 # two and its first half refused, so it stays the cheaper over-merge.
-_STRUCTURAL_BREAK = re.compile(r"\n(?=[ \t]*(?:\n|(?:[-*+]|\d{1,9}[.)])[ \t]|#{1,6}[ \t]))")
+#
+# The same breaks inside a blockquote (#391). A line holding only `>`s is
+# markdown's blank line within a quote, and `> - item` / `> # h` are its list
+# items and headings, so the lookahead first skips any `>` prefix. Without it
+# `> claim\n>\n> cited [cite:x]` was one sentence. `_QUOTE_PREFIX` is that
+# prefix, and `_QUOTE_BLANK` a line that is blank once it is removed.
+_QUOTE_PREFIX = re.compile(r"(?:[ \t]*>)*")
+_QUOTE_BLANK = re.compile(r"[ \t>]*")
+_STRUCTURAL_BREAK = re.compile(
+    r"\n(?=(?:[ \t]*>)*[ \t]*(?:\n|(?:[-*+]|\d{1,9}[.)])[ \t]|#{1,6}[ \t]))"
+)
 # The text in front of a break that it does NOT cut after (#385): a heading line,
 # or a lead-in ending in `:` ("Key Postgres settings:"). Neither got its own
 # sentence before #385 (each rode the text after it), and they carry no marker
@@ -126,7 +136,8 @@ _LEAD_IN = re.compile(r".*:[ \t]*")
 # An ordered-list marker at the start of a line (`1. item`). `_SENTENCE_SPLIT`
 # reads its `.` plus space as a sentence end, so `'1.'` was cut off as a
 # fragment and, holding a digit, refused a fully cited numbered list (#385).
-_ORDERED_MARKER = re.compile(r"[ \t]*\d{1,9}")
+# Behind a blockquote prefix too (`> 1. item`, #391).
+_ORDERED_MARKER = re.compile(r"(?:[ \t]*>)*[ \t]*\d{1,9}")
 
 # Tokens that end in a period but are NOT sentence boundaries. The `_SENTENCE_SPLIT`
 # regex treats every period-then-whitespace as a boundary, so an ordinary
@@ -549,6 +560,20 @@ def _ends_with_abbreviation(fragment: str, following: str = "") -> bool:
     return False
 
 
+def _last_content_line(text: str) -> str:
+    """The last line of `text` that is not blank, with any `>` prefix removed.
+
+    What the #385 heading / `:` lead-in check reads in front of a break. A line
+    of only `>`s is blank inside a blockquote (#391), so `> Settings:\n>\n> - a`
+    finds `Settings:` and the cited list under it stays attached, as it does
+    outside a quote.
+    """
+    for line in reversed(text.split("\n")):
+        if not _QUOTE_BLANK.fullmatch(line):
+            return line[_QUOTE_PREFIX.match(line).end() :].rstrip()
+    return ""
+
+
 def split_sentences(text: str) -> list[str]:
     """Split text into claim sentences for citation validation.
 
@@ -572,7 +597,9 @@ def split_sentences(text: str) -> list[str]:
     A markdown structural break is a boundary too, whether or not a terminator
     precedes it: a blank line, a list item, or a heading (`_STRUCTURAL_BREAK`,
     #385). A heading line and a lead-in ending in `:` stay attached to the text
-    after them, and the abbreviation merge never re-joins across a break.
+    after them, and the abbreviation merge never re-joins across a break. The
+    same holds inside a blockquote, where a `>`-only line is the blank line, and
+    for CRLF or CR line endings (#391).
 
     The split is intentionally simple. It is not a full NLP tokenizer, and a
     claim the model leaves unterminated can only be separated at one of these
@@ -587,20 +614,26 @@ def split_sentences(text: str) -> list[str]:
     # the markers with placeholders, which would corrupt any text that already
     # contained the placeholder characters.
     stripped = text.strip()
-    marker_spans = [m.span() for m in _CITE_PATTERN.finditer(stripped)]
+    # Boundaries are found on `lines`, a copy with CRLF and lone-CR line endings
+    # read as `\n` (#391): `\r\n\r\n` is the same blank line as `\n\n`, but no
+    # `\n`-anchored break matched it, so an uncited paragraph rode the next one's
+    # marker. The copy keeps every offset (`\r\n` -> ` \n`, `\r` -> `\n`), so the
+    # parts are still cut from `stripped` and come back byte-for-byte.
+    lines = stripped.replace("\r\n", " \n").replace("\r", "\n")
+    marker_spans = [m.span() for m in _CITE_PATTERN.finditer(lines)]
     breaks = [
         m.start()
-        for m in _STRUCTURAL_BREAK.finditer(stripped)
+        for m in _STRUCTURAL_BREAK.finditer(lines)
         if not any(lo < m.start() < hi for lo, hi in marker_spans)  # #256, as below
     ]
     cuts: list[tuple[int, int]] = []
-    for boundary in _SENTENCE_SPLIT.finditer(stripped):
+    for boundary in _SENTENCE_SPLIT.finditer(lines):
         gap_lo, gap_hi = boundary.span("gap" if boundary.group("gap") is not None else "cjk")
         if any(lo < gap_lo < hi for lo, hi in marker_spans):
             continue
-        line_start = stripped.rfind("\n", 0, boundary.start()) + 1
+        line_start = lines.rfind("\n", 0, boundary.start()) + 1
         if boundary.group().startswith(".") and _ORDERED_MARKER.fullmatch(
-            stripped, line_start, boundary.start()
+            lines, line_start, boundary.start()
         ):
             continue  # the `1.` of a numbered-list item, not a sentence end (#385)
         cuts.append((gap_lo, gap_hi))
@@ -610,8 +643,7 @@ def split_sentences(text: str) -> list[str]:
     for pos in breaks:
         if any(lo <= pos < hi for lo, hi in cuts):
             continue
-        before = stripped[:pos].rstrip()  # the last non-blank line: `Settings:\n\n- a`
-        last_line = before[before.rfind("\n") + 1 :]
+        last_line = _last_content_line(lines[:pos])  # `Settings:\n\n- a`
         if _HEADING_LINE.fullmatch(last_line) or _LEAD_IN.fullmatch(last_line):
             continue
         cuts.append((pos, pos + 1))
