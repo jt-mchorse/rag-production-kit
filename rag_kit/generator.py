@@ -104,6 +104,30 @@ _SENTENCE_SPLIT = re.compile(
     rf"|[{_CJK_TERMINATORS}]+(?:{_MARKER})*(?P<cjk>)(?=[^\s{re.escape(_CLOSERS)}\[])"
 )
 
+# A line or paragraph break was never a boundary: only a terminator split, so a
+# bullet or paragraph with no closing punctuation merged into the next sentence
+# and an uncited claim rode its [cite:...] marker (#385, the same false-accept
+# as #190/#262). Markdown is the model's default shape (#262) and the system
+# prompt never asks for terminated sentences. So the newline in front of an
+# UNAMBIGUOUS structural break is a boundary too: a blank line, a list item
+# (`-`, `*`, `+`, `1.`, `1)`), or an ATX heading (`#`..`######` then a space).
+# A bare single newline is not one: a hard-wrapped sentence would be cut in
+# two and its first half refused, so it stays the cheaper over-merge.
+_STRUCTURAL_BREAK = re.compile(r"\n(?=[ \t]*(?:\n|(?:[-*+]|\d{1,9}[.)])[ \t]|#{1,6}[ \t]))")
+# The text in front of a break that it does NOT cut after (#385): a heading line,
+# or a lead-in ending in `:` ("Key Postgres settings:"). Neither got its own
+# sentence before #385 (each rode the text after it), and they carry no marker
+# of their own in a normal answer, so cutting there would refuse every cited
+# list that has a heading or a lead-in. They stay attached to what follows,
+# which is exactly how they behaved before. A claim written INTO one still
+# rides; telling such a claim from a label needs a classifier, out of scope here.
+_HEADING_LINE = re.compile(r"[ \t]{0,3}#{1,6}[ \t].*")
+_LEAD_IN = re.compile(r".*:[ \t]*")
+# An ordered-list marker at the start of a line (`1. item`). `_SENTENCE_SPLIT`
+# reads its `.` plus space as a sentence end, so `'1.'` was cut off as a
+# fragment and, holding a digit, refused a fully cited numbered list (#385).
+_ORDERED_MARKER = re.compile(r"[ \t]*\d{1,9}")
+
 # Tokens that end in a period but are NOT sentence boundaries. The `_SENTENCE_SPLIT`
 # regex treats every period-then-whitespace as a boundary, so an ordinary
 # abbreviation ("Dr.", "U.S.", "e.g.") strands a leading claim-less fragment
@@ -545,9 +569,14 @@ def split_sentences(text: str) -> list[str]:
     refuses the whole answer (#110). The merge is deliberately lenient — see
     `_ABBREVIATIONS`.
 
-    The split is intentionally simple — generators are instructed to produce one
-    claim per sentence ending in `.`/`!`/`?`, and we don't need a full NLP
-    tokenizer for that contract.
+    A markdown structural break is a boundary too, whether or not a terminator
+    precedes it: a blank line, a list item, or a heading (`_STRUCTURAL_BREAK`,
+    #385). A heading line and a lead-in ending in `:` stay attached to the text
+    after them, and the abbreviation merge never re-joins across a break.
+
+    The split is intentionally simple. It is not a full NLP tokenizer, and a
+    claim the model leaves unterminated can only be separated at one of these
+    markdown breaks. A bare single newline does not separate it.
     """
     # Never split INSIDE a citation marker (#256). `Document` accepts an id like
     # `faq.md#Q3. refunds` and `_CITE_PATTERN` reads it back, but the split
@@ -559,18 +588,44 @@ def split_sentences(text: str) -> list[str]:
     # contained the placeholder characters.
     stripped = text.strip()
     marker_spans = [m.span() for m in _CITE_PATTERN.finditer(stripped)]
-    parts: list[str] = []
-    start = 0
+    breaks = [
+        m.start()
+        for m in _STRUCTURAL_BREAK.finditer(stripped)
+        if not any(lo < m.start() < hi for lo, hi in marker_spans)  # #256, as below
+    ]
+    cuts: list[tuple[int, int]] = []
     for boundary in _SENTENCE_SPLIT.finditer(stripped):
         gap_lo, gap_hi = boundary.span("gap" if boundary.group("gap") is not None else "cjk")
         if any(lo < gap_lo < hi for lo, hi in marker_spans):
             continue
-        parts.append(stripped[start:gap_lo])
-        start = gap_hi
+        line_start = stripped.rfind("\n", 0, boundary.start()) + 1
+        if boundary.group().startswith(".") and _ORDERED_MARKER.fullmatch(
+            stripped, line_start, boundary.start()
+        ):
+            continue  # the `1.` of a numbered-list item, not a sentence end (#385)
+        cuts.append((gap_lo, gap_hi))
+    # Structural breaks (#385). One that lies inside a terminator's gap
+    # (`done.\n\n- next`) is already cut there; the cut is only marked as
+    # structural, so the merge pass below cannot re-join across it.
+    for pos in breaks:
+        if any(lo <= pos < hi for lo, hi in cuts):
+            continue
+        before = stripped[:pos].rstrip()  # the last non-blank line: `Settings:\n\n- a`
+        last_line = before[before.rfind("\n") + 1 :]
+        if _HEADING_LINE.fullmatch(last_line) or _LEAD_IN.fullmatch(last_line):
+            continue
+        cuts.append((pos, pos + 1))
+    cuts.sort()
+    parts: list[str] = []
+    start = 0
+    for lo, hi in cuts:
+        parts.append(stripped[start:lo])
+        start = hi
     parts.append(stripped[start:])
     merged: list[str] = []
-    for part in parts:
-        if merged and _ends_with_abbreviation(merged[-1], following=part):
+    for i, part in enumerate(parts):
+        structural = i > 0 and any(cuts[i - 1][0] <= pos < cuts[i - 1][1] for pos in breaks)
+        if merged and not structural and _ends_with_abbreviation(merged[-1], following=part):
             merged[-1] = f"{merged[-1]} {part}"
         else:
             merged.append(part)
