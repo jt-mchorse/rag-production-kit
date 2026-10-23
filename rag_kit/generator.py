@@ -131,8 +131,15 @@ _STRUCTURAL_BREAK = re.compile(
 # list that has a heading or a lead-in. They stay attached to what follows,
 # which is exactly how they behaved before. A claim written INTO one still
 # rides; telling such a claim from a label needs a classifier, out of scope here.
+# The `:` need not be the last character (#400). Markdown emphasis closes AFTER
+# it (`**Key settings:**`, `*...:*`, `__...:__`), and a CJK answer writes the
+# fullwidth `：`, so a lead-in is `:` or `：` then any run of `_CLOSERS` -- the
+# same terminator-then-closer shape the splitter reads (#161/#262/#314). Without
+# it each of those lines was cut off as its own uncited sentence and a fully
+# cited list under it refused. A colon mid-line (`Key: settings are`) is still
+# not one, and neither is a bold label with no colon (`**Key settings**`, #389).
 _HEADING_LINE = re.compile(r"[ \t]{0,3}#{1,6}[ \t].*")
-_LEAD_IN = re.compile(r".*:[ \t]*")
+_LEAD_IN = re.compile(rf".*[:：][{re.escape(_CLOSERS)}]*[ \t]*")
 # An ordered-list marker at the start of a line (`1. item`). `_SENTENCE_SPLIT`
 # reads its `.` plus space as a sentence end, so `'1.'` was cut off as a
 # fragment and, holding a digit, refused a fully cited numbered list (#385).
