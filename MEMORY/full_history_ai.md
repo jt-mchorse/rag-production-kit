@@ -4288,3 +4288,23 @@ context_for_next_session:
   - "EVAL_RUN_REWRITES_COMMITTED_evals_current_run_id_started_at_git_sha_restore_with_git_checkout_before_committing"
 followups: []
 ---
+
+---
+session: 2026-10-23T07:38Z
+issue: 399
+branch: session/2026-10-23-0750-issue-399
+focus: TEMPLATEGENERATOR_PREFIX_PUSHED_HEADING_LIST_AND_NUMBERED_MARKERS_OFF_THE_LINE_START_THE_385_EXEMPTIONS_READ_SO_IT_REFUSED_ITS_OWN_MARKDOWN_OUTPUT
+phase: shipped
+delta:
+  files_changed: 2
+  tests_added: 21
+  suite: "2916 passed, 7 skipped, 26 deselected after rebase onto #401 (fresh py3.11 and py3.12 .[dev] venvs); ruff check + format clean; eval suite (py3.12 .[eval]) 0 flagged / 8 unchanged x3; pg job and nextjs demo not run locally (untouched)"
+decisions_made: []
+measured: "main c5a014b: the 5 issue chunks ('# Refund policy\\n\\n...', '1. Open...', '> # Policy\\n>\\n> ...') -> Refusal unparseable_output; hunt fuzz 40k seed 1 -> 2,222 refusals. After: 5 GeneratedAnswer; 0 refusals on 40k seed 1, 100k seed 7, 27,497 multi-chunk draws (read-back fallback fires in 71). Revert (generator.py only, pycache cleared) 14 of 21 red; 7 green controls (5 nothing-to-cite refusals, plain prose byte-identical, lead-in list). Partial reverts: no fallback 2 red, marker gap 3, ws strip 1, space join 5, no lead 3."
+context_for_next_session:
+  - "WRITER_FIX_NOT_READER_FIX_split_sentences_and_LEAD_IN_untouched_400_owns_LEAD_IN"
+  - "READ_BACK_FALLBACK_cite_every_cut_derived_from_split_sentences_because_heading_exemption_can_come_from_a_DROPPED_punctuation_only_fragment_on_the_same_line"
+  - "MARKER_GAP_ARM_WAS_GREEN_UNDER_PARTIAL_REVERT_because_the_fallback_also_answers_pinned_exact_text_to_make_it_red"
+  - "PY311_FSTRING_CANNOT_HOLD_A_BACKSLASH_in_an_expression"
+followups: []
+---

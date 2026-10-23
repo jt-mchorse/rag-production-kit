@@ -3774,3 +3774,19 @@ the sentence splitter already knows about, such as `*`, `_` and closing quotes
 or brackets. A colon in the middle of a line still does not count. A bold label
 with no colon at all (`**Key settings**`) is still cut off. That case belongs to
 the label-vs-claim question in #389.
+
+## 2026-10-23 — The template generator no longer refuses its own markdown answers (#399)
+
+#385 taught the sentence splitter that a markdown heading, list item or blank
+line ends a sentence. It also let a heading line or a `1.` stay attached to the
+text after it, but only when they sit at the start of a line. The template
+generator wrote "Per the retrieved context, " in front of every sentence and
+joined the sentences with spaces. That pushed the `#` or the `1.` off the start
+of the line, so the splitter cut it off with no citation and the generator
+refused its own answer for ordinary markdown documents. Now the prefix goes
+after the heading mark, list marker or `>`, and such a sentence starts on its
+own line. Two smaller mismatches are fixed too. As a last step the generator
+reads its own sentence back through the splitter, and if any piece would be
+uncited it adds a citation at every place the splitter can cut. Plain prose
+answers are unchanged byte for byte, and a seeded fuzz of 3,000 random markdown
+chunks now gets no refusals.
