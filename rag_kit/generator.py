@@ -686,6 +686,16 @@ _TERMINATOR_THEN_CLOSERS = re.compile(
     rf"[{re.escape(_TERMINATORS + _CLOSERS)}]*$"
 )
 
+# What `_STRUCTURAL_BREAK` reads at the start of a line (#399): `>` quote
+# prefixes, list markers and ATX heading marks, each before a space, in any
+# nesting. `_template_sentence` keeps a sentence's run of them at its start and
+# writes the template prefix after it, and `TemplateGenerator.generate` starts
+# such a sentence on its own line, so the #385/#391 line-start reads see the
+# same heading, numbered item or quote in the answer as in the chunk.
+_BLOCK_PREFIX = re.compile(r"(?:[ \t]*(?:>|(?:[-*+]|\d{1,9}[.)]|#{1,6})(?=[ \t])))*[ \t]*")
+# A line holding only such a marker, which one more space turns into a break.
+_BARE_BLOCK_MARKER = re.compile(r"(?:[ \t]*>)*[ \t]*(?:[-*+]|\d{1,9}[.)]|#{1,6})")
+
 
 def _template_sentence(sentence: str, external_id: str) -> str:
     """One cited template sentence for one source sentence (#258).
@@ -698,12 +708,73 @@ def _template_sentence(sentence: str, external_id: str) -> str:
     cut the claim from its own marker, so `enforce_citations` refused a fully
     grounded chunk. The marker goes *before* that tail instead, which keeps the
     quote balanced and the sentence and its marker in one piece.
+
+    A markdown sentence keeps its block prefix in front of the template prefix
+    (`# Per the retrieved context, Policy`), so the #385 heading and numbered-
+    item reads still see it (#399). And the result is read back with
+    `split_sentences`: when some part of it is still uncited -- the reader cut
+    it where it had not cut the chunk, because a heading mark or a `30.` it
+    keyed on now sits elsewhere -- every point the reader can cut at gets a
+    marker of its own (`_cite_every_cut`). Derived from the reader rather than
+    restated, like `_marker_readback` (#197).
     """
+    marker = f"[cite:{external_id}]"
     s = sentence.strip()
+    # The prefix goes after any block prefix, not in front of it (#399): the
+    # #385 reads are anchored at a line start, so `Per the retrieved context,
+    # # Policy` was no longer a heading and `..., 1. Open` no longer a list item.
+    lead = s[: _BLOCK_PREFIX.match(s).end()]
+    s = s[len(lead) :]
     tail = _TERMINATOR_THEN_CLOSERS.search(s)
     if tail is not None:
-        return f"Per the retrieved context, {s[: tail.start()]} [cite:{external_id}]{s[tail.start() :]}"
-    return f"Per the retrieved context, {s.rstrip(_TERMINATORS)} [cite:{external_id}]."
+        head, end = s[: tail.start()], s[tail.start() :]
+    else:
+        head, end = s.rstrip(_TERMINATORS), "."
+    # And any whitespace the strip exposed, with the terminators behind it
+    # (#399): `30.\n ?` left `30.\n `, so the marker sat after a blank line
+    # (a break) or `30.` became a mid-line sentence end, uncited either way.
+    head = head.rstrip(_TERMINATORS + " \t\r\n")
+    body = f"{lead}Per the retrieved context, {head}"
+    text = f"{body}{_marker_gap(body)}{marker}{end}"
+    if all(_CITE_PATTERN.search(part) for part in split_sentences(text)):
+        return text
+    body = _cite_every_cut(body, marker)
+    return f"{body}{_marker_gap(body)}{marker}{end}"
+
+
+def _marker_gap(text: str) -> str:
+    """The space in front of a marker appended to `text`, or none (#399).
+
+    ` [cite:` after a bare `#` / `*` / `2)` line makes it a heading or list
+    item: a new structural break, which cut the claim from its own marker.
+    """
+    last_line = re.split(r"\r\n|\r|\n", text)[-1]
+    return "" if _BARE_BLOCK_MARKER.fullmatch(last_line) else " "
+
+
+def _cite_every_cut(text: str, marker: str) -> str:
+    """`text` with `marker` in front of every place `split_sentences` may cut it.
+
+    Those are a terminator run the splitter reads as a sentence end, and the end
+    of a line that holds something (#399). Each part the reader can cut off then
+    carries a marker, whichever cuts its heading and numbered-item rules make.
+    The fallback of `_template_sentence`: it reads worse than one marker, so it
+    is only used when the template's own output did not read back cited.
+    """
+    lines = text.replace("\r\n", " \n").replace("\r", "\n")  # as `split_sentences`
+    spots = {m.start() for m in _SENTENCE_SPLIT.finditer(lines)}
+    for m in re.finditer(r"[ \t]*\n", lines):
+        line = lines[lines.rfind("\n", 0, m.start()) + 1 : m.start()]
+        if not _QUOTE_BLANK.fullmatch(line):
+            spots.add(m.start())
+    out: list[str] = []
+    start = 0
+    for pos in sorted(spots):
+        out.append(text[start:pos])
+        out.append(_marker_gap(text[:pos]) + marker)
+        start = pos
+    out.append(text[start:])
+    return "".join(out)
 
 
 _MARKER_OPEN = "[cite:"
@@ -959,7 +1030,13 @@ class TemplateGenerator:
             for c in chosen
             for s in split_sentences(_neutralise_markers(c.text))
         ]
-        text = " ".join(sentences)
+        # A sentence that opens with a heading, list marker or `>` starts a new
+        # line (#399): joined by a space, `1. Open` sat mid-line, `_ORDERED_MARKER`
+        # missed it, and `1.` was cut off as an uncited fragment.
+        text = "".join(
+            ("\n" if _BLOCK_PREFIX.match(s).end() else " ") + s if i else s
+            for i, s in enumerate(sentences)
+        )
         try:
             citations = enforce_citations(text, retrieved)
         # Reached when every chosen chunk is empty / punctuation-only (no cited
@@ -969,7 +1046,9 @@ class TemplateGenerator:
         # space, which `split_sentences` split inside its own marker; until
         # #258 by a sentence ending in a terminator plus a closing
         # quote/bracket, which `_template_sentence` now keeps with its marker;
-        # until #283 by a chunk whose own text contained a `[cite:` marker.
+        # until #283 by a chunk whose own text contained a `[cite:` marker; until
+        # #399 by a markdown heading, list or numbered item, whose mark the
+        # template prefix pushed off the line start the #385 reads key on.
         except CitationError as e:
             return _refusal(e.reason, e.detail, threshold, top)
         return GeneratedAnswer(
