@@ -4249,3 +4249,23 @@ context_for_next_session:
 followups:
   - "rag-production-kit#396"
 ---
+
+---
+session: 2026-10-23T07:33Z
+issue: 396
+branch: session/2026-10-23-0745-issue-396
+focus: PHASETIMINGS_RECORD_PERCENTILE_COHERE_TIMEOUT_AND_TO_PGVECTOR_RAN_ISFINITE_OR_FLOAT_ON_AN_INT_PAST_FLOAT_RANGE_SO_10_400_ESCAPED_AS_RAW_OVERFLOWERROR_395_SIBLING
+phase: shipped
+delta:
+  files_changed: 6
+  tests_added: 24
+  suite: "2861 passed, 7 skipped, 26 deselected (fresh py3.11 .[dev] venv); ruff check + format clean; pg job, eval job, nextjs demo not run locally (pg untouched for finite floats)"
+decisions_made: []
+measured: "main c3dd45e: PhaseTimings().record('total', 10**400), PhaseTimings(total=[10**400]).percentile('total', 50), CohereReranker(api_key='x', timeout_s=10**400), to_pgvector([...10**400...]) -> OverflowError: int too large to convert to float. After: ValueError naming the field, int named by bit length. Revert (db/io_utils/reranker/streaming/telemetry, pycache cleared) 16 of 24 red; 8 green controls (2**1023 and 2**1024-2**970-1 at each site, percentile [-5.0, nan] and to_pgvector inf messages)."
+context_for_next_session:
+  - "HELPERS_MOVED_past_float_range_and_describe_number_now_live_in_io_utils_telemetry_imports_them_db_importing_telemetry_would_cycle_via_indexer"
+  - "FOURTH_SITE_db_to_pgvector_float_v_itself_raised_found_from_the_issue_not_checked_yet_list"
+  - "GENERATOR_ALREADY_SAFE_as_finite_float_maps_overflow_to_inf_cohere_relevance_score_is_sdk_parsed_float_not_reachable"
+  - "SHELL_ALIASES_test_TO_PYTEST_use_brackets_for_file_checks"
+followups: []
+---

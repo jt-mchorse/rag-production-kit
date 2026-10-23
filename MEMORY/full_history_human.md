@@ -3748,3 +3748,16 @@ names the field and gives the number's size. The issue guessed that
 so it is fixed too. Large integers that do fit in a float, such as `2**1023`,
 still work. The same crash in `PhaseTimings` and the Cohere reranker's
 timeout is filed as #396.
+
+## 2026-10-23 — Stream timings, the Cohere timeout and embeddings reject huge numbers with a clear error (#396)
+
+#395 fixed the "is this number finite?" crash in the telemetry module. The same
+crash remained in three other places. One was `PhaseTimings`, both when
+recording a timing and when reading a percentile from a hand-built list. The
+others were the Cohere reranker's `timeout_s` and the embedding writer
+`to_pgvector`. Each crashed with a bare `OverflowError` on an integer too big to
+be a float (`10**400`). Each now raises a `ValueError` that names the field and
+gives the number's size. The two helpers from #395 moved to `io_utils` so all
+four modules share one copy without a circular import. Large integers that do
+fit in a float, such as `2**1023`, still work. The generator's score checks
+already handled this case, so they were left alone.
