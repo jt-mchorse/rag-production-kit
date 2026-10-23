@@ -3735,3 +3735,16 @@ crashed too, even though `-2**63` is a timestamp the store accepts. It now
 works out the cutoff as a decimal number, the same type as the timestamp
 column, so the query just runs and returns the row stored at that time. The
 same finiteness crash in `ModelPrice` and `percentile` is filed as #395.
+
+## 2026-10-23 — Prices, percentiles and cost totals reject huge numbers with a clear error (#395)
+
+#392 fixed the "is this number finite?" crash at the places that write to
+SQLite. The same crash remained where nothing touches the database: a model
+price, the `percentile` helper, and the cost total in `aggregate`. Each one
+crashed with a bare `OverflowError` on an integer too big to be a float
+(`10**400`). Each now checks for that first and raises a `ValueError` that
+names the field and gives the number's size. The issue guessed that
+`aggregate`'s cost check was unreachable, but a hand-built record reaches it,
+so it is fixed too. Large integers that do fit in a float, such as `2**1023`,
+still work. The same crash in `PhaseTimings` and the Cohere reranker's
+timeout is filed as #396.

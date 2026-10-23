@@ -4229,3 +4229,23 @@ context_for_next_session:
 followups:
   - "rag-production-kit#395"
 ---
+
+---
+session: 2026-10-23T07:25Z
+issue: 395
+branch: session/2026-10-23-0726-issue-395
+focus: MODELPRICE_PERCENTILE_AND_AGGREGATE_TOTAL_USD_RAN_ISFINITE_ON_AN_INT_PAST_FLOAT_RANGE_SO_10_400_ESCAPED_AS_RAW_OVERFLOWERROR_392_SIBLING
+phase: shipped
+delta:
+  files_changed: 2
+  tests_added: 22
+  suite: "2837 passed, 7 skipped, 26 deselected (fresh py3.11 .[dev] venv); ruff check + format clean; pg job, eval job, nextjs demo not run locally (untouched)"
+decisions_made: []
+measured: "main b8f403e: ModelPrice(10**400, 0.0), ModelPrice(0.0, 10**400), percentile([10**400], 0.5), aggregate([CostRecord(total_usd=10**400)]), aggregate([CostRecord(total_latency_ms=10**400)]) -> OverflowError: int too large to convert to float. After: ValueError naming the field, int named by bit length. Revert (telemetry.py only, pycache cleared) 13 of 22 red; 9 green controls (2**63, 2**1023, 2**1024-2**970-1 the largest float()-able int, negative-rate and [inf] messages). Partial revert of the aggregate hunk alone: 1 red."
+context_for_next_session:
+  - "ISSUE_PREMISE_WRONG_aggregate_total_usd_guard_IS_reachable_via_a_directly_constructed_CostRecord_aggregate_takes_any_records"
+  - "PYTEST_PARAMETRIZE_IDS_CALL_STR_ON_A_5000_DIGIT_INT_AND_COLLECTION_ERRORS_use_explicit_ids"
+  - "FLOAT_RANGE_NOT_INT64_these_sites_never_bind_to_sqlite_largest_float_able_int_is_2_1024_minus_2_970_minus_1"
+followups:
+  - "rag-production-kit#396"
+---
