@@ -4269,3 +4269,22 @@ context_for_next_session:
   - "SHELL_ALIASES_test_TO_PYTEST_use_brackets_for_file_checks"
 followups: []
 ---
+
+---
+session: 2026-10-23T07:38Z
+issue: 400
+branch: session/2026-10-23-0750-issue-400
+focus: LEAD_IN_REQUIRED_COLON_AS_LAST_CHAR_SO_BOLD_ITALIC_OR_FULLWIDTH_COLON_LEAD_INS_WERE_CUT_OFF_AND_A_FULLY_CITED_LIST_UNDER_THEM_REFUSED_385_FOLLOWUP
+phase: shipped
+delta:
+  files_changed: 2
+  tests_added: 34
+  suite: "2895 passed, 7 skipped, 26 deselected (fresh py3.11 .[dev] venv); ruff check + format clean; eval job run locally in a separate .[eval] venv, all rows unchanged vs baselines; pg job and nextjs demo not run locally (untouched)"
+decisions_made: []
+measured: "main c5a014b: '**Key settings:**', '*Key settings:*', '__Key settings:__', '主要设置：', '**主要设置：**' over a fully cited 2-item list -> Refusal 'sentence has no [cite:...] marker' with a blank line AND a single newline; 'Key settings:' accepted. After: all GeneratedAnswer; mid-line colon still refused. Revert (generator.py only, pycache cleared) 21 of 34 red; 13 green controls (plain colon lead-in, mid-line colon incl. '**Key:** settings', uncited bullet under each new lead-in still refused)."
+context_for_next_session:
+  - "LEAD_IN_NOW_COLON_OR_FULLWIDTH_COLON_THEN_SENTENCE_CLOSERS_a_trailing_closer_set_includes_paren_and_quotes_so_'great_:)'_is_now_a_lead_in_cheap_over_merge"
+  - "BOLD_LABEL_WITH_NO_COLON_'**Key settings**'_STILL_CUT_OFF_left_to_389_label_vs_claim"
+  - "EVAL_RUN_REWRITES_COMMITTED_evals_current_run_id_started_at_git_sha_restore_with_git_checkout_before_committing"
+followups: []
+---

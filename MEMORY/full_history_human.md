@@ -3761,3 +3761,16 @@ gives the number's size. The two helpers from #395 moved to `io_utils` so all
 four modules share one copy without a circular import. Large integers that do
 fit in a float, such as `2**1023`, still work. The generator's score checks
 already handled this case, so they were left alone.
+
+## 2026-10-23 — A cited list under a bold or fullwidth-colon lead-in is no longer refused (#400)
+
+#385 kept a lead-in line such as `Key settings:` attached to the cited list
+below it, but only when the colon was the line's last character. Claude often
+writes `**Key settings:**` over a list. In that line, and in `*…:*`, `__…:__`
+and the Chinese fullwidth colon `：`, the colon is not last, so the line was cut
+off as its own uncited sentence. A fully cited answer was then refused. A
+lead-in is now a colon (`:` or `：`) followed by any of the closing characters
+the sentence splitter already knows about, such as `*`, `_` and closing quotes
+or brackets. A colon in the middle of a line still does not count. A bold label
+with no colon at all (`**Key settings**`) is still cut off. That case belongs to
+the label-vs-claim question in #389.
