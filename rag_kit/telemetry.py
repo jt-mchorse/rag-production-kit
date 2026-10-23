@@ -46,6 +46,34 @@ class UnknownModelError(KeyError):
     """
 
 
+def _past_float_range(value: object) -> bool:
+    """True for an ``int`` that ``float()`` cannot convert (#395).
+
+    ``math.isfinite`` converts an ``int`` to ``float`` first, so ``10**400``
+    escaped every finiteness guard as a raw ``OverflowError`` naming no field.
+    Ask this BEFORE ``isfinite``. These sites never bind to SQLite, so the bound
+    is float range, not ``_check_sqlite_int_range``'s int64; ``2**1023`` passes.
+    """
+    if isinstance(value, bool) or not isinstance(value, int):
+        return False
+    try:
+        float(value)
+    except OverflowError:
+        return True
+    return False
+
+
+def _describe_number(value: object) -> str:
+    """*value* for a message; a past-float-range int is named by its size (#395).
+
+    Past 4300 digits ``str()`` itself raises, and the message would lose the
+    field name -- the same reason ``_check_sqlite_int_range`` does this (#392).
+    """
+    if isinstance(value, int) and _past_float_range(value):
+        return f"an int of {value.bit_length()} bits"
+    return repr(value)
+
+
 @dataclass(frozen=True)
 class ModelPrice:
     """USD-per-million-tokens for one model."""
@@ -72,8 +100,11 @@ class ModelPrice:
             # `math.isfinite` as a bare TypeError naming no field.
             if isinstance(value, bool) or not isinstance(value, (int, float)):
                 raise ValueError(f"{name} must be a finite number >= 0.0; got {value!r}")
-            if not math.isfinite(value) or value < 0.0:
-                raise ValueError(f"{name} must be a finite number >= 0.0; got {value}")
+            # An int past float range is refused before `isfinite` converts it (#395).
+            if _past_float_range(value) or not math.isfinite(value) or value < 0.0:
+                raise ValueError(
+                    f"{name} must be a finite number >= 0.0; got {_describe_number(value)}"
+                )
 
     def cost(self, prompt_tokens: int, completion_tokens: int) -> tuple[float, float]:
         """Return ``(prompt_usd, completion_usd)`` rounded to 6 decimal places."""
@@ -731,6 +762,11 @@ def percentile(values: Sequence[float], q: float) -> float:
         raise ValueError(f"q must be in [0.0, 1.0]; got {q}")
     if not values:
         return 0.0
+    # `_past_float_range` first (#395): `isfinite` raised a raw OverflowError on
+    # `10**400`. Such a value is named by its size; its repr can itself raise.
+    huge = [_describe_number(v) for v in values if _past_float_range(v)]
+    if huge:
+        raise ValueError(f"values must all be finite numbers; got {', '.join(huge)}")
     if any(not math.isfinite(v) for v in values):
         raise ValueError(f"values must all be finite numbers; got {list(values)!r}")
     s = sorted(values)
@@ -773,6 +809,13 @@ def aggregate(records: Iterable[CostRecord]) -> Aggregate:
     # observability artifacts" contract. Reject it here rather than emit an
     # unparseable artifact, the same posture as the latency guard (#80); #135's
     # dashboard `/json` egress sibling sanitizes at the presentation boundary.
+    #
+    # Not unreachable after #387/#392, as #395 guessed: `aggregate` takes any
+    # records, and a directly-constructed `total_usd=10**400` made `isfinite`
+    # raise a raw OverflowError. Refused first, named by its size (#395).
+    huge = [_describe_number(c) for c in costs if _past_float_range(c)]
+    if huge:
+        raise ValueError(f"total_usd values must all be finite numbers; got {', '.join(huge)}")
     if any(not math.isfinite(c) for c in costs):
         raise ValueError(f"total_usd values must all be finite numbers; got {costs!r}")
     # The latency domain, at the same boundary and for the same reason (#213).
