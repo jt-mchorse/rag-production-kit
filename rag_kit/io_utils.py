@@ -363,3 +363,33 @@ def refuse_bare_string(name: str, value: Any) -> None:
             f"{name} must be a sequence of ids, not a bare {type(value).__name__}: "
             f"{value!r} would be split into its characters -- {fix}"
         )
+
+
+def _past_float_range(value: object) -> bool:
+    """True for an ``int`` that ``float()`` cannot convert (#395).
+
+    ``math.isfinite`` converts an ``int`` to ``float`` first, so ``10**400``
+    escaped every finiteness guard as a raw ``OverflowError`` naming no field.
+    Ask this BEFORE ``isfinite``. These sites never bind to SQLite, so the bound
+    is float range, not ``telemetry._check_sqlite_int_range``'s int64;
+    ``2**1023`` passes. Lives here, not in ``telemetry``, so ``streaming``,
+    ``reranker`` and ``db`` share it without an import cycle (#396).
+    """
+    if isinstance(value, bool) or not isinstance(value, int):
+        return False
+    try:
+        float(value)
+    except OverflowError:
+        return True
+    return False
+
+
+def _describe_number(value: object) -> str:
+    """*value* for a message; a past-float-range int is named by its size (#395).
+
+    Past 4300 digits ``str()`` itself raises, and the message would lose the
+    field name -- the same reason ``telemetry._check_sqlite_int_range`` does this (#392).
+    """
+    if isinstance(value, int) and _past_float_range(value):
+        return f"an int of {value.bit_length()} bits"
+    return repr(value)

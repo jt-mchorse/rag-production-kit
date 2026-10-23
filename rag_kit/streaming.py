@@ -31,7 +31,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Literal, Protocol
 
-from .io_utils import atomic_write_text, copy_json_value
+from .io_utils import _describe_number, _past_float_range, atomic_write_text, copy_json_value
 from .reranker import Candidate, Reranker
 from .retriever import RetrievalResult
 from .telemetry import percentile as _telemetry_percentile
@@ -152,8 +152,10 @@ class PhaseTimings:
         # str escaped `math.isfinite` as a bare TypeError.
         if isinstance(ms, bool) or not isinstance(ms, (int, float)):
             raise ValueError(f"ms must be a finite non-negative number; got {ms!r}")
-        if not math.isfinite(ms) or ms < 0:
-            raise ValueError(f"ms must be a finite non-negative number; got {ms!r}")
+        # An int past float range is refused before `isfinite` converts it,
+        # and named by its size (#396, the sibling of telemetry's #395).
+        if _past_float_range(ms) or not math.isfinite(ms) or ms < 0:
+            raise ValueError(f"ms must be a finite non-negative number; got {_describe_number(ms)}")
         getattr(self, phase).append(ms)
 
     def percentile(self, phase: str, p: float) -> float | None:
@@ -215,12 +217,22 @@ class PhaseTimings:
         #
         # The type half too (#362), for the same reason: `PhaseTimings(total=[True])`
         # never touches `record`, and returned `True` as its p50.
+        #
+        # And an int past float range (#396): `isfinite` raised a raw
+        # OverflowError on `10**400`. Checked before `isfinite`, and the message
+        # names each value via `_describe_number`, since such an int's repr can
+        # itself raise.
         raw = getattr(self, phase)
         if any(
-            isinstance(v, bool) or not isinstance(v, (int, float)) or not math.isfinite(v) or v < 0
+            isinstance(v, bool)
+            or not isinstance(v, (int, float))
+            or _past_float_range(v)
+            or not math.isfinite(v)
+            or v < 0
             for v in raw
         ):
-            raise ValueError(f"values must all be finite non-negative numbers; got {list(raw)!r}")
+            shown = ", ".join(_describe_number(v) for v in raw)
+            raise ValueError(f"values must all be finite non-negative numbers; got [{shown}]")
         values = sorted(raw)
         if not values:
             return None

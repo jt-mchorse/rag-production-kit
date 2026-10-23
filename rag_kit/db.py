@@ -13,6 +13,7 @@ import os
 from typing import Any
 
 from .embedder import EMBEDDING_DIM
+from .io_utils import _describe_number, _past_float_range
 
 try:
     import psycopg
@@ -123,10 +124,12 @@ def to_pgvector(vec: list[float], *, expected_dim: int = EMBEDDING_DIM) -> str:
         )
     out: list[str] = []
     for i, v in enumerate(vec):
-        f = float(v)
+        # An int past float range made `float(v)` itself raise a raw
+        # OverflowError naming no index (#396); refuse it as non-finite first.
+        f = math.inf if _past_float_range(v) else float(v)
         if not math.isfinite(f):
             raise ValueError(
-                f"embedding component at index {i} must be finite; got {v!r} — "
+                f"embedding component at index {i} must be finite; got {_describe_number(v)} — "
                 "a NaN/Inf value is rejected by pgvector and would otherwise surface "
                 "as an opaque error far from the embedder seam (or silently corrupt "
                 "dense-channel ordering)"

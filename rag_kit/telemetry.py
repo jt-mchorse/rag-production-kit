@@ -30,7 +30,10 @@ from pathlib import Path
 from typing import Any
 
 from rag_kit.indexer import _lone_surrogate
-from rag_kit.io_utils import atomic_write_text
+
+# Moved to `io_utils` so the streaming, reranker and db guards can share them
+# without an import cycle (#396).
+from rag_kit.io_utils import _describe_number, _past_float_range, atomic_write_text
 
 # ----------------------------------------------------------------------
 # Price table
@@ -44,34 +47,6 @@ class UnknownModelError(KeyError):
     only catch ``KeyError``; the explicit subclass lets newer callers
     pattern-match on the more specific type.
     """
-
-
-def _past_float_range(value: object) -> bool:
-    """True for an ``int`` that ``float()`` cannot convert (#395).
-
-    ``math.isfinite`` converts an ``int`` to ``float`` first, so ``10**400``
-    escaped every finiteness guard as a raw ``OverflowError`` naming no field.
-    Ask this BEFORE ``isfinite``. These sites never bind to SQLite, so the bound
-    is float range, not ``_check_sqlite_int_range``'s int64; ``2**1023`` passes.
-    """
-    if isinstance(value, bool) or not isinstance(value, int):
-        return False
-    try:
-        float(value)
-    except OverflowError:
-        return True
-    return False
-
-
-def _describe_number(value: object) -> str:
-    """*value* for a message; a past-float-range int is named by its size (#395).
-
-    Past 4300 digits ``str()`` itself raises, and the message would lose the
-    field name -- the same reason ``_check_sqlite_int_range`` does this (#392).
-    """
-    if isinstance(value, int) and _past_float_range(value):
-        return f"an int of {value.bit_length()} bits"
-    return repr(value)
 
 
 @dataclass(frozen=True)

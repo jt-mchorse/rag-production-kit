@@ -29,7 +29,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Any, Protocol
 
-from .io_utils import copy_json_value, refuse_bare_string
+from .io_utils import _describe_number, _past_float_range, copy_json_value, refuse_bare_string
 from .text import word_tokens
 
 
@@ -254,10 +254,14 @@ class CohereReranker:
         if timeout_s is not None and (
             isinstance(timeout_s, bool)
             or not isinstance(timeout_s, (int, float))
+            # Before `isfinite`, which raised a raw OverflowError on `10**400` (#396).
+            or _past_float_range(timeout_s)
             or not math.isfinite(timeout_s)
             or timeout_s <= 0
         ):
-            raise ValueError(f"timeout_s must be a finite number > 0.0, got {timeout_s!r}")
+            raise ValueError(
+                f"timeout_s must be a finite number > 0.0, got {_describe_number(timeout_s)}"
+            )
 
         try:
             import cohere  # type: ignore[import-not-found]
