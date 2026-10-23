@@ -3720,3 +3720,18 @@ cut from the original text. Inside a quote, a fully cited list under a heading
 or a `:` lead-in is still accepted. So is a numbered list, which used to be
 refused because its `1.` was read as a sentence of its own. A hard-wrapped
 quoted sentence stays one sentence.
+
+## 2026-10-23 — Telemetry time filters and huge numbers fail with a clear error (#392)
+
+#387 taught `build` and `record()` to refuse integers too big for SQLite, but
+missed two places. The time filters `since()` and
+`dump_aggregate_json(since_ts=...)` never checked their floor, so `2**63`
+crashed at the database with a bare `OverflowError`. Separately, every
+"is this number finite?" check ran before the size check, and the finiteness
+check itself crashes on an integer too big to be a float (`10**400`). The size
+check now runs first everywhere, and the filters run it too, so each of these
+inputs gets a `ValueError` that names the field. `last_24h(now=-2**63)`
+crashed too, even though `-2**63` is a timestamp the store accepts. It now
+works out the cutoff as a decimal number, the same type as the timestamp
+column, so the query just runs and returns the row stored at that time. The
+same finiteness crash in `ModelPrice` and `percentile` is filed as #395.

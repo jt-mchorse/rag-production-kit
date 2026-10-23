@@ -4208,3 +4208,24 @@ context_for_next_session:
   - "NOT_HANDLED_u2028_u0085_formfeed_line_separators_and_setext_or_fenced_blocks_inside_a_quote_389_class"
 followups: []
 ---
+
+---
+session: 2026-10-23T07:23Z
+issue: 392
+branch: session/2026-10-22-0814-issue-392
+focus: SINCE_AND_DUMP_FLOORS_HAD_NO_SQLITE_INT_RANGE_CHECK_AND_ISFINITE_RAN_BEFORE_THE_387_RANGE_CHECK_SO_INTS_PAST_FLOAT_RANGE_ESCAPED_AS_RAW_OVERFLOWERROR
+phase: shipped
+delta:
+  files_changed: 2
+  tests_added: 26
+  suite: "2815 passed, 7 skipped, 26 deselected (fresh py3.11 and py3.12 .[dev] venvs); ruff check + format clean; pg job, eval job, nextjs demo not run locally (untouched)"
+decisions_made: []
+measured: "main 58dd718: since(2**63), since(-2**63-1), dump_aggregate_json(since_ts=2**63) -> OverflowError at bind; since(10**400), dump since_ts=10**400, last_24h(now=10**400), build ts/total_latency_ms/per_phase_ms = 10**400, record(replace(rec, ts=10**400)) -> OverflowError from isfinite/isnan; last_24h(now=-2**63) -> OverflowError at bind of the int cutoff. After: ValueError naming ts_floor/since_ts/now/the build field; last_24h(now=-2**63) returns the row stored at ts=-2**63. Revert (telemetry.py only, pycache cleared) 14 of 26 red; 12 green controls (int64 bounds, float(2**63), +-inf floors, in-range now, build at bounds)."
+context_for_next_session:
+  - "LAST_24H_CUTOFF_IS_A_FLOAT_NOT_A_REFUSAL_now_minus_2_63_is_a_storable_ts_so_its_window_must_be_answerable_ts_column_is_REAL"
+  - "HUGE_INTS_NAMED_BY_BIT_LENGTH_past_4300_digits_str_raises_its_own_ValueError_and_drops_the_field_name"
+  - "FOLLOWUP_395_ModelPrice_and_percentile_isfinite_on_an_int_past_float_range_same_class"
+  - "RESUMED_SESSION_prior_agent_cut_off_after_commit_rebased_onto_58dd718_without_conflict"
+followups:
+  - "rag-production-kit#395"
+---
