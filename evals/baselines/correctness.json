@@ -1,13 +1,13 @@
 {
-  "run_id": "correctness_a1e728ed8297",
-  "started_at": "2026-05-16T00:00:00Z",
+  "run_id": "correctness_9fac10f88974",
+  "started_at": "2026-10-26T07:58:38Z",
   "suite": "correctness",
   "dataset_version": "rag-qa-v0.1",
   "judge_model": "deterministic-stub-v1",
   "judge_kappa": null,
-  "mean_score": 0.9008,
+  "mean_score": 0.8869,
   "n_rows": 8,
-  "git_sha": "e40188cff0bc6193eb6d678ffe88e76a0f5f9cbf",
+  "git_sha": "32e0815978404895efa61f1305be5856fc23d7c2",
   "rows": [
     {
       "example_id": "rag_qa_001",
@@ -41,8 +41,8 @@
     },
     {
       "example_id": "rag_qa_007",
-      "score": 0.7778,
-      "reasoning": "token overlap 7/9 (['all', 'can', 'csv', 'dashboard', 'data', 'export', 'json'])"
+      "score": 0.6667,
+      "reasoning": "token overlap 6/9 (['all', 'can', 'csv', 'dashboard', 'data', 'json'])"
     },
     {
       "example_id": "rag_qa_008",

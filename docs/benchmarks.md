@@ -12,7 +12,7 @@ README published the eval baselines (#233).
 | ------------------------------------- | ------------------------------------------------------------------------------ | ----- |
 | Recall@5 on the eval golden set       | `evals/baselines/recall_at_5.json` (n=8, synthetic `rag-qa-v0.1`, every PR)     | 1.00  |
 | End-to-end answer faithfulness        | `evals/baselines/faithfulness.json` (n=8, synthetic `rag-qa-v0.1`, every PR)    | 1.00  |
-| Answer correctness                    | `evals/baselines/correctness.json` (n=8, synthetic `rag-qa-v0.1`, every PR)     | 0.90  |
+| Answer correctness                    | `evals/baselines/correctness.json` (n=8, synthetic `rag-qa-v0.1`, every PR)     | 0.89  |
 | Retrieval latency p50 / p95 / p99     | captured per request by the telemetry layer (#6); no headline number, by design | —     |
 | Cost per request                      | captured per request by the telemetry layer (#6); no headline number, by design | —     |
 | Pipeline overhead (streaming)         | [Streaming pipeline](#streaming-pipeline-5) below                               | < 0.15 ms p95 |

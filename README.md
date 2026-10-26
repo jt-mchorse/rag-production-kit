@@ -344,13 +344,15 @@ own SQLite store is the source of truth.
 
 Three eval suites run on every PR against the synthetic `rag-qa-v0.1`
 golden set (8 examples, 10-chunk in-memory corpus, dep-free
-`TemplateGenerator`). First baseline (n=8, deterministic):
+`TemplateGenerator`). Committed baselines (n=8, deterministic; correctness
+was regenerated in #404, when the scorer stopped crediting tokens inside
+`[cite:<id>]` markers and moved from 0.90 to 0.89):
 
 | suite          | mean score | reproducer                          |
 | -------------- | ---------: | ----------------------------------- |
 | faithfulness   |       1.00 | `python -m evals.run_eval`          |
 | recall_at_5    |       1.00 | `python -m evals.run_eval`          |
-| correctness    |       0.90 | `python -m evals.run_eval`          |
+| correctness    |       0.89 | `python -m evals.run_eval`          |
 
 Real-LLM eval runs (Anthropic-backed `Generator`, real pgvector
 retrieval) are operator-triggered with `ANTHROPIC_API_KEY` + `DATABASE_URL`
