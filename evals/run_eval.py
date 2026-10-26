@@ -50,6 +50,7 @@ from rag_kit import (
     TemplateGenerator,
     enforce_citations,
 )
+from rag_kit.generator import _CITE_PATTERN
 from rag_kit.io_utils import atomic_write_text
 from rag_kit.retriever import RetrievalResult
 from rag_kit.text import word_tokens
@@ -180,13 +181,26 @@ def _score_recall_at_5(
     )
 
 
+def _answer_tokens(text: str) -> list[str]:
+    """Content tokens of an answer with its ``[cite:<id>]`` markers removed.
+
+    A marker names a chunk, it is not answer content, and a judge would not
+    credit it (#404). Tokenized with the markers in, an id like
+    ``doc-data-export`` supplied ``export`` to a row whose prose only said
+    "exported", and that one token held the published correctness mean at
+    0.90. Each marker becomes a space so the words either side stay apart.
+    The same pattern the generator writes and ``enforce_citations`` reads.
+    """
+    return _tokens(_CITE_PATTERN.sub(" ", text))
+
+
 def _score_correctness(generated: GeneratedAnswer | Refusal, expected: str) -> tuple[float, str]:
     if isinstance(generated, Refusal):
         return 0.0, f"refused (reason={generated.reason})"
-    expected_tokens = set(_tokens(expected)) - _STOP
+    expected_tokens = set(_answer_tokens(expected)) - _STOP
     if not expected_tokens:
         return 0.0, "expected output had no content tokens"
-    gen_tokens = set(_tokens(generated.text)) - _STOP
+    gen_tokens = set(_answer_tokens(generated.text)) - _STOP
     hits = expected_tokens & gen_tokens
     score = len(hits) / len(expected_tokens)
     return score, f"token overlap {len(hits)}/{len(expected_tokens)} ({sorted(hits)})"
