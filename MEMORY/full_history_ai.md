@@ -4346,3 +4346,22 @@ context_for_next_session:
   - "PYTEST_ADDOPTS_Q_SO_-q_ON_THE_CLI_HIDES_THE_SUMMARY_LINE_run_without_-q_to_read_counts"
 followups: []
 ---
+
+---
+session: 2026-10-27T07:36Z
+issue: 410
+branch: session/2026-10-27-0737-issue-410
+focus: AGGREGATE_SUMMED_A_NEGATIVE_TOTAL_USD_213_CARRIED_THE_NON_NEGATIVE_CLAUSE_FOR_LATENCY_AND_TOKENS_NOT_COST
+phase: shipped
+delta:
+  files_changed: 4
+  tests_added: 15
+  suite: "2967 passed, 7 skipped, 26 deselected (fresh py3.11 and py3.12 .[dev] venvs); ruff check + format clean; pg job, eval job, nextjs demo not run locally (untouched)"
+decisions_made: []
+measured: "main 49660aa, bare CostRecord total_usd -5.0 and 0.002: aggregate().total_usd -4.998; record->since->dump_aggregate_json wrote total_usd -4.998; dashboard headline $-4.9980. After: ValueError 'total_usd values must all be non-negative', no file written, dashboard banner, table keeps $-5.000000. Revert (telemetry.py only, pycache cleared) 8 of 15 red; 7 green controls (zero/positive sums, 3 finiteness-message rows, good headline, money-field population, components unpublished). Neighbours: sum(costs)<0 guard 2 red; negativity before finiteness 3 red suite-wide (-inf message)."
+context_for_next_session:
+  - "TOTAL_USD_IS_THE_ONLY_PUBLISHED_MONEY_FIELD_prompt_usd_and_completion_usd_are_stored_but_nothing_sums_or_publishes_them_test_cost_domain_boundary_pins_the_population"
+  - "NON_NEGATIVE_INVENTORY_LOCK_NOW_MATCHES_THE_GTE_0_SPELLING_so_ModelPrice___post_init___is_pinned_as_telemetry.__post_init__"
+  - "SAME_SIZE_REORDER_PROBE_RESTORED_IN_THE_SAME_SECOND_LEFT_A_STALE_PYC_3_false_reds_until_pycache_cleared"
+followups: []
+---

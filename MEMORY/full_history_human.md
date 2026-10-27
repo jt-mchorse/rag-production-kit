@@ -3816,3 +3816,18 @@ The check is now one shared helper that both `build` and `record` call, so
 `record` refuses only NaN and wrong types, because `aggregate` checks the rest
 when it reads the data back. No read path checks the per-phase map, so `record`
 applies the whole rule.
+
+## 2026-10-27 — The telemetry aggregate no longer publishes negative spend (#410)
+
+`aggregate` already refused a cost that was not a finite number, a negative
+latency and a negative token count. It never refused a negative cost. Normal
+records can't have one, because the price table rejects negative rates and
+counts. But a record made directly with `CostRecord(...)` can, and the store
+keeps it on purpose, since the sign is meant to be checked when the data is
+read. So `-5.0` next to `0.002` published total spend of `-4.998` in the JSON
+dump and in the dashboard headline. `aggregate` now refuses any negative
+`total_usd` with its own message. The dashboard shows its "Summary unavailable"
+banner and keeps the raw value in the table. `total_usd` is the only money
+field anything adds up or shows, and a test now pins that. The test that lists
+every "non-negative" check also finds the `>= 0.0` wording now, which is how
+this one was missed.
