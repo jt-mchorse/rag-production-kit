@@ -806,6 +806,23 @@ def aggregate(records: Iterable[CostRecord]) -> Aggregate:
         raise ValueError(f"total_usd values must all be finite numbers; got {', '.join(huge)}")
     if any(not math.isfinite(c) for c in costs):
         raise ValueError(f"total_usd values must all be finite numbers; got {costs!r}")
+    # The cost domain, the clause #213 carried for latency and token counts and
+    # not for cost (#410). `ModelPrice` refuses a negative rate ("a finite number
+    # >= 0.0", #36) and `PriceTable.cost` a negative count, so `build` can never
+    # produce a negative `total_usd`; `record` leaves the sign to this read side
+    # by design (#245). A directly-constructed `total_usd=-5.0` therefore reached
+    # the sum: measured on 49660aa, with one real record of 0.002 it published
+    # `total_usd = -4.998` through `dump_aggregate_json` and the dashboard
+    # headline. Checked per record, not on the sum: a -5.0 beside a +10.0 sums
+    # positive and is just as wrong. Negativity only, like the latency clause
+    # below, so the two finiteness messages above stay as their tests quote them.
+    #
+    # `total_usd` is the only money field anything here sums or publishes.
+    # `prompt_usd` / `completion_usd` are stored and read back, but no `Aggregate`
+    # field, `/json` row or dashboard cell reads them, so they have no read
+    # boundary to agree with.
+    if any(c < 0 for c in costs):
+        raise ValueError(f"total_usd values must all be non-negative; got {costs!r}")
     # The latency domain, at the same boundary and for the same reason (#213).
     # `CostRecord.build` rejects "a finite non-negative number"; every sweep
     # since (#38, #58, #63, #80, #81, #82, #87, #106, #108, #135, #168) carried

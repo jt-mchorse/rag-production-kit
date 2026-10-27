@@ -254,8 +254,9 @@ def _render_chart_svg(records: Sequence[CostRecord], width: int = 720, height: i
 def _render_dashboard_html(records: Sequence[CostRecord]) -> str:
     # `aggregate` is a *metric* boundary and refuses to compute a summary over
     # invalid data -- a non-finite `total_usd` (#80) or, since #213, a negative
-    # `total_latency_ms`. That is right for `dump_aggregate_json`, which must not
-    # publish a number it cannot stand behind, and wrong to propagate from here:
+    # `total_latency_ms`, and since #410 a negative `total_usd`. That is right for
+    # `dump_aggregate_json`, which must not publish a number it cannot stand
+    # behind, and wrong to propagate from here:
     # an unhandled `ValueError` in `_handle_dashboard` becomes a bare 500 and a
     # blank page, which is the exact failure mode #135 added `_json_safe` to
     # prevent on the `/json` side. Surfaced by
