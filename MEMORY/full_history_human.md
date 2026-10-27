@@ -3790,3 +3790,15 @@ reads its own sentence back through the splitter, and if any piece would be
 uncited it adds a citation at every place the splitter can cut. Plain prose
 answers are unchanged byte for byte, and a seeded fuzz of 3,000 random markdown
 chunks now gets no refusals.
+
+## 2026-10-27 — Correctness no longer scores words inside citation markers (#404)
+
+The correctness eval is a stand-in for an LLM judge. It counts how many of the
+expected answer's words appear in the generated answer. It counted words
+inside the `[cite:<id>]` markers too, so a chunk id like `doc-data-export`
+gave one row the word "export" when its prose only said "exported". Each
+marker is now replaced with a space before counting, so the words on either
+side stay separate. That row drops from 0.78 to 0.67, and the published
+correctness mean goes from 0.90 to 0.89. The committed baseline and current
+records were regenerated with the documented `python -m evals.run_eval`
+command, and the README and benchmarks rows now show 0.89.

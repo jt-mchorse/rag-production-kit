@@ -4308,3 +4308,22 @@ context_for_next_session:
   - "PY311_FSTRING_CANNOT_HOLD_A_BACKSLASH_in_an_expression"
 followups: []
 ---
+
+---
+session: 2026-10-27T07:17Z
+issue: 404
+branch: session/2026-10-27-0717-issue-404
+focus: CORRECTNESS_PROXY_CREDITED_TOKENS_INSIDE_CITE_MARKERS_SO_A_CHUNK_ID_SUPPLIED_ANSWER_CONTENT_AND_HELD_THE_PUBLISHED_MEAN_AT_0_90
+phase: shipped
+delta:
+  files_changed: 6
+  tests_added: 10
+  suite: "2927 passed, 6 skipped, 26 deselected (fresh py3.12 .[dev] venv); ruff check + format clean; pg job and nextjs demo not run locally (untouched)"
+decisions_made: []
+measured: "main 1b6ebd6: _score_correctness('See the policy [cite:pro-14-day-refund-window].', 'Pro customers get a 14-day refund window.') -> 0.714 (5/7); rag_qa_007 0.7778; suite mean 0.9008. After: 0.0; rag_qa_007 0.6667; mean 0.8869 (README + docs/benchmarks.md 0.90 -> 0.89). Artifacts from python -m evals.run_eval [--write-baselines] --suite correctness; a rerun changes only run_id/git_sha/started_at. Revert (run_eval.py only, pycache cleared) 8 of 10 red; 2 green controls (prose beside a colliding marker, marker between two words); the second is red against sub('') instead of sub(' ')."
+context_for_next_session:
+  - "MARKERS_REPLACED_WITH_A_SPACE_NOT_DELETED_so_'refund[cite:a]window'_stays_two_tokens"
+  - "ONLY_CORRECTNESS_TOKENIZES_ANSWER_TEXT_retrieval_and_reranker_tokenize_query_and_chunk_text_which_has_no_markers"
+  - "WORK_WAS_DONE_2026_10_26_IN_AN_UNPUSHED_WORKTREE_cherry_picked_onto_a_fresh_branch_and_reverified"
+followups: []
+---
