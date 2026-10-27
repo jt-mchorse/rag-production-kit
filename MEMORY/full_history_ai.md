@@ -4365,3 +4365,21 @@ context_for_next_session:
   - "SAME_SIZE_REORDER_PROBE_RESTORED_IN_THE_SAME_SECOND_LEFT_A_STALE_PYC_3_false_reds_until_pycache_cleared"
 followups: []
 ---
+
+---
+session: 2026-10-27T07:44Z
+issue: 411
+branch: session/2026-10-27-0743-issue-411
+focus: README_AND_ARCHITECTURE_CALLED_THE_CORRECTNESS_EVAL_JUDGE_SCORED_AND_RERANKER_BACKED_IT_IS_A_TOKEN_OVERLAP_PROXY_OVER_AN_IN_MEMORY_RETRIEVER
+phase: shipped
+delta:
+  files_changed: 2
+  tests_added: 0
+  suite: "2952 passed, 7 skipped, 26 deselected (fresh py3.12 .[dev] venv, after commit); doc-lock tests 31 passed; ruff check + format clean"
+decisions_made: []
+measured: "main 49660aa: run_all_suites builds TemplateGenerator() over _retrieve_in_memory(k=5); no reranker constructed, no judge called; _score_correctness is content-token overlap. README:122 said judge-scored; architecture.md section 7 said same retriever / reranker / generator stack. Docs-only, no revert probe."
+context_for_next_session:
+  - "DID_NOT_USE_THE_ISSUES_SUGGESTED_WORDING_an_LLM_judge_run_needs_an_operator_API_key_because_run_eval_says_the_real_backend_is_not_implemented"
+  - "README_REAL_LLM_EVAL_RUNS_ARE_OPERATOR_TRIGGERED_SENTENCE_AND_BENCHMARKS_MD_SAME_CLAIM_DESCRIBE_A_PATH_NO_CODE_IMPLEMENTS_not_fixed_here"
+followups: []
+---

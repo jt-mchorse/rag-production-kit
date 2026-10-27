@@ -3831,3 +3831,14 @@ banner and keeps the raw value in the table. `total_usd` is the only money
 field anything adds up or shows, and a test now pins that. The test that lists
 every "non-negative" check also finds the `>= 0.0` wording now, which is how
 this one was missed.
+
+## 2026-10-27 — The docs now say what the correctness eval actually measures (#411)
+
+The README called the correctness eval "judge-scored", and the architecture
+doc said the eval uses the same retriever, reranker and generator as
+production. In fact it uses the simple template generator over an in-memory
+word-overlap retriever. No reranker runs, and the correctness score counts how
+many of the expected answer's words appear in the generated one. Both docs now
+say that. No numbers changed. The README also says real-LLM eval runs can be
+started by an operator, but no code in the repo does that. That sentence is
+left for its own issue.
