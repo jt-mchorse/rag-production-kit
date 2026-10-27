@@ -284,6 +284,46 @@ def _checked_columns(values: Mapping[str, Any]) -> None:
         _check_sqlite_int_range(value, name)
 
 
+def _checked_phases(per_phase_ms: Mapping[Any, Any]) -> None:
+    """Refuse a ``per_phase_ms`` map ``build`` would refuse. Shared by ``build``
+    and ``record`` (#406), so the bare constructor is refused in the same words.
+
+    Per-phase value guard (#108): the same finiteness/sign contract as
+    total_latency_ms, applied to each per_phase_ms value. Without it a
+    non-finite phase value reaches TelemetryStore.record, which persists the
+    map via json.dumps(... allow_nan=True) -- writing the bare token
+    NaN/Infinity (invalid JSON). bool is an int subclass; reject it so a stray
+    True/False can't pose as a millisecond value.
+
+    Keys must be `str`, as the annotation says (#387). `record` persists the map
+    with `json.dumps`, which raised a raw TypeError for a tuple key and coerced
+    the rest to strings: `{None: 5.0}` came back as `{"null": 5.0}`, and
+    `{1: 5.0, "1": 6.0}` as `{"1": 6.0}`, the 5.0 silently gone.
+
+    At ``record`` this is the whole rule, not only what SQLite cannot store as
+    for ``total_latency_ms`` (#245): ``aggregate`` guards that column's
+    infinities and negatives on read (#80, #213), but no read path checks
+    ``per_phase_ms`` (the dashboard's ``/json`` only maps a non-finite value to
+    ``null``), so the write seam is the only place it can be checked.
+    """
+    for phase, value in per_phase_ms.items():
+        if not isinstance(phase, str):
+            raise ValueError(
+                f"per_phase_ms keys must be str phase names; got {type(phase).__name__} {phase!r}"
+            )
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            raise ValueError(
+                f"per_phase_ms[{phase!r}] must be a finite non-negative number; got {value!r}"
+            )
+        # The same int range as `total_latency_ms` (#392). An int past float
+        # range made `math.isfinite` itself raise a raw OverflowError.
+        _check_sqlite_int_range(value, f"per_phase_ms[{phase!r}]")
+        if not math.isfinite(value) or value < 0:
+            raise ValueError(
+                f"per_phase_ms[{phase!r}] must be a finite non-negative number; got {value}"
+            )
+
+
 @dataclass(frozen=True)
 class CostRecord:
     """One per-request telemetry blob.
@@ -426,37 +466,7 @@ class CostRecord:
             raise ValueError(
                 f"total_latency_ms must be a finite non-negative number; got {total_latency_ms}"
             )
-        # Per-phase value guard (#108): the same finiteness/sign contract as
-        # total_latency_ms above, applied to each per_phase_ms value. Without
-        # it a non-finite phase value reaches TelemetryStore.record, which
-        # persists the map via json.dumps(... allow_nan=True) — writing the
-        # bare token NaN/Infinity (invalid JSON). since() then swallows the
-        # whole row's phases on JSONDecodeError, silently dropping the data.
-        # bool is an int subclass; reject it so a stray True/False can't pose
-        # as a millisecond value.
-        #
-        # Keys must be `str`, as the annotation says (#387). `record` persists
-        # the map with `json.dumps`, which raised a raw TypeError for a tuple
-        # key and coerced the rest to strings: `{None: 5.0}` came back as
-        # `{"null": 5.0}`, and `{1: 5.0, "1": 6.0}` as `{"1": 6.0}`, the 5.0
-        # silently gone.
-        for phase, value in (per_phase_ms or {}).items():
-            if not isinstance(phase, str):
-                raise ValueError(
-                    f"per_phase_ms keys must be str phase names; "
-                    f"got {type(phase).__name__} {phase!r}"
-                )
-            if isinstance(value, bool) or not isinstance(value, (int, float)):
-                raise ValueError(
-                    f"per_phase_ms[{phase!r}] must be a finite non-negative number; got {value!r}"
-                )
-            # The same int range as `total_latency_ms` (#392). An int past float
-            # range made `math.isfinite` itself raise a raw OverflowError.
-            _check_sqlite_int_range(value, f"per_phase_ms[{phase!r}]")
-            if not math.isfinite(value) or value < 0:
-                raise ValueError(
-                    f"per_phase_ms[{phase!r}] must be a finite non-negative number; got {value}"
-                )
+        _checked_phases(per_phase_ms or {})
         prompt_usd, completion_usd = price_table.cost(model, prompt_tokens, completion_tokens)
         return CostRecord(
             ts=ts_value,
@@ -533,7 +543,9 @@ class TelemetryStore:
         any other ``REAL`` column that is not a non-``bool`` ``int``/``float``
         or is NaN (#245, #368), or a ``TEXT``/``INTEGER`` column of the wrong
         type or a ``TEXT`` one holding a lone surrogate (#352, #368), or an
-        ``int`` in any column outside SQLite's signed 64-bit range (#387). ``build``
+        ``int`` in any column outside SQLite's signed 64-bit range (#387), or a
+        ``per_phase_ms`` that ``build`` refuses (#406): a non-``str`` key, or a
+        value that is not a finite non-negative number. ``build``
         already refuses them; the bare constructor is public (`rag_kit.__all__`) and validates
         neither, and ``ts`` cannot be guarded at a read boundary the way
         ``aggregate`` guards latency: ``since()`` filters and orders on it in
@@ -559,6 +571,7 @@ class TelemetryStore:
                     f"NOT NULL column {name} refuses"
                 )
             _check_sqlite_int_range(value, name)
+        _checked_phases(rec.per_phase_ms)
         cur = self._conn.execute(
             """
             INSERT INTO cost_records (

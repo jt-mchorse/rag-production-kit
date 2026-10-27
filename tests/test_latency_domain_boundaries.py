@@ -485,6 +485,12 @@ def test_every_non_negative_guard_is_accounted_for() -> None:
         # refuses a negative count; `retrieved_count` is not aggregated or
         # rendered as a number anywhere, so it has no read boundary to agree.
         "telemetry._checked_columns",
+        # #406: `build`'s `per_phase_ms` loop, moved out so `record` applies it
+        # to a bare record too. No read boundary aggregates or renders
+        # `per_phase_ms` as a number (`aggregate` does not read it; the
+        # dashboard's `/json` passes it through `_json_safe`), so there is no
+        # read clause to agree with, and the write seam carries the whole rule.
+        "telemetry._checked_phases",
         # read / metric boundaries (#213). `telemetry.aggregate` carries two
         # clauses -- latency and token counts -- and the second of those is the
         # site THIS LOCK FOUND: #213 opened with a hand-written list of three
