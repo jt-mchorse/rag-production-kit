@@ -119,7 +119,9 @@ consumes both.
 [llm-eval-harness] repo (imported, not vendored — D-002). Three
 suites run on every PR against the synthetic `rag-qa-v0.1` golden
 set: faithfulness against the citation contract, recall@5 against the
-in-memory corpus, and judge-scored answer correctness. CI's `eval`
+in-memory corpus, and answer correctness as a deterministic token-overlap
+proxy (the share of the expected answer's content tokens that appear in
+the generated one; no LLM judge runs). CI's `eval`
 job builds the composite PR comment with the per-suite mean-score
 table the Benchmarks section quotes verbatim; baselines live under
 `evals/baselines/` and the orchestrator is the deterministic

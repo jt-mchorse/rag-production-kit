@@ -567,10 +567,13 @@ flowchart LR
     STICKY --> PRC["Sticky PR comment"]
 ```
 
-**Composes with.** Reads the same retriever / reranker / generator
-stack the production query path uses; the only swap is an in-memory
-token-overlap retriever for the hermetic CI path so an Anthropic key
-isn't required for the PR check.
+**Composes with.** Reads the generator and citation contract the
+production query path uses — the dep-free `TemplateGenerator` and
+`enforce_citations`. Retrieval is an in-memory token-overlap retriever
+in place of `Retriever`'s hybrid BM25 + pgvector search, and no
+reranker runs, so the PR check needs no database and no API key. The
+correctness suite is scored by content-token overlap with the expected
+answer, a deterministic proxy for an LLM judge, not a judge.
 
 **Why these decisions.**
 
