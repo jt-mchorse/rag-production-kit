@@ -4327,3 +4327,22 @@ context_for_next_session:
   - "WORK_WAS_DONE_2026_10_26_IN_AN_UNPUSHED_WORKTREE_cherry_picked_onto_a_fresh_branch_and_reverified"
 followups: []
 ---
+
+---
+session: 2026-10-27T07:25Z
+issue: 406
+branch: session/2026-10-27-0718-issue-406
+focus: RECORD_SKIPPED_BUILDS_PER_PHASE_MS_KEY_AND_VALUE_CHECKS_FOR_A_BARE_COSTRECORD_390_DEFERRED_HALF
+phase: shipped
+delta:
+  files_changed: 3
+  tests_added: 26
+  suite: "2942 passed, 7 skipped, 26 deselected (fresh py3.11 and py3.12 .[dev] venvs); 2952 passed after rebase onto #408 (py3.12); ruff check + format clean; pg job, eval job, nextjs demo not run locally (untouched)"
+decisions_made: []
+measured: "main 1b6ebd6, bare CostRecord -> record -> since(-inf): {('a','b'): 1.0} raw TypeError from json.dumps; {1: 5.0, '1': 6.0} read back {'1': 6.0}; {None: 5.0} read back {'null': 5.0}; values 'fast', None, [1], True, nan, inf, -3.0, 2**70, 10**400 stored as given. After: build's exact ValueError, nothing stored. Revert (telemetry.py only, pycache cleared) 20 of 26 red; 6 green controls (round trips of maps build accepts)."
+context_for_next_session:
+  - "PER_PHASE_MS_GETS_THE_FULL_RULE_AT_RECORD_unlike_total_latency_ms_which_245_scopes_to_nan_and_type_because_aggregate_guards_it_on_read_nothing_reads_per_phase_ms_behind_a_guard"
+  - "NON_NEGATIVE_INVENTORY_LOCK_test_latency_domain_boundaries_fires_on_any_new_function_with_a_non_negative_raise_add_it_with_the_read_boundary_reason"
+  - "PYTEST_ADDOPTS_Q_SO_-q_ON_THE_CLI_HIDES_THE_SUMMARY_LINE_run_without_-q_to_read_counts"
+followups: []
+---

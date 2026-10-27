@@ -3802,3 +3802,17 @@ side stay separate. That row drops from 0.78 to 0.67, and the published
 correctness mean goes from 0.90 to 0.89. The committed baseline and current
 records were regenerated with the documented `python -m evals.run_eval`
 command, and the README and benchmarks rows now show 0.89.
+
+## 2026-10-27 — `record` now checks a bare record's per-phase timings the way `build` does (#406)
+
+`CostRecord.build` refuses a `per_phase_ms` map whose keys are not strings, or
+whose values are not finite non-negative numbers. `TelemetryStore.record` never
+ran those checks, and records made directly with `CostRecord(...)` skip `build`.
+So a tuple key crashed with a raw `TypeError`, `{1: 5.0, "1": 6.0}` quietly lost
+the 5.0, `{None: 5.0}` came back as `{"null": 5.0}`, and values like `"fast"`,
+`NaN` or `-3.0` were stored as given. PR #390 had listed this as out of scope.
+The check is now one shared helper that both `build` and `record` call, so
+`record` raises the same message and stores nothing. For `total_latency_ms`,
+`record` refuses only NaN and wrong types, because `aggregate` checks the rest
+when it reads the data back. No read path checks the per-phase map, so `record`
+applies the whole rule.
