@@ -4421,3 +4421,22 @@ context_for_next_session:
   - "OPEN_FROM_THE_SAME_HUNT_to_pgvector_checks_finiteness_as_float64_for_a_float32_vector_column_zero_or_underflowing_vectors_give_NaN_cosine_not_yet_filed"
 followups: []
 ---
+
+---
+session: 2026-10-28T07:57Z
+issue: 419
+branch: session/2026-10-28-0757-issue-419
+focus: TO_PGVECTOR_CHECKED_FINITENESS_AS_FLOAT64_BUT_VECTOR_N_IS_FLOAT32_A_COMPONENT_PAST_3_4E38_FAILED_IN_POSTGRES_AFTER_THE_BATCH_WAS_EMBEDDED
+phase: shipped
+delta:
+  files_changed: 3
+  tests_added: 19
+  suite: "2997 passed 31 skipped (after commit); ruff check + format clean"
+decisions_made: []
+measured: "scratch PG 17.6 + pgvector (initdb -E UTF8, LC_ALL=C): FLT_MAX and the rounding midpoint 3.4028235677973366e38 stored as FLT_MAX; nextafter(midpoint) both signs, 3.5e38, 1e39 -> 'out of range for type vector'; 1e-50 stored as 0. Guard refuses abs > midpoint, matching pgvector exactly. Revert 8 red / 10 green. test_past_float_range_siblings pinned acceptance of 2**1023 and float max (both refused by pgvector) -> now the named float32 refusal plus a 10**38 accepted arm. Zero-norm/underflow NaN cosine filed as decision-revisit #420. PR #421."
+context_for_next_session:
+  - "A_GUARD_THAT_CHECKS_A_TYPE_IS_FINITE_MUST_CHECK_THE_STORAGE_TYPE_not_the_language_type"
+  - "396_PINNED_ACCEPTANCE_OF_VALUES_THE_DATABASE_REFUSES_an_anti_over_reach_arm_can_pin_a_wrong_answer"
+  - "OPEN_420_zero_norm_vector_HashEmbedder_emits_one_JT_gated"
+followups: ["#420"]
+---

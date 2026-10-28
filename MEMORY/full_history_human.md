@@ -3867,3 +3867,15 @@ and the same question could cite a different source depending on which path
 answered it. The retriever now exposes the exact candidate pool its own
 search reranks, and the streaming pipeline uses it. A randomized test
 checks that both paths give identical reranked results. PR #418.
+
+## 2026-10-28 — Embedding values too large for the database are refused up front (#419)
+
+The vector column stores 32-bit floats. The guard on embedding values only
+checked that each value was a finite 64-bit number, so a value above about
+3.4e38 passed the guard and was then rejected by Postgres, after every
+document in the batch had already been embedded (and paid for). The guard now
+refuses such a value immediately and names its position. The cut-off was
+measured against pgvector, and the guard refuses exactly what pgvector
+refuses, nothing more. A related question, what to do with an all-zero
+embedding that the database can never rank, is filed for JT as #420.
+PR #421.
