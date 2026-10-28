@@ -59,6 +59,16 @@ def connect(
     return psycopg.connect(dsn, connect_timeout=DEFAULT_CONNECT_TIMEOUT_S)
 
 
+#: The largest magnitude pgvector stores (#419). `vector(n)` is float32, so a
+#: float64 that is finite here can still be out of range there: `3.5e38` and
+#: `1e39` are refused by Postgres ("out of range for type vector") after the
+#: whole batch was embedded. This is float32's rounding midpoint between FLT_MAX
+#: and 2**128; measured on PG 17.6 + pgvector, the midpoint itself is stored as
+#: FLT_MAX, so only magnitudes strictly above it are refused -- the guard never
+#: refuses a value pgvector would store.
+_FLOAT32_LIMIT = 3.4028235677973366e38
+
+
 def to_pgvector(vec: list[float], *, expected_dim: int = EMBEDDING_DIM) -> str:
     """Format a Python list as a pgvector literal: '[1,2,3]'.
 
@@ -109,7 +119,7 @@ def to_pgvector(vec: list[float], *, expected_dim: int = EMBEDDING_DIM) -> str:
 
     Raises:
         ValueError: when `vec` has the wrong number of components, or when any
-            component is non-finite.
+            component is non-finite or outside float32's range (#419).
     """
     if len(vec) != expected_dim:
         raise ValueError(
@@ -133,6 +143,13 @@ def to_pgvector(vec: list[float], *, expected_dim: int = EMBEDDING_DIM) -> str:
                 "a NaN/Inf value is rejected by pgvector and would otherwise surface "
                 "as an opaque error far from the embedder seam (or silently corrupt "
                 "dense-channel ordering)"
+            )
+        # Finite as a float64 is not enough: the column is float32 (#419).
+        if abs(f) > _FLOAT32_LIMIT:
+            raise ValueError(
+                f"embedding component at index {i} must fit in float32 (|v| <= ~3.4e38, "
+                f"pgvector's storage type); got {_describe_number(v)} — Postgres would "
+                "refuse it as out of range, after the whole batch had been embedded"
             )
         out.append(repr(f))
     return "[" + ",".join(out) + "]"

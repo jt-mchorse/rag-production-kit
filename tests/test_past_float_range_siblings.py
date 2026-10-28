@@ -103,8 +103,15 @@ def test_cohere_timeout_accepts_a_large_int_float_can_hold(value: int) -> None:
 
 
 @pytest.mark.parametrize("value", HELD, ids=HELD_IDS)
-def test_to_pgvector_accepts_a_large_int_float_can_hold(value: int) -> None:
-    assert repr(float(value)) in to_pgvector(_vec(value))
+def test_to_pgvector_names_a_large_int_float_can_hold_but_float32_cannot(value: int) -> None:
+    # Clears #396's float-range check, then meets the column's own range: the
+    # vector is float32, and pgvector refuses these as out of range (#419).
+    with pytest.raises(ValueError, match=r"index 3 must fit in float32"):
+        to_pgvector(_vec(value))
+
+
+def test_to_pgvector_accepts_a_large_int_float32_can_hold() -> None:
+    assert repr(float(10**38)) in to_pgvector(_vec(10**38))
 
 
 def test_to_pgvector_still_names_infinity_by_its_repr() -> None:
