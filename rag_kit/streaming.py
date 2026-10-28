@@ -311,8 +311,10 @@ class StreamingPipeline:
     """
 
     # When a reranker is set, over-fetch from retrieval so the reranker
-    # has more candidates than the final `k` to choose from. Matches the
-    # multiplier baked into `Retriever.search` (#2).
+    # has more candidates than the final `k` to choose from. Only for a
+    # retriever without `rerank_pool`: `Retriever.search` already over-fetches
+    # its channels by this factor, so calling it with `k * 4` read them 16k
+    # deep and reranked a different pool than the library does (#417).
     RERANK_OVERFETCH = 4
 
     def __init__(
@@ -338,9 +340,14 @@ class StreamingPipeline:
         try:
             yield StreamEvent("retrieving", {"query": query, "k": k}, 0.0)
 
-            over_fetch = k * self.RERANK_OVERFETCH if self.reranker else k
+            pool = getattr(self.retriever, "rerank_pool", None) if self.reranker else None
             t_ret_start = _now_ms()
-            retrieved = self.retriever.search(query, k=over_fetch, reranker=None)
+            if callable(pool):
+                # The pool `Retriever.search(query, k, reranker=...)` reranks (#417).
+                retrieved = pool(query, k)
+            else:
+                over_fetch = k * self.RERANK_OVERFETCH if self.reranker else k
+                retrieved = self.retriever.search(query, k=over_fetch, reranker=None)
             t_ret_end = _now_ms()
             ret_ms = t_ret_end - t_ret_start
             if self.timings is not None:

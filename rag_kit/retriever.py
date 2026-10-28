@@ -157,6 +157,22 @@ class Retriever:
             reranker=reranker,
         )
 
+    def rerank_pool(self, query: str, k: int = 5) -> list[RetrievalResult]:
+        """The candidates `search(query, k, reranker=r)` hands its reranker (#417).
+
+        Channels `k * _CANDIDATE_MULTIPLIER` deep, fused, cut to that many, in
+        fused order. `StreamingPipeline` reranks this pool so the SSE path and
+        the library cite the same chunks: it used to call `search` with an
+        already over-fetched `k`, and `_hybrid_search` over-fetched again, so
+        each channel was read 16k deep instead of 4k and the pools differed.
+        """
+        if not isinstance(k, int) or isinstance(k, bool) or k <= 0:
+            raise ValueError(f"k must be a positive integer, got {k!r}")
+        if not query:
+            raise ValueError("query must be non-empty")
+        _require_sendable(query, "query")
+        return self._hybrid_search(query, k, reranker=None, pool=True)
+
     # ------------------------------------------------------------------
     # Single-query hybrid path (the pre-D-014 behavior, factored out so
     # the multi-hop path can call it once per sub-query).
@@ -169,7 +185,9 @@ class Retriever:
         *,
         reranker: Reranker | None,
         rerank_query: str | None = None,
+        pool: bool = False,
     ) -> list[RetrievalResult]:
+        # `pool=True` returns the whole pre-rerank pool (`rerank_pool`, #417).
         # `query` drives retrieval (lexical + dense channels). `rerank_query`
         # is what the reranker scores against; it defaults to `query` so the
         # `rewriter=None` and multi-hop-per-sub-query callers are unchanged,
@@ -322,6 +340,8 @@ class Retriever:
                 )
             )
 
+        if pool:
+            return pre_rerank
         if reranker is None:
             return pre_rerank[:k]
 
