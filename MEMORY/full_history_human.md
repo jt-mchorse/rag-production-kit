@@ -3842,3 +3842,17 @@ many of the expected answer's words appear in the generated one. Both docs now
 say that. No numbers changed. The README also says real-LLM eval runs can be
 started by an operator, but no code in the repo does that. That sentence is
 left for its own issue.
+
+## 2026-10-28 — The docs no longer describe eval runs that don't exist (#414)
+
+The README and the benchmarks page said that real-LLM, real-pgvector eval
+runs could be triggered by setting an API key and a database URL. The code
+reads neither, so the eval always runs the small built-in fixture. Three
+comments named a switch variable for it, each with a different spelling,
+and nothing reads any of them. The README also said the rewriter benchmark
+could use the Anthropic rewriter and run on your own corpus. It can do
+neither. All of these now say what actually runs, and that real-LLM numbers
+are pending. A new test checks that any eval switch the docs name is read
+by the code, and that the benchmark's options match what the README says.
+Building a real backend is filed as #415 for JT to decide, since it needs
+an API budget. PR #416.

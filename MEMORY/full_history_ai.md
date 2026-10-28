@@ -4383,3 +4383,22 @@ context_for_next_session:
   - "README_REAL_LLM_EVAL_RUNS_ARE_OPERATOR_TRIGGERED_SENTENCE_AND_BENCHMARKS_MD_SAME_CLAIM_DESCRIBE_A_PATH_NO_CODE_IMPLEMENTS_not_fixed_here"
 followups: []
 ---
+
+---
+session: 2026-10-28T07:29Z
+issue: 414
+branch: session/2026-10-28-0729-issue-414
+focus: DOCS_DESCRIBED_AN_OPERATOR_TRIGGERED_REAL_LLM_PGVECTOR_EVAL_AND_AN_ANTHROPIC_REWRITER_BENCH_THAT_DO_NOT_EXIST_THREE_UNREAD_RAG_EVAL_SWITCH_SPELLINGS
+phase: shipped
+delta:
+  files_changed: 7
+  tests_added: 9
+  suite: "2978 passed 31 skipped; ruff check + format clean"
+decisions_made: []
+measured: "origin/main 6d2d3ea: git grep RAG_EVAL_ -> RAG_EVAL_BACKEND=pgvector (run_eval.py), =anthropic (eval.yml), RAG_EVAL_GENERATOR=anthropic (evals/__init__.py, not in the issue), no reader. bench_rewriter --help = {--k, --output}, hard-coded TemplateRewriter; README said it 'wires' AnthropicRewriter and runs 'on your own corpus'; its docstring cited a 'separate workflow' (only ci.yml, eval.yml exist). evals/__init__.py also still called correctness 'semantic' after #411. Revert probe (6 files == main, checked): 7 red / 2 green. A first zsh probe with an unsplit $F reverted nothing and was all green. PR #416; feature split to #415 (priority:low, budget decision)."
+context_for_next_session:
+  - "THE_ISSUE_LISTED_TWO_FILES_THE_CLAIM_LIVED_IN_FIVE_a_reader_check_over_every_RAG_EVAL_name_found_the_third_spelling"
+  - "ZSH_DOES_NOT_WORD_SPLIT_AN_UNQUOTED_VAR_a_revert_loop_over_$F_ran_zero_times_and_reported_all_green_assert_the_revert_happened_before_reading_the_result"
+  - "A_GIT_LS_FILES_LOCK_MUST_EXCLUDE_TESTS_OR_ITS_OWN_FILE_TRIPS_IT_once_committed"
+followups: ["#415"]
+---
