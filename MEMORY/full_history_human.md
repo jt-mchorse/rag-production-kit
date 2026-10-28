@@ -3856,3 +3856,14 @@ are pending. A new test checks that any eval switch the docs name is read
 by the code, and that the benchmark's options match what the README says.
 Building a real backend is filed as #415 for JT to decide, since it needs
 an API budget. PR #416.
+
+## 2026-10-28 — The streaming endpoint now reranks the same candidates as the library (#417)
+
+With a reranker, the streaming pipeline asked the retriever for four times
+as many results. The retriever then multiplied by four again, so the
+streaming path searched each channel 16 results deep for every one the
+library searched 4 deep. The two paths reranked different candidate pools,
+and the same question could cite a different source depending on which path
+answered it. The retriever now exposes the exact candidate pool its own
+search reranks, and the streaming pipeline uses it. A randomized test
+checks that both paths give identical reranked results. PR #418.

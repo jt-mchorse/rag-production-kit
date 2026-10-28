@@ -4402,3 +4402,22 @@ context_for_next_session:
   - "A_GIT_LS_FILES_LOCK_MUST_EXCLUDE_TESTS_OR_ITS_OWN_FILE_TRIPS_IT_once_committed"
 followups: ["#415"]
 ---
+
+---
+session: 2026-10-28T07:52Z
+issue: 417
+branch: session/2026-10-28-0753-issue-417
+focus: STREAMING_PIPELINE_OVER_FETCHED_TWICE_WITH_A_RERANKER_16K_PER_CHANNEL_VS_THE_LIBRARYS_4K_SO_THE_SSE_PATH_RERANKED_A_DIFFERENT_POOL
+phase: shipped
+delta:
+  files_changed: 3
+  tests_added: 68
+  suite: "3046 passed 31 skipped (after commit); ruff check + format clean"
+decisions_made: []
+measured: "origin/main 53750a3, LIMIT-honouring fake connection, LexicalOverlapReranker, chunk X lexical 3 / dense 5: library LIMITs [4,4] top-1 D1, streaming LIMITs [16,16] top-1 X. After: both [4,4] top-1 D1. Revert (streaming.py at main): 39 red / 29 green (controls + 22 random seeds whose pools coincide). PR #418."
+context_for_next_session:
+  - "Retriever.rerank_pool_IS_THE_ONE_DEFINITION_OF_THE_PRE_RERANK_POOL_streaming_duck_types_it_and_falls_back_for_fakes"
+  - "EVERY_STREAMING_TEST_USED_A_FAKE_RETRIEVER_WITHOUT_INTERNAL_OVERFETCH_a_fake_hides_a_multiplier_the_real_one_applies"
+  - "OPEN_FROM_THE_SAME_HUNT_to_pgvector_checks_finiteness_as_float64_for_a_float32_vector_column_zero_or_underflowing_vectors_give_NaN_cosine_not_yet_filed"
+followups: []
+---
