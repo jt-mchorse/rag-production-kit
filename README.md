@@ -356,10 +356,13 @@ was regenerated in #404, when the scorer stopped crediting tokens inside
 | recall_at_5    |       1.00 | `python -m evals.run_eval`          |
 | correctness    |       0.89 | `python -m evals.run_eval`          |
 
-Real-LLM eval runs (Anthropic-backed `Generator`, real pgvector
-retrieval) are operator-triggered with `ANTHROPIC_API_KEY` + `DATABASE_URL`
-locally — the CI fixture path covers regressions in the deterministic
-pipeline and keeps the workflow API-key-free.
+There is no real-LLM eval path yet. `python -m evals.run_eval` always
+runs the hermetic fixture above — the in-memory retriever and
+`TemplateGenerator` — whatever `ANTHROPIC_API_KEY` or `DATABASE_URL` is
+set to, so an `AnthropicGenerator` or real-pgvector eval number is
+pending an implementation, not an operator run (#414). The fixture path
+covers regressions in the deterministic pipeline and keeps the workflow
+API-key-free.
 
 **Reranker lift over fused-only** (issue #234, `scripts/bench_reranker.py`):
 the dep-free `LexicalOverlapReranker` lifts recall@3 on the same multi-hop
@@ -390,11 +393,11 @@ drops from 0.50 to 0.00. The rewriter splits it into `who founded it?`,
 a sub-query with no antecedent, whose top hit is `founder-cohere`; that
 ties `hq-anthropic` in the fusion and wins the id tie-break. The
 template rewriter does not carry a subject into a pronoun-bearing
-second conjunct (#379). Running it on your own corpus is two lines:
-`python -m scripts.bench_rewriter --k 3 --output md`.
-`AnthropicRewriter` numbers are pending an operator-triggered run (the
-script wires it but the bench fixture above is `TemplateRewriter`-only
-so CI stays API-key-free).
+second conjunct (#379). To reproduce the table:
+`python -m scripts.bench_rewriter --k 3 --output md`. The script benches
+only `TemplateRewriter` on its built-in fixture; it takes no corpus and
+has no `AnthropicRewriter` option, so an `AnthropicRewriter` number is
+pending an implementation (#414).
 
 ## Demo
 

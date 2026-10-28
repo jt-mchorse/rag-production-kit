@@ -10,8 +10,8 @@
 # deltas vs the committed baselines under evals/baselines/.
 #
 # Why fixtures + token-overlap: action runner has no ANTHROPIC_API_KEY
-# budget; real-LLM eval runs are operator-triggered locally with
-# RAG_EVAL_BACKEND=anthropic (not yet wired — lands when budget is set).
+# budget, and there is no real-LLM eval backend yet: evals/run_eval.py
+# runs only the hermetic fixture (#414).
 # Mirrors llm-eval-harness's own eval.yml fixture pattern.
 
 name: eval

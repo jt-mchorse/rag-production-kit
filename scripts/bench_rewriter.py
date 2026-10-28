@@ -19,9 +19,9 @@ Usage:
     python -m scripts.bench_rewriter --k 5 --output md
     python -m scripts.bench_rewriter --output json
 
-Real-LLM (`AnthropicRewriter`) numbers are intentionally out of scope
-for this script — they need an operator-supplied ``ANTHROPIC_API_KEY``
-budget and live in a separate workflow.
+Real-LLM (`AnthropicRewriter`) numbers are out of scope for this script,
+which benches only `TemplateRewriter` on the fixture below. No other
+script or workflow produces them yet either (#414).
 """
 
 from __future__ import annotations

@@ -3,9 +3,8 @@ and writes one ``RunResult``-shape JSON per metric.
 
 Hermetic by design: an in-memory token-overlap retriever stands in for
 real pgvector retrieval so the workflow runs with zero external services.
-Real-PG / real-LLM runs are operator-triggered by setting
-``RAG_EVAL_BACKEND=pgvector`` (not implemented in this file — that lands
-when the operator wires their own ``ANTHROPIC_API_KEY`` budget).
+There is no real-PG / real-LLM backend: nothing here reads an API key, a
+database URL or a backend switch, so every run is this fixture (#414).
 
 Three suites, one JSON per:
 
@@ -22,8 +21,8 @@ Three suites, one JSON per:
   ``tests/test_eval_run.py::test_score_recall_at_5_partial_credit``.)
 - ``correctness``:   per-row fraction of expected-output content tokens
   that appear in the generated answer (a deterministic string-overlap
-  proxy for the LLM-as-judge correctness rubric; real-judge runs land
-  with an operator-set API key).
+  proxy for the LLM-as-judge correctness rubric; no real-judge path
+  exists yet).
 
 Run shape matches ``eval_harness.runner.RunResult`` so ``eval-harness
 diff-json`` can compare current vs baseline without modification.

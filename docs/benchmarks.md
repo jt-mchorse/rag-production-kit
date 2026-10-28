@@ -20,8 +20,9 @@ README published the eval baselines (#233).
 
 The three eval rows are the deterministic CI fixture — an 8-example synthetic
 golden set over a 10-chunk in-memory corpus with the dep-free
-`TemplateGenerator` — not a held-out benchmark on real data. Real-LLM,
-real-pgvector runs are operator-triggered (see the README), and the latency
+`TemplateGenerator` — not a held-out benchmark on real data. There is no
+real-LLM or real-pgvector eval path yet: `evals/run_eval.py` runs only this
+fixture, whatever API key or database is configured (#414). The latency
 and cost rows are the operator's own telemetry store rather than a number
 this file could honestly quote.
 
