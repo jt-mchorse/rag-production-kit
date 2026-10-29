@@ -94,8 +94,6 @@ class Rewriter(Protocol):
 # ----------------------------------------------------------------------
 
 
-_WHITESPACE = re.compile(r"\s+")
-
 # "compare X with Y", "compare X and Y", "compare X to Y"
 _COMPARE_RE = re.compile(
     r"^\s*compare\s+(?P<a>.+?)\s+(?:with|to|and|vs\.?|versus)\s+(?P<b>.+?)\s*\??\s*$",
@@ -267,7 +265,32 @@ _QUESTION_PREFIXES = (
 
 
 def _norm(text: str) -> str:
-    return _WHITESPACE.sub(" ", text).strip()
+    """`text` with each separating run of blank characters made one space, and the ends stripped.
+
+    Blank is `is_blank`'s rule, whitespace or a format character (#427). The
+    whitespace-only version kept a `"\u200b"` or `"\ufeff"` beside a space or at
+    an end, so `"What is RAG. Then \u200b"` kept a zero-width step that
+    `RewriteResult` refuses (#424). The same leftovers gave `"What is \u200b?"`,
+    a doubled `"RAG?\u200b?"`, and a `"\u200bCompare ..."` or `"RAG.\u200b Then"`
+    that no longer split as its whitespace twin does. A run is a separator when
+    it holds whitespace or touches an end. A format-only run between two other
+    characters is part of the word (a ZWNJ in Persian, a soft hyphen, a ZWJ) and
+    is kept.
+    """
+    out: list[str] = []
+    run: list[str] = []
+    for ch in text:
+        if is_blank(ch):
+            run.append(ch)
+            continue
+        if run and out:
+            if any(c.isspace() for c in run):
+                out.append(" ")
+            else:
+                out.extend(run)
+        run = []
+        out.append(ch)
+    return "".join(out)
 
 
 def _looks_like_question(s: str) -> bool:
@@ -289,7 +312,8 @@ def _split_then(query: str) -> list[str] | None:
         # independent question — including when it's followed by punctuation
         # rather than a space (see _THEN_PREFIX / #92).
         s = _THEN_PREFIX.sub("", s)
-        if s:
+        # `is_blank`, as `AnthropicRewriter` filters (#424, #427).
+        if not is_blank(s):
             cleaned.append(s)
     if len(cleaned) >= 2:
         return cleaned
@@ -337,7 +361,7 @@ def _split_compare(query: str) -> list[str] | None:
         return None
     a = _norm(match.group("a"))
     b = _norm(match.group("b"))
-    if not a or not b:
+    if is_blank(a) or is_blank(b):
         return None
     # And an unambiguous sentence end inside an entity ("MySQL? Which one is
     # cheaper to host") refuses the match too. A bare ASCII `.` is left out:
@@ -375,7 +399,7 @@ def _split_question_and(query: str) -> list[str] | None:
     out: list[str] = []
     for part in parts:
         s = _norm(part)
-        if not s:
+        if is_blank(s):
             return None
         if not _looks_like_question(s):
             return None
