@@ -4478,3 +4478,23 @@ context_for_next_session:
   - "ANTHROPIC_GENERATOR_GENERATE_HAS_NO_EMPTINESS_CHECK_accepts_empty_and_blank_query_left_unchanged"
 followups: []
 ---
+
+---
+session: 2026-10-29T08:08Z
+issue: 426
+branch: session/2026-10-29-0800-issue-426
+focus: ANTHROPIC_AND_TEMPLATE_GENERATOR_ACCEPTED_A_BLANK_QUERY_AND_THE_NEXTJS_API_STREAM_STREAMED_FOR_A_MISSING_OR_BLANK_Q
+phase: shipped
+delta:
+  files_changed: 8
+  tests_added: 189
+  suite: "3433 passed 7 skipped (after commit); vitest 112 passed; ruff check + format clean; tsc clean"
+decisions_made: []
+measured: "origin/main 3cb15e8, fake client threshold 0.0: AnthropicGenerator.generate('', '   ', '\\u200b', '\\ufeff\\u3000') -> 1 messages.create each, GeneratedAnswer; TemplateGenerator same -> GeneratedAnswer; Next.js GET /api/stream no q / q= / %20%20 / %E2%80%8B / %E3%80%80 -> 200, 276 SSE events. After: ValueError 0 calls; 400 missing q. Revert (generator.py + route.ts == main, pycache cleared): pytest 50 red / 52 green (31 table arms, 20 controls, type-first); vitest 20 red / 92 green. Neighbours: isBlank as /^[\\s\\p{Cf}]*$/u 11 red; U+0085 dropped from the list 5 red. PR #429."
+context_for_next_session:
+  - "JS_BACKSLASH_S_IS_NOT_PYTHON_ISSPACE_it_lacks_U001C_U001F_and_U0085_and_includes_UFEFF_so_lib_blank_ts_lists_the_29_codepoints"
+  - "DEMO_NEXTJS_TEST_BLANK_ROWS_JSON_IS_SHARED_vitest_checks_isBlank_pytest_checks_is_blank_and_the_isspace_catalog"
+  - "CF_COUNT_IS_UNICODE_VERSION_DEPENDENT_163_on_3_11_170_on_3_12_so_a_cross_runtime_table_uses_only_long_stable_Cf_rows"
+  - "TEMPLATE_GENERATOR_NOW_TYPE_CHECKS_AND_BLANK_CHECKS_QUERY_like_AnthropicGenerator"
+followups: []
+---

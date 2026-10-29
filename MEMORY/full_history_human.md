@@ -3906,3 +3906,18 @@ one the same way. That covers the retriever, both rewriters, both rerankers
 and the streaming pipeline. The demo capture script and the streaming demo
 server follow the same rule, so a blank `q` gets a 400 instead of an empty
 stream. PR #425.
+
+## 2026-10-29 — The generators and the Next.js demo refuse a blank query too (#426)
+
+The blank-query fix in #424 covered every place that already refused an empty
+query. Two places never did. The Anthropic generator sent an empty or blank
+query to the paid API, and the template generator answered one. Both now
+refuse it with the same "query must be non-empty" message. The template
+generator also checks that the query is a string, so every generator follows
+the same rules. The Next.js demo answered a missing or blank `q` with a full
+streamed answer, which no longer matched the Python demo's 400. It now returns
+`400 missing q` too. Its "blank" check is a port of the Python one. It can't
+use JavaScript's built-in whitespace class, because that class treats a few
+characters differently from Python. A shared table of test rows is checked
+against both versions, so they can't drift apart without a test failing.
+PR #429.
