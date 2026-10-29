@@ -4459,3 +4459,22 @@ context_for_next_session:
   - "TYPE_RULE_IS_ISINSTANCE_STR_AS_EXTERNAL_ID_str_subclass_accepted_bool_refused_type_check_before_emptiness"
 followups: []
 ---
+
+---
+session: 2026-10-29T07:55Z
+issue: 424
+branch: session/2026-10-29-0741-issue-424
+focus: A_WHITESPACE_ONLY_OR_ZERO_WIDTH_QUERY_PASSED_IF_NOT_QUERY_AND_WAS_EMBEDDED_FOR_A_GUARANTEED_EMPTY_RESULT_AND_BLANK_SUB_QUERIES_WERE_NEVER_CHECKED
+phase: shipped
+delta:
+  files_changed: 10
+  tests_added: 150
+  suite: "3331 passed 7 skipped (after commit); ruff check + format clean"
+decisions_made: []
+measured: "origin/main d29bfde, fake conn + counting embedder: search(' '|'\\t\\n'|'\\u3000'|'\\u00a0'|'\\u200b'|'\\ufeff') -> 1 embed 2 SQL [] each; sub_queries ('a','   ') and ('   ','a') -> 2 embeds 4 SQL []; RewriteResult(('',)) constructed. After: all ValueError, 0 embeds 0 SQL. Catalog: isspace == strip() == re \\s (29 cp), Cf 170 cp, none of the 199 yields a word_tokens token. Revert (6 call-site files == main, text.py helper kept so tests import, pycache cleared): 119 red / 62 green (definition tests, controls, strip-covered rewriter arms). PR #425."
+context_for_next_session:
+  - "BLANK_IS_ISSPACE_OR_CF_rag_kit_text_is_blank_strip_misses_U200B_UFEFF_U2060"
+  - "THE_PRE_CHECKS_THAT_COPY_RUN_S_RULE_capture_demo_and_the_SSE_server_missing_q_400_must_follow_it_or_q_plus_plus_plus_gets_an_empty_200"
+  - "ANTHROPIC_GENERATOR_GENERATE_HAS_NO_EMPTINESS_CHECK_accepts_empty_and_blank_query_left_unchanged"
+followups: []
+---

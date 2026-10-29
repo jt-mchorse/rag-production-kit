@@ -3892,3 +3892,17 @@ reranker. Each of them sent a bytes query straight to its paid API. All of
 these entry points now refuse a non-string with a clear message before
 spending anything. The rule is the same one the document id already used:
 string subclasses are accepted. PR #423.
+
+## 2026-10-29 — A blank query or rewriter sub-query is refused before any paid call (#424)
+
+The "query must be non-empty" check only caught the empty string. A query of
+only spaces, tabs, an ideographic space or a zero-width character got past it.
+It was sent to the embedder (a paid call) and searched, and the result was
+always empty. A blank sub-query from a rewriter wasn't checked at all. "Blank"
+now has one definition: only whitespace, or only invisible formatting
+characters like the zero-width space, which Python's `strip()` does not
+remove. Every place that already refused an empty query now refuses a blank
+one the same way. That covers the retriever, both rewriters, both rerankers
+and the streaming pipeline. The demo capture script and the streaming demo
+server follow the same rule, so a blank `q` gets a 400 instead of an empty
+stream. PR #425.
