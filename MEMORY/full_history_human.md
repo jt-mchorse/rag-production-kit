@@ -3879,3 +3879,16 @@ measured against pgvector, and the guard refuses exactly what pgvector
 refuses, nothing more. A related question, what to do with an all-zero
 embedding that the database can never rank, is filed for JT as #420.
 PR #421.
+
+## 2026-10-29 — A query or document text that isn't a string is refused before any paid call (#422)
+
+Nothing checked that a search query or a document's text was actually a
+string. A query of bytes, a number or a list was sent to the embedder (a
+paid call) before failing with an unhelpful error. With a query rewriter
+the query reached the rewriter instead, and the search could even succeed.
+A document whose text was a list or a dict was accepted outright. The same
+gap existed in the Anthropic rewriter, the Anthropic generator and the Cohere
+reranker. Each of them sent a bytes query straight to its paid API. All of
+these entry points now refuse a non-string with a clear message before
+spending anything. The rule is the same one the document id already used:
+string subclasses are accepted. PR #423.

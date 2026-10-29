@@ -4440,3 +4440,22 @@ context_for_next_session:
   - "OPEN_420_zero_norm_vector_HashEmbedder_emits_one_JT_gated"
 followups: ["#420"]
 ---
+
+---
+session: 2026-10-29T07:37Z
+issue: 422
+branch: session/2026-10-29-0729-issue-422
+focus: A_NON_STR_QUERY_OR_DOCUMENT_TEXT_WAS_NEVER_TYPE_CHECKED_SO_IT_REACHED_THE_EMBEDDER_REWRITER_ANTHROPIC_AND_COHERE_BEFORE_A_BARE_ERROR_AND_LIST_DICT_TEXT_WAS_ACCEPTED
+phase: shipped
+delta:
+  files_changed: 7
+  tests_added: 118
+  suite: "3181 passed 7 skipped (after commit); ruff check + format clean"
+decisions_made: []
+measured: "origin/main 094efe2, fake conn + counting embedder: search/rerank_pool on b'refund policy', 123, ['refund','policy'], ('refund',) -> 1 embed call then bare AttributeError; same with a rewriter -> rewrite() called and the search SUCCEEDED (2 embeds); sub_queries ('who wrote Hamlet', b'bad') embedded the first; Document('d1', list|dict) ACCEPTED. Siblings not in the issue: AnthropicRewriter.rewrite(b'...') and AnthropicGenerator.generate(b'...') sent \"Query: b'...'\" to messages.create; CohereReranker.rerank(b'...') reached client.rerank. Revert (6 files == main, pycache cleared): 112 red / 6 green (controls); per-file 54/13/12/12/9/12 = 112. PR #423."
+context_for_next_session:
+  - "THE_ISSUE_NAMED_THE_EMBEDDER_BUT_THE_REWRITER_GENERATOR_AND_COHERE_SEAMS_WERE_PAID_TOO_bytes_has_strip_so_it_passed_every_emptiness_check"
+  - "THE_REWRITER_PATH_HID_THE_BUG_a_rewriter_returning_strings_made_a_list_query_search_succeed_so_no_error_ever_surfaced"
+  - "TYPE_RULE_IS_ISINSTANCE_STR_AS_EXTERNAL_ID_str_subclass_accepted_bool_refused_type_check_before_emptiness"
+followups: []
+---
