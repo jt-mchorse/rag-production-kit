@@ -1,0 +1,146 @@
+{
+  "_comment": "Shared by demo/nextjs/test/blank.test.ts (isBlank) and tests/test_blank_query_parity.py (rag_kit.text.is_blank), #426. Text is given as codepoints so control characters survive. Cf rows use codepoints that are Cf in every Unicode version Python 3.11+ and Node 20 ship.",
+  "py_isspace_codepoints": [9, 10, 11, 12, 13, 28, 29, 30, 31, 32, 133, 160, 5760, 8192, 8193, 8194, 8195, 8196, 8197, 8198, 8199, 8200, 8201, 8202, 8232, 8233, 8239, 8287, 12288],
+  "rows": [
+    {
+      "name": "empty",
+      "codepoints": [],
+      "blank": true
+    },
+    {
+      "name": "space",
+      "codepoints": [32],
+      "blank": true
+    },
+    {
+      "name": "spaces",
+      "codepoints": [32, 32, 32],
+      "blank": true
+    },
+    {
+      "name": "tab-newline",
+      "codepoints": [9, 10],
+      "blank": true
+    },
+    {
+      "name": "ideographic-space",
+      "codepoints": [12288],
+      "blank": true
+    },
+    {
+      "name": "nbsp",
+      "codepoints": [160],
+      "blank": true
+    },
+    {
+      "name": "ogham-space-mark",
+      "codepoints": [5760],
+      "blank": true
+    },
+    {
+      "name": "file-separator",
+      "codepoints": [28],
+      "blank": true
+    },
+    {
+      "name": "next-line",
+      "codepoints": [133],
+      "blank": true
+    },
+    {
+      "name": "zwsp",
+      "codepoints": [8203],
+      "blank": true
+    },
+    {
+      "name": "bom",
+      "codepoints": [65279],
+      "blank": true
+    },
+    {
+      "name": "word-joiner",
+      "codepoints": [8288],
+      "blank": true
+    },
+    {
+      "name": "soft-hyphen",
+      "codepoints": [173],
+      "blank": true
+    },
+    {
+      "name": "left-to-right-mark",
+      "codepoints": [8206],
+      "blank": true
+    },
+    {
+      "name": "arabic-letter-mark",
+      "codepoints": [1564],
+      "blank": true
+    },
+    {
+      "name": "mongolian-vowel-separator",
+      "codepoints": [6158],
+      "blank": true
+    },
+    {
+      "name": "language-tag",
+      "codepoints": [917505],
+      "blank": true
+    },
+    {
+      "name": "mixed",
+      "codepoints": [32, 8203, 12288, 65279, 9, 28, 133, 917505],
+      "blank": true
+    },
+    {
+      "name": "padded",
+      "codepoints": [32, 32, 114, 101, 102, 117, 110, 100, 32, 32],
+      "blank": false
+    },
+    {
+      "name": "zwsp-padded",
+      "codepoints": [8203, 114, 101, 102, 117, 110, 100, 8203],
+      "blank": false
+    },
+    {
+      "name": "combining-mark",
+      "codepoints": [769],
+      "blank": false
+    },
+    {
+      "name": "hangul-filler",
+      "codepoints": [12644],
+      "blank": false
+    },
+    {
+      "name": "digit",
+      "codepoints": [48],
+      "blank": false
+    },
+    {
+      "name": "letter",
+      "codepoints": [97],
+      "blank": false
+    },
+    {
+      "name": "nul",
+      "codepoints": [0],
+      "blank": false
+    },
+    {
+      "name": "delete",
+      "codepoints": [127],
+      "blank": false
+    },
+    {
+      "name": "lone-surrogate",
+      "codepoints": [55296],
+      "blank": false
+    },
+    {
+      "name": "blank-then-letter",
+      "codepoints": [32, 133, 97],
+      "blank": false
+    }
+  ]
+}

@@ -1,5 +1,6 @@
 import type { NextRequest } from "next/server";
 
+import { isBlank } from "@/lib/blank";
 import { retrieve } from "@/lib/corpus";
 import { streamAnswer } from "@/lib/streamer";
 
@@ -8,6 +9,8 @@ export const dynamic = "force-dynamic";
 
 /**
  * GET /api/stream?q=<query>
+ *
+ * A missing, empty or blank `q` is a `400 missing q` (see `lib/blank.ts`).
  *
  * Emits Server-Sent Events that mirror the protocol the Python demo
  * (`demo/streaming/server.py`) already speaks. Phase event types:
@@ -28,6 +31,15 @@ export const dynamic = "force-dynamic";
 export async function GET(req: NextRequest): Promise<Response> {
   const url = new URL(req.url);
   const q = url.searchParams.get("q") ?? "";
+  // The Python demo server's rule (#166, #425): a missing, empty or blank `q`
+  // is a `400 missing q` before the stream starts, not a 200 that retrieves
+  // and answers nothing in particular (#426). Blank is `rag_kit.text.is_blank`.
+  if (isBlank(q)) {
+    return new Response("missing q", {
+      status: 400,
+      headers: { "content-type": "text/plain; charset=utf-8" },
+    });
+  }
   // Per-token streaming delay. Defaults to 12ms (a hand-tuned value that
   // gives a "watching it type" feel without being slow). Tests pass
   // `delay=0` to skip the wait; the demo UI never passes the flag.

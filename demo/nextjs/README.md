@@ -52,10 +52,17 @@ Citation tokens are emitted as their own `token` frame with
 `is_citation: true` so the client doesn't have to regex on
 partially-decoded text.
 
+A missing, empty or blank `q` gets `400 missing q` before any frame, as
+the Python demo answers it. "Blank" is `rag_kit.text.is_blank` ported to
+[`lib/blank.ts`](lib/blank.ts): whitespace by Python's `str.isspace` or a
+format (Cf) character, so `q=%E2%80%8B` (U+200B) is blank too. Both
+definitions are tested against one row table,
+[`test/blank-rows.json`](test/blank-rows.json).
+
 ## Tests
 
 ```bash
-npm test          # 13 tests · corpus + streamer + SSE protocol shape
+npm test          # 112 tests · corpus + streamer + SSE protocol shape + blank q
 npm run typecheck
 npm run build
 ```

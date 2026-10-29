@@ -44,7 +44,7 @@ from typing import Any, Protocol
 from .comparison import render_comparison
 from .io_utils import copy_json_value
 from .retriever import RetrievalResult
-from .text import SENTENCE_CLOSERS, SENTENCE_TERMINATORS
+from .text import SENTENCE_CLOSERS, SENTENCE_TERMINATORS, is_blank
 
 _DEFAULT_THRESHOLD = 0.02  # tuned against the in-repo retrieval tests; >0 by construction
 # Decimal places the refusal detail has always rendered at, and still renders
@@ -1002,6 +1002,12 @@ class TemplateGenerator:
         *,
         threshold: float = _DEFAULT_THRESHOLD,
     ) -> GeneratedAnswer | Refusal:
+        # Free, but held to `AnthropicGenerator`'s query rules (#422, #426) so
+        # the `Generator` protocol means one thing whichever backend is wired.
+        if not isinstance(query, str):
+            raise ValueError(f"query must be a string; got {type(query).__name__}")
+        if is_blank(query):
+            raise ValueError("query must be non-empty")
         threshold = _validate_threshold(threshold)
         top = _top_score(retrieved)
         if not retrieved:
@@ -1123,6 +1129,10 @@ class AnthropicGenerator:
         # was sent -- `b"..."` as the text `Query: b'...'`.
         if not isinstance(query, str):
             raise ValueError(f"query must be a string; got {type(query).__name__}")
+        # `Retriever.search`'s rule (#424, #426): a blank query was sent as a
+        # paid call with an empty `Query:` line.
+        if is_blank(query):
+            raise ValueError("query must be non-empty")
         threshold = _validate_threshold(threshold)
         top = _top_score(retrieved)
         if not retrieved:

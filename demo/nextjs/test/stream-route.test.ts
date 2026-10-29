@@ -156,11 +156,13 @@ describe("GET /api/stream — edge cases", () => {
     expect((retrieved.payload.chunks as unknown[]).length).toBeGreaterThan(0);
   });
 
-  it("treats a missing q as empty and still completes", async () => {
+  it("answers a missing q with 400 missing q, as the Python demo does (#426)", async () => {
+    // This arm used to pin the opposite: a missing q streamed a full answer.
+    // The blank rows are in blank.test.ts.
     const req = new Request("http://localhost/api/stream?delay=0");
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const res = await GET(req as any);
-    const frames = parseSSE(await readAllText(res));
-    expect(frames[frames.length - 1].event).toBe("done");
+    expect(res.status).toBe(400);
+    expect(await res.text()).toBe("missing q");
   });
 });
