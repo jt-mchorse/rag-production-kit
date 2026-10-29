@@ -517,6 +517,10 @@ class AnthropicRewriter:
         return self._client
 
     def rewrite(self, query: str) -> RewriteResult:
+        # Before the paid call (#422): `bytes` has a `.strip()`, so `b"..."`
+        # passed the emptiness check and was sent as the text `Query: b'...'`.
+        if not isinstance(query, str):
+            raise ValueError(f"query must be a string; got {type(query).__name__}")
         if not query or not query.strip():
             raise ValueError("query must be non-empty")
         client = self._ensure_client()

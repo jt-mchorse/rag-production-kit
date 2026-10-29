@@ -333,6 +333,10 @@ class StreamingPipeline:
     def run(self, query: str, k: int = 5) -> Iterator[StreamEvent]:
         if not isinstance(k, int) or isinstance(k, bool) or k <= 0:
             raise ValueError(f"k must be a positive integer, got {k!r}")
+        # With `k` and emptiness, before the first event: the retriever and the
+        # reranker it feeds may both be paid calls (#422).
+        if not isinstance(query, str):
+            raise ValueError(f"query must be a string; got {type(query).__name__}")
         if not query:
             raise ValueError("query must be non-empty")
 

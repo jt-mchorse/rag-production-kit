@@ -92,6 +92,12 @@ class Document:
                 f"(got {self.external_id!r}); the [cite:...] marker grammar "
                 "terminates at the first ']', so such an id cannot be cited back"
             )
+        # The same type rule for the text (#422). Without it `["a", "list"]` and
+        # `{"a": 1}` were accepted -- and embedded by `add_documents` with the
+        # rest of the batch before the write -- while `b"..."` and `42` failed
+        # in `_require_storable` as a bare `TypeError` naming no field.
+        if not isinstance(self.text, str):
+            raise ValueError(f"Document.text must be a string; got {type(self.text).__name__}")
         if not self.text:
             raise ValueError("Document.text must be non-empty")
         # Postgres can store neither a NUL (`text` refuses it, `jsonb` refuses

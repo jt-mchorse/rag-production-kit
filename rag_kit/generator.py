@@ -1119,6 +1119,10 @@ class AnthropicGenerator:
         *,
         threshold: float = _DEFAULT_THRESHOLD,
     ) -> GeneratedAnswer | Refusal:
+        # Before the paid call (#422): the prompt is an f-string, so any object
+        # was sent -- `b"..."` as the text `Query: b'...'`.
+        if not isinstance(query, str):
+            raise ValueError(f"query must be a string; got {type(query).__name__}")
         threshold = _validate_threshold(threshold)
         top = _top_score(retrieved)
         if not retrieved:

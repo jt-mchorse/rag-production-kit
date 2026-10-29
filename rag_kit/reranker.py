@@ -278,6 +278,10 @@ class CohereReranker:
         self.timeout_s = timeout_s if timeout_s is not None else self.DEFAULT_TIMEOUT_S
 
     def rerank(self, query: str, candidates: Sequence[Candidate]) -> list[ScoredCandidate]:
+        # Before the paid call (#422): `b"..."` passed `not query` and went to
+        # `client.rerank`.
+        if not isinstance(query, str):
+            raise ValueError(f"query must be a string; got {type(query).__name__}")
         if not query:
             raise ValueError("query must be non-empty")
         candidates_list = list(candidates)
