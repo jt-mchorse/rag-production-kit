@@ -308,3 +308,21 @@ def test_the_stream_ends_the_response_so_a_browser_can_run_a_second_query(
         body = _read_to_eof(server, f"/stream?q={query.replace(' ', '+')}&k=2")
         assert body.rstrip().endswith(b"}"), body[-200:]
         assert b"event: done" in body
+
+
+@pytest.mark.parametrize("q", ["+++", "%09%0A", quote("\u3000"), quote("\u200b")])
+def test_a_blank_q_is_a_400_not_an_empty_200(server: _Captured, q: str) -> None:
+    # #424: `run` refuses a blank query on the first `next()`, after the SSE
+    # headers -- the #166 shape. `parse_qs` keeps `q=+++` as three spaces, so
+    # the server applies `run`'s rule before the 200.
+    status, body = _get(server, f"/stream?q={q}")
+    assert status == 400
+    assert body != b""
+    _assert_no_traceback(server)
+
+
+def test_control_a_padded_q_still_streams(server: _Captured) -> None:
+    status, body = _get(server, "/stream?q=+refund+&k=1")
+    assert status == 200
+    assert b"event: done" in body
+    _assert_no_traceback(server)

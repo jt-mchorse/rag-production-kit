@@ -35,6 +35,7 @@ from .io_utils import _describe_number, _past_float_range, atomic_write_text, co
 from .reranker import Candidate, Reranker
 from .retriever import RetrievalResult
 from .telemetry import percentile as _telemetry_percentile
+from .text import is_blank
 
 EventType = Literal[
     "retrieving",  # phase start: retrieving from PG
@@ -337,7 +338,9 @@ class StreamingPipeline:
         # reranker it feeds may both be paid calls (#422).
         if not isinstance(query, str):
             raise ValueError(f"query must be a string; got {type(query).__name__}")
-        if not query:
+        # `Retriever.search`'s rule (#424), here so a blank query fails before
+        # the first event rather than on the retriever after `retrieving`.
+        if is_blank(query):
             raise ValueError("query must be non-empty")
 
         t0 = _now_ms()

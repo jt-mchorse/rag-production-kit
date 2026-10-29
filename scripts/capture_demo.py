@@ -370,11 +370,15 @@ def main(argv: list[str] | None = None) -> int:
     # `StreamingPipeline.run`, whose `if not query` guard sits above the
     # generator's `try` -- so an empty value surfaced as a raw `ValueError`
     # traceback at exit 1 after the STAGE 1 banner had printed. The rule here is
-    # that guard's rule, copied exactly: whitespace-only is NOT rejected,
-    # because `run` and the SSE server (`parse_qs` keeps `q=+++` as three
-    # spaces) both stream it, and a capture stricter than the surfaces it
-    # records would be a different contract, not a pre-check.
-    if not args.query:
+    # that guard's rule, imported rather than copied: a capture stricter or
+    # looser than the surfaces it records would be a different contract, not a
+    # pre-check. Since #424 the rule is `is_blank`, so a whitespace-only query
+    # is refused here as `run` and the SSE server now refuse it.
+    if str(REPO_ROOT) not in sys.path:
+        sys.path.insert(0, str(REPO_ROOT))
+    from rag_kit.text import is_blank
+
+    if is_blank(args.query):
         parser.error(f"--query must be non-empty; got {args.query!r}")
 
     # STAGE 1 — in-process streaming preview, hermetic.

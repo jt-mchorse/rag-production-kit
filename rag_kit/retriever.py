@@ -34,6 +34,7 @@ from .fusion import DEFAULT_K, reciprocal_rank_fusion
 from .indexer import _unstorable
 from .reranker import Candidate, Reranker
 from .rewriter import Rewriter
+from .text import is_blank
 
 
 def _require_sendable(text: str, where: str) -> None:
@@ -135,7 +136,9 @@ class Retriever:
         # calls: this query cannot reach the lexical channel either way (#366).
         # Before the emptiness check, so `b""` and `[]` are named by type (#422).
         _require_sendable(query, "query")
-        if not query:
+        # Blank, not just empty (#424): `"   "` and `"\u200b"` were embedded and
+        # searched for a guaranteed `[]`, and went to the rewriter first.
+        if is_blank(query):
             raise ValueError("query must be non-empty")
 
         if rewriter is None:
@@ -149,8 +152,11 @@ class Retriever:
         # one sub-query at a time, so a bad second one cost the first (#366).
         # A non-`str` one is refused here as well (#422): `RewriteResult` only
         # refuses a bare string in place of the tuple, not a non-str element.
+        # And a blank one (#424): `("a", "   ")` embedded both and searched both.
         for idx, sq in enumerate(sub_queries):
             _require_sendable(sq, f"rewriter sub_queries[{idx}]")
+            if is_blank(sq):
+                raise ValueError(f"rewriter sub_queries[{idx}] must be non-empty; got {sq!r}")
         if len(sub_queries) == 1:
             # Single-sub-query rewrites collapse to the existing single-shot path
             # using the (possibly normalized) rewritten query for *retrieval*, but
@@ -179,7 +185,7 @@ class Retriever:
         if not isinstance(k, int) or isinstance(k, bool) or k <= 0:
             raise ValueError(f"k must be a positive integer, got {k!r}")
         _require_sendable(query, "query")
-        if not query:
+        if is_blank(query):
             raise ValueError("query must be non-empty")
         return self._hybrid_search(query, k, reranker=None, pool=True)
 

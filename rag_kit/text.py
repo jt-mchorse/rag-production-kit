@@ -43,6 +43,20 @@ SENTENCE_TERMINATORS = ".!?…。！？｡؟۔।॥።፧։՜՞။។៕‼⁇�
 SENTENCE_CLOSERS = "\"'”’»›)]}*_`~」』）】〕〗〙〛〉》＂＇］｝"
 
 
+def is_blank(text: str) -> bool:
+    """True when ``text`` has nothing to search for: empty, or only blank characters.
+
+    The one definition behind every "query must be non-empty" check (#424). A
+    blank character is whitespace by `str.isspace` (the set `str.strip()` and
+    `re`'s `\\s` also use: the same 29 codepoints, U+00A0 and U+3000 among
+    them) or a format character, category ``Cf`` (U+200B, U+FEFF, U+2060 and
+    167 more), which `str.strip()` leaves alone. None of those 199 codepoints
+    yields a `word_tokens` token, so a blank query is one the lexical channel
+    cannot match and whose embedding encodes nothing: the same request as ``""``.
+    """
+    return all(ch.isspace() or unicodedata.category(ch) == "Cf" for ch in text)
+
+
 def word_tokens(text: str) -> list[str]:
     """Lowercased word tokens of ``text``; underscores and punctuation separate."""
     if text.isascii():

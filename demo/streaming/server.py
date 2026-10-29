@@ -44,6 +44,7 @@ from rag_kit.reranker import (  # noqa: E402
 )
 from rag_kit.retriever import RetrievalResult  # noqa: E402
 from rag_kit.streaming import StreamingPipeline, to_sse  # noqa: E402
+from rag_kit.text import is_blank  # noqa: E402
 
 _DEMO_DIR = Path(__file__).resolve().parent
 
@@ -153,7 +154,10 @@ class Handler(BaseHTTPRequestHandler):
 
     def _serve_stream(self, qs: dict[str, list[str]]) -> None:
         query = (qs.get("q") or [""])[0]
-        if not query:
+        # `run`'s rule (#424), before the 200: `parse_qs` keeps `q=+++` as three
+        # spaces, which `run` now refuses on the first `next()` -- after the SSE
+        # headers, so the client would get a 200 and an empty body (#166).
+        if is_blank(query):
             self.send_error(400, "missing q")
             return
         # Validate `k` fully *before* the response starts, like `missing q`

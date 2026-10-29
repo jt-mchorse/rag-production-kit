@@ -40,6 +40,7 @@ from typing import Any, Protocol
 
 from .text import SENTENCE_CLOSERS as _SENTENCE_CLOSERS
 from .text import SENTENCE_TERMINATORS as _SENTENCE_TERMINATORS
+from .text import is_blank
 
 
 @dataclass(frozen=True)
@@ -72,6 +73,13 @@ class RewriteResult:
                 f"{type(self.sub_queries).__name__}: {self.sub_queries!r} would be searched "
                 f"one character at a time -- {fix}"
             )
+        # A blank sub-query (#424): `Retriever.search` would embed and search it
+        # for a guaranteed `[]`. A non-str element is left to the retriever's
+        # type check (#422), and a non-sequence to its own error.
+        if isinstance(self.sub_queries, (tuple, list)):
+            for idx, sq in enumerate(self.sub_queries):
+                if isinstance(sq, str) and is_blank(sq):
+                    raise ValueError(f"sub_queries[{idx}] must be non-empty; got {sq!r}")
 
 
 class Rewriter(Protocol):
@@ -423,7 +431,8 @@ class TemplateRewriter:
     _MAX_SUB_QUERIES = 8
 
     def rewrite(self, query: str) -> RewriteResult:
-        if not query or not query.strip():
+        # `is_blank`, the retriever's rule (#424): `.strip()` let `"\u200b"` by.
+        if not query or (isinstance(query, str) and is_blank(query)):
             raise ValueError("query must be non-empty")
         normalized = _norm(query)
 
@@ -521,7 +530,8 @@ class AnthropicRewriter:
         # passed the emptiness check and was sent as the text `Query: b'...'`.
         if not isinstance(query, str):
             raise ValueError(f"query must be a string; got {type(query).__name__}")
-        if not query or not query.strip():
+        # Blank by the retriever's rule (#424), which counts `"\u200b"` too.
+        if is_blank(query):
             raise ValueError("query must be non-empty")
         client = self._ensure_client()
         message = client.messages.create(
@@ -559,7 +569,9 @@ class AnthropicRewriter:
             if not isinstance(entry, str):
                 raise ValueError(f"sub_queries entry is not a string: {entry!r}")
             text = _norm(entry)
-            if text:
+            # `is_blank`, not truthiness (#424): `_norm` strips whitespace but
+            # keeps a `"\u200b"`, which `RewriteResult` now refuses.
+            if not is_blank(text):
                 cleaned.append(text)
         if not cleaned:
             raise ValueError("AnthropicRewriter sub_queries were all blank after normalization")
