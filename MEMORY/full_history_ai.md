@@ -4573,3 +4573,21 @@ context_for_next_session:
   - "TEMPLATE_HEAD_RSTRIP_STRIPS_ONLY_SPACE_TAB_CR_LF_so_1_NBSP_DOT_keeps_the_NBSP_before_the_marker_cosmetic_verdict_equal"
 followups: []
 ---
+
+---
+session: 2026-10-30T08:20Z
+issue: 436
+branch: session/2026-10-30-0820-issue-436
+focus: CHECK_WRITABLE_NOW_REFUSES_A_DIRECTORY_TARGET_AND_AN_UNWRITABLE_RESOLVED_PARENT_SO_WRITE_RUNS_PREFLIGHT_CATCHES_THEM_BEFORE_ANY_SUITE_FILE_IS_REPLACED
+phase: shipped
+delta:
+  files_changed: 2
+  tests_added: 13
+  suite: "4133 passed 7 skipped (after commit, py3.11 and py3.12); ruff check + format clean"
+decisions_made: []
+measured: "origin/main a578284 (macOS uid 502): run_eval.main([]) with correctness.json a directory -> rc 2 Errno 21 at the rename, faithfulness.json + recall_at_5.json already rewritten; correctness.json a symlink to a file in a 0555 dir -> rc 2 Errno 13 on the temp file, same two rewritten; symlink loop control -> rc 2 Errno 62, nothing written. After: all three rc 2 with every sibling byte-identical. Revert (io_utils == main, pycache cleared): 9 of 13 red, 4 green = file-in-chain + loop controls (existing os.stat raises) and the two [faithfulness] run_eval arms (first write fails before any replace). PR #438."
+context_for_next_session:
+  - "CHECK_WRITABLE_ONLY_atomic_write_text_UNCHANGED_it_already_raised_each_error_just_after_siblings_were_replaced"
+  - "PARENT_CHECK_IS_ON_THE_NEAREST_EXISTING_ANCESTOR_OF_THE_RESOLVED_TARGET_W_OK_or_X_OK_and_applies_to_EXISTING_targets_too_because_the_temp_file_goes_beside_the_resolved_file"
+followups: []
+---

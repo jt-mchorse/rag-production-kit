@@ -3977,3 +3977,14 @@ format character counts as nothing, and any space-like character counts as a
 space. A sweep of every line-start shape, ten kinds of blank and both a space
 and a newline in front found 247 disagreements with the plain-space version
 before the fix and none after. PR #437.
+
+## 2026-10-30 — The eval pre-flight also catches a directory or a link into a read-only folder (#436)
+
+Before writing its three result files, the eval script checks each one can be
+written, so a bad target is refused before any file is replaced. That check
+only looked at whether the file itself was read-only. If a result file was
+actually a directory, or a link into a read-only folder, the check passed and
+the write failed partway, after the first two files had already been
+overwritten. The check now refuses a directory, and it confirms the folder the
+file really lives in (after following links) can be written to. Ordinary files
+behave as before. PR #438.
