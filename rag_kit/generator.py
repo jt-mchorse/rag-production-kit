@@ -44,7 +44,7 @@ from typing import Any, Protocol
 from .comparison import render_comparison
 from .io_utils import copy_json_value
 from .retriever import RetrievalResult
-from .text import SENTENCE_CLOSERS, SENTENCE_TERMINATORS, is_blank
+from .text import FORMAT_CHARACTERS, SENTENCE_CLOSERS, SENTENCE_TERMINATORS, is_blank
 
 _DEFAULT_THRESHOLD = 0.02  # tuned against the in-repo retrieval tests; >0 by construction
 # Decimal places the refusal detail has always rendered at, and still renders
@@ -96,12 +96,25 @@ _TERMINATORS = SENTENCE_TERMINATORS
 # The gap is a capture group because the terminators and closers it follows
 # stay attached to the sentence they end; Python `re` has no variable-width
 # lookbehind to express that.
+#
+# A format character (category Cf: U+200B, U+FEFF, U+2060, U+00AD) is blank by
+# `text.is_blank` (#424) and invisible, but the gap had to START with
+# whitespace, so `Germany.\u200b The sky ... [cite:a].` was one sentence and the
+# uncited claim passed (#431, the surface #427/#430 did not list). So a format
+# character may sit anywhere in the terminator and closer run, and the gap is a
+# run of blank characters holding at least one whitespace character -- the run
+# rule `rewriter._norm` uses. A format-only gap (`blue.\u200bThe`) is still no
+# gap, as `blue.The` is none. The CJK form skips format characters before its
+# lookahead, so `。\u200b」` keeps the closer as `。」` does.
 _CLOSERS = SENTENCE_CLOSERS  # shared with the rewriter (#320)
+_FORMAT = re.escape(FORMAT_CHARACTERS)
 _CJK_TERMINATORS = "。！？｡"
 _MARKER = r"\[cite:[^\]]+\]"
 _SENTENCE_SPLIT = re.compile(
-    rf"[{re.escape(_TERMINATORS)}]+(?:[{re.escape(_CLOSERS)}]|{_MARKER})*(?P<gap>\s+)"
-    rf"|[{_CJK_TERMINATORS}]+(?:{_MARKER})*(?P<cjk>)(?=[^\s{re.escape(_CLOSERS)}\[])"
+    rf"[{re.escape(_TERMINATORS)}]+(?:[{re.escape(_CLOSERS)}{_FORMAT}]|{_MARKER})*"
+    rf"(?P<gap>\s[\s{_FORMAT}]*)"
+    rf"|[{_CJK_TERMINATORS}]+(?:{_MARKER}|[{_FORMAT}])*(?P<cjk>)"
+    rf"(?=[^\s{re.escape(_CLOSERS)}{_FORMAT}\[])"
 )
 
 # A line or paragraph break was never a boundary: only a terminator split, so a
@@ -494,7 +507,9 @@ def _ends_with_abbreviation(fragment: str, following: str = "") -> bool:
     tokens = fragment.split()
     if not tokens:
         return False
-    last = tokens[-1].rstrip(".")
+    # A format character after the dot is read as nothing, so `Dr.\u200b Smith`
+    # stays one sentence as `Dr. Smith` does (#431).
+    last = tokens[-1].rstrip("." + FORMAT_CHARACTERS)
     if not last:
         return False
     if last.lower() in _ABBREVIATIONS:
@@ -681,9 +696,12 @@ def split_sentences(text: str) -> list[str]:
 # `FAQ.).` end in a terminator AFTER the closer, so a tail anchored on closers
 # matched nothing, the strip took only the last `.`, and the marker landed after
 # `?"` -- where the splitter cut the claim from it again.
+# A format character may sit anywhere in that run, as in the splitter's (#431),
+# but only a real closer makes it a tail: `blue.\u200b` is stripped like
+# `blue.`, and `go.\u200b"` keeps its marker in front of `.\u200b"`.
 _TERMINATOR_THEN_CLOSERS = re.compile(
-    rf"[{re.escape(_TERMINATORS)}]+[{re.escape(_CLOSERS)}]+"
-    rf"[{re.escape(_TERMINATORS + _CLOSERS)}]*$"
+    rf"[{re.escape(_TERMINATORS)}]+[{_FORMAT}]*[{re.escape(_CLOSERS)}]"
+    rf"[{re.escape(_TERMINATORS + _CLOSERS)}{_FORMAT}]*$"
 )
 
 # What `_STRUCTURAL_BREAK` reads at the start of a line (#399): `>` quote
@@ -733,7 +751,7 @@ def _template_sentence(sentence: str, external_id: str) -> str:
     # And any whitespace the strip exposed, with the terminators behind it
     # (#399): `30.\n ?` left `30.\n `, so the marker sat after a blank line
     # (a break) or `30.` became a mid-line sentence end, uncited either way.
-    head = head.rstrip(_TERMINATORS + " \t\r\n")
+    head = head.rstrip(_TERMINATORS + FORMAT_CHARACTERS + " \t\r\n")
     body = f"{lead}Per the retrieved context, {head}"
     text = f"{body}{_marker_gap(body)}{marker}{end}"
     if all(_CITE_PATTERN.search(part) for part in split_sentences(text)):

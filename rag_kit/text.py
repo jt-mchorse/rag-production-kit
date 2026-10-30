@@ -17,6 +17,7 @@ sign would otherwise split its word).
 from __future__ import annotations
 
 import re
+import sys
 import unicodedata
 
 _ASCII_TOKEN_RE = re.compile(r"[a-z0-9]+")
@@ -41,6 +42,15 @@ SENTENCE_TERMINATORS = ".!?…。！？｡؟۔।॥።፧։՜՞။។៕‼⁇�
 #: One set for every split site, so the rewriter's Then-split cannot drift from
 #: the generator again (#320).
 SENTENCE_CLOSERS = "\"'”’»›)]}*_`~」』）】〕〗〙〛〉》＂＇］｝"
+
+#: Every format character (category ``Cf``: U+200B, U+FEFF, U+2060, U+00AD, ...),
+#: the non-whitespace half of `is_blank`'s rule. Enumerated from the
+#: `unicodedata` catalog rather than hand-listed, because Python's `re` has no
+#: `\\p{Cf}` and a list written from memory misses members. The splitters read
+#: one beside a terminator, closer or gap as they read nothing at all (#431).
+FORMAT_CHARACTERS = "".join(
+    ch for ch in map(chr, range(sys.maxunicode + 1)) if unicodedata.category(ch) == "Cf"
+)
 
 
 def is_blank(text: str) -> bool:

@@ -38,6 +38,7 @@ import re
 from dataclasses import dataclass
 from typing import Any, Protocol
 
+from .text import FORMAT_CHARACTERS as _FORMAT_CHARACTERS
 from .text import SENTENCE_CLOSERS as _SENTENCE_CLOSERS
 from .text import SENTENCE_TERMINATORS as _SENTENCE_TERMINATORS
 from .text import is_blank
@@ -132,9 +133,17 @@ _COMPARE_RE = re.compile(
 # six-character class. After #262 widened the generator to 26 closers in runs,
 # `.»`, `.」`, `.）`, `.**` and `.")` before "Then" no longer decomposed. So the
 # candidate gaps are found here and the text before each is checked instead.
+#
+# A format character (category Cf) may sit in the closer run, as in the
+# generator's splitter (#431): `What is RAG.\u200b" Then ...` did not decompose
+# while `What is RAG." Then ...` did. `_norm` keeps a format-only run between two
+# characters (#430), so it reaches here; a blank run holding whitespace is
+# already one space by then, which is why `_THEN_GAP` and the gaps below stay
+# `\s+`. The same holds for the compare and "and" sentence gaps below.
+_FORMAT = re.escape(_FORMAT_CHARACTERS)
 _THEN_GAP = re.compile(r"\s+(?=then\b)", re.IGNORECASE)
 _ENDS_A_SENTENCE = re.compile(
-    rf"[{re.escape(_SENTENCE_TERMINATORS)}][{re.escape(_SENTENCE_CLOSERS)}]*$"
+    rf"[{re.escape(_SENTENCE_TERMINATORS)}][{re.escape(_SENTENCE_CLOSERS)}{_FORMAT}]*$"
 )
 
 
@@ -147,8 +156,8 @@ _ENDS_A_SENTENCE = re.compile(
 # trailing `？！` or `。」` is not a gap.
 _CJK_TERMINATORS = "。！？｡"
 _HARD_SENTENCE_GAP = re.compile(
-    rf"[{re.escape(_SENTENCE_TERMINATORS.replace('.', ''))}][{re.escape(_SENTENCE_CLOSERS)}]*\s+\S"
-    rf"|[{_CJK_TERMINATORS}](?=[^\s{re.escape(_SENTENCE_CLOSERS + _SENTENCE_TERMINATORS)}])"
+    rf"[{re.escape(_SENTENCE_TERMINATORS.replace('.', ''))}][{re.escape(_SENTENCE_CLOSERS)}{_FORMAT}]*\s+\S"
+    rf"|[{_CJK_TERMINATORS}][{_FORMAT}]*(?=[^\s{re.escape(_SENTENCE_CLOSERS + _SENTENCE_TERMINATORS)}{_FORMAT}])"
 )
 
 # The "and" conjuncts use a narrower rule (#376). An ASCII `!` and `…` also
@@ -170,13 +179,13 @@ _HARD_SENTENCE_GAP = re.compile(
 _SOFT_TERMINATORS = "!…"
 _AND_HARD_GAP = re.compile(
     rf"[{re.escape(_SENTENCE_TERMINATORS.replace('.', '').replace('!', '').replace('…', '').replace('?', ''))}]"
-    rf"[{re.escape(_SENTENCE_CLOSERS)}]*\s+\S"
-    rf"|[{_CJK_TERMINATORS}](?=[^\s{re.escape(_SENTENCE_CLOSERS + _SENTENCE_TERMINATORS)}])"
+    rf"[{re.escape(_SENTENCE_CLOSERS)}{_FORMAT}]*\s+\S"
+    rf"|[{_CJK_TERMINATORS}][{_FORMAT}]*(?=[^\s{re.escape(_SENTENCE_CLOSERS + _SENTENCE_TERMINATORS)}{_FORMAT}])"
 )
 _AND_SOFT_GAP = re.compile(
-    rf"[{re.escape(_SOFT_TERMINATORS)}][{re.escape(_SENTENCE_CLOSERS)}]*\s+(?=\S)"
+    rf"[{re.escape(_SOFT_TERMINATORS)}][{re.escape(_SENTENCE_CLOSERS)}{_FORMAT}]*\s+(?=\S)"
 )
-_AND_QUESTION_GAP = re.compile(rf"\?([{re.escape(_SENTENCE_CLOSERS)}]*)\s+(?=\S)")
+_AND_QUESTION_GAP = re.compile(rf"\?([{re.escape(_SENTENCE_CLOSERS)}{_FORMAT}]*)\s+(?=\S)")
 
 
 def _spans_a_sentence(conjunct: str) -> bool:
@@ -185,7 +194,9 @@ def _spans_a_sentence(conjunct: str) -> bool:
         return True
     for gap in _AND_QUESTION_GAP.finditer(conjunct):
         # A quoted title's `?`: a closer, then the sentence goes on in lowercase.
-        if not (gap.group(1) and conjunct[gap.end()].islower()):
+        # A format character alone is no closer (#431).
+        has_closer = gap.group(1).strip(_FORMAT_CHARACTERS)
+        if not (has_closer and conjunct[gap.end()].islower()):
             return True
     for gap in _AND_SOFT_GAP.finditer(conjunct):
         rest = conjunct[gap.end() :]
@@ -327,8 +338,9 @@ def _split_then(query: str) -> list[str] | None:
 # appended `?` stacked a second one after the closer. That is the same doubled
 # terminator #94/#111/#132/#150 removed for the bare case. The closers are
 # the generator's set (`text.SENTENCE_CLOSERS`), the one #320 gave the
-# Then-split.
-_TRAILING_PUNCT = re.compile(rf"[{re.escape(_TERMINATORS + _SENTENCE_CLOSERS)}]+$")
+# Then-split. A format character in the run is dropped with the terminators
+# (#431), so `"Dune?\u200b"` reads as `"Dune?"` does.
+_TRAILING_PUNCT = re.compile(rf"[{re.escape(_TERMINATORS + _SENTENCE_CLOSERS)}{_FORMAT}]+$")
 
 
 def _as_question(s: str) -> str:
@@ -343,7 +355,9 @@ def _as_question(s: str) -> str:
     tail = _TRAILING_PUNCT.search(s)
     if tail is None:
         return s + "?"
-    closers = "".join(ch for ch in tail.group() if ch not in _TERMINATORS)
+    closers = "".join(
+        ch for ch in tail.group() if ch not in _TERMINATORS and ch not in _FORMAT_CHARACTERS
+    )
     return s[: tail.start()] + closers + "?"
 
 
