@@ -50,7 +50,7 @@ from rag_kit import (
     enforce_citations,
 )
 from rag_kit.generator import _CITE_PATTERN
-from rag_kit.io_utils import atomic_write_text
+from rag_kit.io_utils import atomic_write_text, check_writable
 from rag_kit.retriever import RetrievalResult
 from rag_kit.text import word_tokens
 
@@ -368,6 +368,11 @@ def write_runs(
     exactly the kind of intermittent difference nobody diagnoses.
     """
     when = started_at or _utc_now_iso()
+    # Every target before any write (#432): the writer refuses a read-only
+    # suite file, and without this a read-only `correctness.json` was refused
+    # only after `faithfulness.json` and `recall_at_5.json` had been replaced.
+    for run in runs:
+        check_writable(out_dir / f"{run.suite}.json")
     paths: dict[str, Path] = {}
     for run in runs:
         path = out_dir / f"{run.suite}.json"

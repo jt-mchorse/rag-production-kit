@@ -158,6 +158,19 @@ def _refuse_unwritable_target(target: Path) -> None:
         raise PermissionError(errno.EACCES, os.strerror(errno.EACCES), str(target))
 
 
+def check_writable(path: str | Path) -> None:
+    """Raise the `PermissionError` `atomic_write_text` would for a read-only *path*.
+
+    For a caller that writes several files in turn: checking every target
+    first refuses a read-only one before any of the others has been replaced.
+    Same resolution as the writer, so a symlink is checked at the file it
+    names. Only the file's own mode is asked about; a parent problem (a file
+    in the chain, a read-only directory) is shared by every sibling and
+    already fails on the first write, before anything is replaced.
+    """
+    _refuse_unwritable_target(_resolve_symlinked_target(Path(path)))
+
+
 def atomic_write_text(path: str | Path, text: str) -> None:
     # Write to a sibling temp file in the destination's parent
     # directory, fsync, then `os.replace` (atomic on POSIX within the

@@ -26,7 +26,7 @@ from pathlib import Path
 import pytest
 
 from evals import run_eval
-from rag_kit.io_utils import atomic_write_text
+from rag_kit.io_utils import atomic_write_text, check_writable
 
 pytestmark = [
     pytest.mark.skipif(sys.platform == "win32", reason="POSIX permission bits"),
@@ -140,3 +140,41 @@ def test_run_eval_on_a_readonly_suite_file_exits_2(
         assert suite_file.read_text(encoding="utf-8") == "old\n"
     finally:
         suite_file.chmod(0o644)
+
+
+@pytest.mark.parametrize("readonly", run_eval.SUITES)
+def test_run_eval_refuses_before_replacing_any_suite_file(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, readonly: str
+) -> None:
+    # `write_runs` writes the three suites in turn. With the refusal only in
+    # the writer, a read-only LAST file was refused after the first two had
+    # been replaced: exit 2 over a half-new results directory.
+    out_dir = tmp_path / "current"
+    out_dir.mkdir()
+    for suite in run_eval.SUITES:
+        (out_dir / f"{suite}.json").write_text("old\n", encoding="utf-8")
+    (out_dir / f"{readonly}.json").chmod(0o444)
+    monkeypatch.setattr(run_eval, "CURRENT_DIR", out_dir)
+    try:
+        assert run_eval.main([]) == 2
+        assert {
+            suite: (out_dir / f"{suite}.json").read_text(encoding="utf-8")
+            for suite in run_eval.SUITES
+        } == dict.fromkeys(run_eval.SUITES, "old\n")
+    finally:
+        (out_dir / f"{readonly}.json").chmod(0o644)
+
+
+def test_check_writable_agrees_with_the_writer(frozen: Path, tmp_path: Path) -> None:
+    with pytest.raises(PermissionError) as excinfo:
+        check_writable(frozen)
+    assert excinfo.value.errno == errno.EACCES
+    link = tmp_path / "link.json"
+    link.symlink_to(frozen)
+    with pytest.raises(PermissionError):
+        check_writable(link)
+    # Controls: a missing target and a writable one are both fine.
+    check_writable(tmp_path / "missing.json")
+    writable = tmp_path / "w.json"
+    writable.write_text("x", encoding="utf-8")
+    check_writable(writable)
