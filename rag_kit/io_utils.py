@@ -17,6 +17,7 @@ Pattern matches `llm-eval-harness/eval_harness/cli.py::_atomic_write_text`
 from __future__ import annotations
 
 import contextlib
+import errno
 import os
 import secrets
 import stat
@@ -129,6 +130,34 @@ def _resolve_symlinked_target(target: Path) -> Path:
     return Path(os.path.realpath(target))
 
 
+def _refuse_unwritable_target(target: Path) -> None:
+    """Raise `PermissionError` if *target* exists and cannot be written (#432).
+
+    `os.replace` swaps the directory ENTRY, so only the directory's write bit
+    is checked and the target's own is never consulted: a `chmod 444` output
+    was silently rewritten, contents replaced and mode still 0444.
+    `Path.write_text`, the call this helper replaced, opens the file for
+    writing and fails with `EACCES`. Raising the same error here, before the
+    temp file exists, keeps that contract and leaves nothing behind; the
+    `except OSError` write seams in `evals/run_eval.py` and
+    `scripts/bench_streaming.py` turn it into exit 2, as their comments say
+    they do for an unwritable target.
+
+    `os.access` asks the kernel the same question the open would, so root
+    (which `Path.write_text` lets through) still writes. The `os.stat` first
+    keeps a missing target -- the create case -- out of the check, and lets a
+    link loop raise its own `ELOOP` rather than a misleading `EACCES`. Like
+    `Path.write_text`, this is a check at open time, not a lock: a `chmod`
+    racing the write is not covered. Ported from prompt-regression-suite#318.
+    """
+    try:
+        os.stat(target)
+    except FileNotFoundError:
+        return
+    if not os.access(target, os.W_OK):
+        raise PermissionError(errno.EACCES, os.strerror(errno.EACCES), str(target))
+
+
 def atomic_write_text(path: str | Path, text: str) -> None:
     # Write to a sibling temp file in the destination's parent
     # directory, fsync, then `os.replace` (atomic on POSIX within the
@@ -136,7 +165,11 @@ def atomic_write_text(path: str | Path, text: str) -> None:
     # filesystem so the rename cannot fall back to a copy. On any
     # exception between the temp write and the rename, the temp is
     # unlinked.
+    #
+    # A read-only existing target is refused, as `Path.write_text` refuses it,
+    # instead of being renamed over (#432). See `_refuse_unwritable_target`.
     target = _resolve_symlinked_target(Path(path))
+    _refuse_unwritable_target(target)
     target.parent.mkdir(parents=True, exist_ok=True)
     tmp_path: Path | None = None
     try:
