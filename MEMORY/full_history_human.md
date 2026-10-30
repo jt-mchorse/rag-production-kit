@@ -3963,3 +3963,17 @@ is writable before it starts. The eval script writes three result files in a
 row, so it now checks all three first. Before that, a read-only last file was
 refused only after the other two had been replaced. New files and writable
 files behave as before. PR #434.
+
+## 2026-10-30 — An invisible character after a line-start "1." no longer hides a list item (#435)
+
+The citation check also cuts an answer at markdown line starts: a list item, a
+heading, a blank line. After #433, the sentence splitter saw an end at a
+line-start "1." followed by a zero-width space or a non-breaking space. It then
+dropped that end, reading the "1." as a numbered item. The line-start check
+wanted a plain space or tab after the marker, so it did not see a list item
+either, and an uncited claim on the line above passed. Every line-start check,
+in the validator and in the template writer, now uses one rule: an invisible
+format character counts as nothing, and any space-like character counts as a
+space. A sweep of every line-start shape, ten kinds of blank and both a space
+and a newline in front found 247 disagreements with the plain-space version
+before the fix and none after. PR #437.

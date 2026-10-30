@@ -4554,3 +4554,22 @@ context_for_next_session:
   - "WRITE_RUNS_CHECKS_ALL_THREE_SUITE_FILES_BEFORE_WRITING_ANY_it_is_the_only_multi_file_writer"
 followups: []
 ---
+
+---
+session: 2026-10-30T08:16Z
+issue: 435
+branch: session/2026-10-30-0805-issue-435
+focus: LINE_START_READERS_WANTED_SPACE_OR_TAB_SO_A_CF_OR_NBSP_AFTER_A_LINE_START_1_DOT_WAS_SKIPPED_AS_A_NUMBERED_ITEM_BY_THE_SPLITTER_BUT_NOT_READ_AS_ONE_BY_THE_BREAK_AND_AN_UNCITED_CLAIM_PASSED
+phase: shipped
+delta:
+  files_changed: 2
+  tests_added: 171
+  suite: "4120 passed 7 skipped (after commit, py3.11 and py3.12); ruff check + format clean"
+decisions_made: []
+measured: "origin/main a2c0736: enforce_citations('Paris is in Germany\\n1.\\u200b The sky is blue [cite:a].') ACCEPT (twin REFUSE), same for '\\n1.\\xa0', '\\n1)\\u3000'; 'Key settings:\\u200b\\n- ...' and '##\\u200b Settings\\n- ...' REFUSE (twins ACCEPT). Sweep: line-start constructs x slot positions x 10 blank classes x space/newline context: 247/2060 verdicts and 417/1000 TemplateGenerator round trips differ from the Cf-dropped, whitespace-as-space twin; after 0/0, no exclusion. New tests 171 (103 verdict + 50 round-trip shapes looping blanks x contexts, 12 twin controls, 6 issue rows). Revert (generator.py == main, pycache cleared): 86 red / 85 green (12 controls + 73 shapes main already matched). A first draft's _LEAD_IN backtracked 6.2s on a 20k-Cf line; made each Cf run unambiguous (<0.07s). PR #437."
+context_for_next_session:
+  - "LINE_START_BLANK_RULE_IS_ONE_SET_OF_FRAGMENTS_LINE_SPACE_LINE_FORMAT_LINE_BLANK_LINE_MARKER_MARKER_SPACE_shared_by_reader_and_writer"
+  - "A_CF_RUN_IN_A_LINE_START_REGEX_MUST_HAVE_ONE_PLACE_TO_MATCH_or_a_long_run_backtracks_quadratically"
+  - "TEMPLATE_HEAD_RSTRIP_STRIPS_ONLY_SPACE_TAB_CR_LF_so_1_NBSP_DOT_keeps_the_NBSP_before_the_marker_cosmetic_verdict_equal"
+followups: []
+---
