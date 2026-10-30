@@ -4535,3 +4535,22 @@ context_for_next_session:
   - "REWRITER_THEN_GAP_STAYS_BACKSLASH_S_PLUS_because_it_runs_on_norm_output"
 followups: []
 ---
+
+---
+session: 2026-10-30T07:41Z
+issue: 432
+branch: session/2026-10-30-0741-issue-432
+focus: ATOMIC_WRITE_TEXT_RENAMED_OVER_A_READ_ONLY_0444_TARGET_NOW_EACCES_LIKE_PATH_WRITE_TEXT_AND_WRITE_RUNS_PREFLIGHTS_ALL_THREE_SUITE_FILES
+phase: shipped
+delta:
+  files_changed: 3
+  tests_added: 13
+  suite: "3949 passed 7 skipped (after commit, py3.11 and py3.12); ruff check + format clean"
+decisions_made: []
+measured: "origin/main df93d6b (macOS uid 502): atomic_write_text on a 0444 file -> no error, contents 'new', mode still 0444; Path.write_text -> PermissionError(13). Writer fix alone: run_eval.main([]) with a 0444 correctness.json -> rc 2 but faithfulness.json and recall_at_5.json already rewritten. After: EACCES / exit 2, all files byte-identical, no .tmp. Revert (io_utils + run_eval == main, no-op check_writable stub, pycache cleared): 9 of 13 red, 4 green = 2 write_text parity + 2 writable/missing controls; run_eval-only revert: 2 red (recall_at_5, correctness), faithfulness arm green as control. PR #434."
+context_for_next_session:
+  - "_refuse_unwritable_target_RUNS_AFTER_THE_SYMLINK_RESOLVE_BEFORE_THE_TEMP_os_stat_then_os_access_W_OK_root_still_writes_port_of_prompt_regression_suite_318"
+  - "IO_UTILS_CHECK_WRITABLE_IS_NEW_file_mode_only_parent_problems_already_fail_on_the_first_write"
+  - "WRITE_RUNS_CHECKS_ALL_THREE_SUITE_FILES_BEFORE_WRITING_ANY_it_is_the_only_multi_file_writer"
+followups: []
+---

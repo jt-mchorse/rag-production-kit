@@ -3950,3 +3950,16 @@ invisible characters is built from Python's Unicode catalog rather than
 written by hand. The query rewriter's own sentence checks follow the same rule,
 and every case is tested against the same text without the invisible character.
 PR #433.
+
+## 2026-10-30 — A read-only output file is no longer silently overwritten (#432)
+
+Every write goes through a helper that writes a temporary file and renames it
+over the target, so an interrupted write cannot leave a half-written file. A
+rename only needs permission on the directory, though, so a file made
+read-only with `chmod 444` was rewritten anyway. A plain file write refuses in
+that case, and the eval and benchmark scripts already documented an unwritable
+output as an error with exit 2. The helper now checks that an existing target
+is writable before it starts. The eval script writes three result files in a
+row, so it now checks all three first. Before that, a read-only last file was
+refused only after the other two had been replaced. New files and writable
+files behave as before. PR #434.
