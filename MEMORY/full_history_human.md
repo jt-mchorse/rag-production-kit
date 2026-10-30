@@ -3921,3 +3921,17 @@ use JavaScript's built-in whitespace class, because that class treats a few
 characters differently from Python. A shared table of test rows is checked
 against both versions, so they can't drift apart without a test failing.
 PR #429.
+
+## 2026-10-30 — The template rewriter never keeps a zero-width step (#427)
+
+The blank-query fix in #425 made a rewrite refuse a blank sub-query, but the
+template rewriter could still build one. It tidied a query by collapsing
+spaces, but it left an invisible character such as a zero-width space or a
+byte-order mark that sat next to a space or at either end. A query that ended
+in "Then" plus a zero-width space raised an error instead of searching. The
+same leftovers turned "Compare RAG with" plus a zero-width space into a
+question about an invisible word. The tidy-up step now treats those invisible
+characters like spaces when they sit beside a space or at an end. It still
+keeps them inside a word, where they matter (a Persian zero-width non-joiner,
+a soft hyphen, an emoji joiner). Every split shape is now tested against nine
+kinds of blank, and each result must match what a plain space gives. PR #430.

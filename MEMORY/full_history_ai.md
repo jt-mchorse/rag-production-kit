@@ -4498,3 +4498,21 @@ context_for_next_session:
   - "TEMPLATE_GENERATOR_NOW_TYPE_CHECKS_AND_BLANK_CHECKS_QUERY_like_AnthropicGenerator"
 followups: []
 ---
+
+---
+session: 2026-10-30T07:20Z
+issue: 427
+branch: session/2026-10-29-0807-issue-427
+focus: TEMPLATE_REWRITER_NORM_KEPT_A_CF_CHARACTER_BESIDE_A_SPACE_OR_AT_AN_END_SO_A_ZERO_WIDTH_THEN_STEP_BUILT_A_REWRITE_RESULT_ITS_OWN_CONSTRUCTOR_REFUSES
+phase: shipped
+delta:
+  files_changed: 2
+  tests_added: 258
+  suite: "3691 passed 7 skipped (after commit); ruff check + format clean"
+decisions_made: []
+measured: "origin/main 8ef52f0: rewrite('What is RAG. Then \\u200b') and ('What is RAG. Then, \\ufeff') -> ValueError sub_queries[1]; 'Compare RAG with \\u200b' -> ('What is RAG?','What is \\u200b?'). _BLANK x 25 split templates = 225 cases: 12 raise, 88 more differ from the ' ' twin. After: 0 / 0. Revert (rewriter.py == main, pycache cleared): 104 red / 154 green (125 whitespace-row or already-equal twin arms, 25 twin-pin controls, 4 in-word Cf controls). Resumed from the interrupted 2026-10-29 draft: rebased onto 8ef52f0, literal ZWNJ/soft-hyphen/ZWJ in the test source replaced with escapes, docstring counts corrected to the file's own 225-case table. PR #430."
+context_for_next_session:
+  - "REWRITER_NORM_IS_A_RUN_SCANNER_a_blank_run_with_whitespace_or_at_an_end_is_a_separator_a_Cf_only_run_inside_a_word_is_kept"
+  - "PUNCTUATION_ONLY_THEN_STEP_STILL_BECOMES_A_DOT_SUB_QUERY_same_as_its_whitespace_twin_not_blank_by_is_blank"
+followups: []
+---
