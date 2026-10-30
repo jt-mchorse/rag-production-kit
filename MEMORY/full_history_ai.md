@@ -4516,3 +4516,22 @@ context_for_next_session:
   - "PUNCTUATION_ONLY_THEN_STEP_STILL_BECOMES_A_DOT_SUB_QUERY_same_as_its_whitespace_twin_not_blank_by_is_blank"
 followups: []
 ---
+
+---
+session: 2026-10-30T07:27Z
+issue: 431
+branch: session/2026-10-30-0727-issue-431
+focus: GENERATOR_SENTENCE_SPLIT_GAP_HAD_TO_START_WITH_WHITESPACE_SO_A_CF_CHARACTER_BETWEEN_THE_FULL_STOP_AND_THE_SPACE_HID_THE_BOUNDARY_AND_AN_UNCITED_CLAIM_PASSED
+phase: shipped
+delta:
+  files_changed: 4
+  tests_added: 245
+  suite: "3936 passed 7 skipped (after commit, py3.11 and py3.12); ruff check + format clean"
+decisions_made: []
+measured: "origin/main f9f433e: enforce_citations('Paris is in Germany.{gap}The sky is blue [cite:a].') ACCEPT for gap '\\u200b ', '\\ufeff ', '\\u2060 ', '\\u00ad ' (REFUSE for ' ' and ' \\u200b'); rewrite('What is RAG.\\u200b\"  Then what is BM25') -> no_decomposition (twin sequential). After: all REFUSE; sequential_then_pattern. New table: 6 Cf rows x (18 split + 8 round-trip + 10 rewriter shapes) vs the empty-slot twin, 28 twin-pin controls, 1 catalog check = 245. Revert (text/generator/rewriter == main, pycache cleared): 133 red / 112 green (28 controls + 84 rows main already matched). PR #433."
+context_for_next_session:
+  - "TEXT_FORMAT_CHARACTERS_IS_THE_CATALOG_CF_SET_the_splitters_read_a_Cf_in_the_closer_run_or_gap_as_nothing"
+  - "SENTENCE_SPLIT_GAP_IS_A_BLANK_RUN_WITH_AT_LEAST_ONE_WHITESPACE_a_Cf_only_gap_is_still_no_gap"
+  - "REWRITER_THEN_GAP_STAYS_BACKSLASH_S_PLUS_because_it_runs_on_norm_output"
+followups: []
+---

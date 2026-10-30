@@ -3935,3 +3935,18 @@ characters like spaces when they sit beside a space or at an end. It still
 keeps them inside a word, where they matter (a Persian zero-width non-joiner,
 a soft hyphen, an emoji joiner). Every split shape is now tested against nine
 kinds of blank, and each result must match what a plain space gives. PR #430.
+
+## 2026-10-30 — An invisible character after a full stop no longer hides a sentence end (#431)
+
+The citation check splits an answer into sentences and makes each one carry its
+own citation, so an uncited claim cannot borrow the next sentence's. The
+splitter only saw a sentence end when a space came straight after the full stop
+(and any closing quote). An invisible character in between, such as a
+zero-width space or a byte-order mark, hid the end, so "Paris is in Germany."
+followed by a cited sentence was accepted. The splitter now reads those
+invisible characters as nothing when they sit beside a full stop, a closing
+quote or the space, the same rule #430 gave the query rewriter. The list of
+invisible characters is built from Python's Unicode catalog rather than
+written by hand. The query rewriter's own sentence checks follow the same rule,
+and every case is tested against the same text without the invisible character.
+PR #433.
