@@ -124,7 +124,7 @@ class PriceTable:
     deployment's actual contract. Configure explicitly:
 
         prices = PriceTable({
-            "claude-opus-4-7":  ModelPrice(15.0, 75.0),  # operator values, not shipped defaults
+            "claude-opus-4-7":  ModelPrice(5.0, 25.0),  # operator values, not shipped defaults
             "claude-sonnet-4-6": ModelPrice(3.0, 15.0),
         })
     """

@@ -281,7 +281,7 @@ from rag_kit import CostRecord, ModelPrice, PriceTable, TelemetryStore
 
 # Prices are operator-supplied — nothing ships in the table (D-015).
 prices = PriceTable({
-    "claude-opus-4-7":   ModelPrice(prompt_per_million=15.0, completion_per_million=75.0),
+    "claude-opus-4-7":   ModelPrice(prompt_per_million=5.0,  completion_per_million=25.0),
     "claude-sonnet-4-6": ModelPrice(prompt_per_million=3.0,  completion_per_million=15.0),
 })
 
