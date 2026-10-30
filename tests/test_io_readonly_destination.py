@@ -178,3 +178,136 @@ def test_check_writable_agrees_with_the_writer(frozen: Path, tmp_path: Path) -> 
     writable = tmp_path / "w.json"
     writable.write_text("x", encoding="utf-8")
     check_writable(writable)
+
+
+# -- #436: what `check_writable` must refuse beyond a read-only file ----------
+#
+# Each layout is one the writer fails on AFTER its caller has replaced the
+# files before it: a directory target (the rename raises), and a symlink whose
+# RESOLVED parent the temp file cannot be created in. A link's resolved parent
+# is its own, so "a parent problem fails on the first write" does not hold.
+
+
+@pytest.fixture
+def readonly_dir(tmp_path: Path) -> Iterator[Path]:
+    """A 0555 directory holding ``c.json``; made writable again for cleanup."""
+    path = tmp_path / "ro"
+    path.mkdir()
+    (path / "c.json").write_text("old\n", encoding="utf-8")
+    path.chmod(0o555)
+    yield path
+    path.chmod(0o755)
+
+
+def test_directory_target_is_refused_like_the_writer(tmp_path: Path) -> None:
+    target = tmp_path / "out.json"
+    target.mkdir()
+    with pytest.raises(IsADirectoryError):
+        check_writable(target)
+    # Parity: the writer raises the same class, only later (at the rename).
+    with pytest.raises(IsADirectoryError):
+        atomic_write_text(target, "new\n")
+    assert target.is_dir()
+
+
+def test_symlink_to_a_directory_is_refused(tmp_path: Path) -> None:
+    real = tmp_path / "d"
+    real.mkdir()
+    link = tmp_path / "out.json"
+    link.symlink_to(real)
+    with pytest.raises(IsADirectoryError):
+        check_writable(link)
+
+
+@pytest.mark.parametrize("name", ["c.json", "missing.json"])
+def test_symlink_into_a_readonly_dir_is_refused_like_the_writer(
+    tmp_path: Path, readonly_dir: Path, name: str
+) -> None:
+    # Existing file (writable itself) and dangling link: either way the temp
+    # file goes beside the resolved path, in a directory it cannot be made in.
+    link = tmp_path / "out.json"
+    link.symlink_to(readonly_dir / name)
+    with pytest.raises(PermissionError) as excinfo:
+        check_writable(link)
+    assert excinfo.value.errno == errno.EACCES
+    with pytest.raises(PermissionError):
+        atomic_write_text(link, "new\n")
+    assert (readonly_dir / "c.json").read_text(encoding="utf-8") == "old\n"
+    assert sorted(p.name for p in readonly_dir.iterdir()) == ["c.json"]
+
+
+def test_missing_parents_are_checked_at_the_first_existing_one(
+    tmp_path: Path, readonly_dir: Path
+) -> None:
+    # The writer makes missing directories, so the question goes to the
+    # nearest one that exists: a read-only one is refused like the writer.
+    nested = readonly_dir / "a" / "b" / "r.json"
+    with pytest.raises(PermissionError):
+        check_writable(nested)
+    with pytest.raises(PermissionError):
+        atomic_write_text(nested, "new\n")
+    # Control: under a writable directory the create case passes.
+    check_writable(tmp_path / "x" / "y" / "r.json")
+    atomic_write_text(tmp_path / "x" / "y" / "r.json", "new\n")
+
+
+def test_a_file_in_the_chain_is_refused(tmp_path: Path) -> None:
+    blocker = tmp_path / "f"
+    blocker.write_text("x", encoding="utf-8")
+    with pytest.raises(NotADirectoryError):
+        check_writable(blocker / "r.json")
+    with pytest.raises(NotADirectoryError):
+        check_writable(blocker / "a" / "r.json")
+    # The writer fails here too, with the class its `mkdir` raises.
+    with pytest.raises((FileExistsError, NotADirectoryError)):
+        atomic_write_text(blocker / "r.json", "new\n")
+
+
+def test_a_symlink_loop_still_raises_its_own_error(tmp_path: Path) -> None:
+    # Control: the read-only check's `os.stat` raises ELOOP first.
+    link = tmp_path / "loop.json"
+    link.symlink_to(link)
+    with pytest.raises(OSError, match="symbolic links") as excinfo:
+        check_writable(link)
+    assert excinfo.value.errno == errno.ELOOP
+
+
+def _suite_dir(tmp_path: Path) -> Path:
+    out_dir = tmp_path / "current"
+    out_dir.mkdir()
+    for suite in run_eval.SUITES:
+        (out_dir / f"{suite}.json").write_text("old\n", encoding="utf-8")
+    return out_dir
+
+
+def _assert_untouched(out_dir: Path, skip: str) -> None:
+    assert {
+        suite: (out_dir / f"{suite}.json").read_text(encoding="utf-8")
+        for suite in run_eval.SUITES
+        if suite != skip
+    } == {suite: "old\n" for suite in run_eval.SUITES if suite != skip}
+
+
+@pytest.mark.parametrize("blocked", run_eval.SUITES)
+def test_run_eval_refuses_a_directory_suite_target_before_any_write(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, blocked: str
+) -> None:
+    out_dir = _suite_dir(tmp_path)
+    (out_dir / f"{blocked}.json").unlink()
+    (out_dir / f"{blocked}.json").mkdir()
+    monkeypatch.setattr(run_eval, "CURRENT_DIR", out_dir)
+    assert run_eval.main([]) == 2
+    _assert_untouched(out_dir, skip=blocked)
+
+
+@pytest.mark.parametrize("blocked", run_eval.SUITES)
+def test_run_eval_refuses_a_link_into_a_readonly_dir_before_any_write(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, readonly_dir: Path, blocked: str
+) -> None:
+    out_dir = _suite_dir(tmp_path)
+    (out_dir / f"{blocked}.json").unlink()
+    (out_dir / f"{blocked}.json").symlink_to(readonly_dir / "c.json")
+    monkeypatch.setattr(run_eval, "CURRENT_DIR", out_dir)
+    assert run_eval.main([]) == 2
+    _assert_untouched(out_dir, skip=blocked)
+    assert (readonly_dir / "c.json").read_text(encoding="utf-8") == "old\n"

@@ -159,16 +159,44 @@ def _refuse_unwritable_target(target: Path) -> None:
 
 
 def check_writable(path: str | Path) -> None:
-    """Raise the `PermissionError` `atomic_write_text` would for a read-only *path*.
+    """Raise an `OSError` for a *path* `atomic_write_text` would fail to write.
 
     For a caller that writes several files in turn: checking every target
-    first refuses a read-only one before any of the others has been replaced.
-    Same resolution as the writer, so a symlink is checked at the file it
-    names. Only the file's own mode is asked about; a parent problem (a file
-    in the chain, a read-only directory) is shared by every sibling and
-    already fails on the first write, before anything is replaced.
+    first refuses an unwritable one before any of the others has been
+    replaced. Same resolution as the writer, so a symlink is checked at the
+    file it names. Refused: a read-only file (`PermissionError`, the writer's
+    own check), a directory (`IsADirectoryError`, which the writer's rename
+    raises), and a directory the temp file cannot be created in -- the
+    nearest existing ancestor of the resolved file is not a directory
+    (`NotADirectoryError`) or not writable and searchable (`PermissionError`).
+
+    The parent cannot be left to the first write (#436). A symlinked target's
+    resolved parent is its own, not one shared with its siblings, so a link
+    into a read-only directory failed on the temp file only after the files
+    before it had been replaced; and a directory target is not a parent
+    problem at all. A missing target in a missing directory is the create
+    case: the writer makes the directories, so only the first one that exists
+    is asked about. A link loop raises its own `ELOOP` from the first check.
+    Like the writer's own check, this is a check, not a lock.
     """
-    _refuse_unwritable_target(_resolve_symlinked_target(Path(path)))
+    target = _resolve_symlinked_target(Path(path))
+    _refuse_unwritable_target(target)
+    with contextlib.suppress(FileNotFoundError):
+        if stat.S_ISDIR(os.stat(target).st_mode):
+            raise IsADirectoryError(errno.EISDIR, os.strerror(errno.EISDIR), str(target))
+    ancestor = target.parent
+    while True:
+        try:
+            mode = os.stat(ancestor).st_mode
+            break
+        except FileNotFoundError:
+            if ancestor.parent == ancestor:
+                raise
+            ancestor = ancestor.parent
+    if not stat.S_ISDIR(mode):
+        raise NotADirectoryError(errno.ENOTDIR, os.strerror(errno.ENOTDIR), str(ancestor))
+    if not os.access(ancestor, os.W_OK | os.X_OK):
+        raise PermissionError(errno.EACCES, os.strerror(errno.EACCES), str(ancestor))
 
 
 def atomic_write_text(path: str | Path, text: str) -> None:
