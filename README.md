@@ -95,6 +95,8 @@ search per sub-query and fuses the rankings with RRF across sub-queries
 backends ship — a dep-free `TemplateRewriter` that handles common
 multi-hop patterns (`Compare X with Y`, `A. Then B.`, multi-question
 conjunctions like `Who is X and where did Y work?`) for hermetic CI,
+including straight or curly contractions such as `What's X and where's Y?`
+while preserving the original wording of each sub-query,
 and an `AnthropicRewriter` behind the existing `[rag-anthropic]` extra
 that asks Claude to decompose the query and validates the JSON
 response. The kwarg defaults to `None`, so every existing caller keeps

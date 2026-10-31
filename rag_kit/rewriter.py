@@ -262,8 +262,14 @@ _QUESTION_PREFIXES = (
     "why",
     "how",
     "which",
+    "whose",
+    "whom",
     "is",
     "are",
+    "was",
+    "were",
+    "has",
+    "have",
     "does",
     "did",
     "do",
@@ -309,6 +315,19 @@ def _looks_like_question(s: str) -> bool:
     if not head:
         return False
     first_word = head.split(" ", 1)[0].rstrip(",?:")
+    # Classify the head only; the sub-query must retain its original wording.
+    first_word = first_word.replace("’", "'")
+    if first_word.endswith("n't"):
+        first_word = first_word[:-3]
+        first_word = {"ca": "can", "wo": "will"}.get(first_word, first_word)
+    else:
+        for suffix in ("'s", "'re"):
+            if first_word.endswith(suffix):
+                root = first_word[: -len(suffix)]
+                # Auxiliary names can be possessives ("Will's biography").
+                if root in ("who", "what", "where", "when", "why", "how", "which"):
+                    first_word = root
+                break
     return first_word in _QUESTION_PREFIXES
 
 

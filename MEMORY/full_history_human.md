@@ -3791,6 +3791,20 @@ uncited it adds a citation at every place the splitter can cut. Plain prose
 answers are unchanged byte for byte, and a seeded fuzz of 3,000 random markdown
 chunks now gets no refusals.
 
+
+## 2026-10-27 - Issue #405: recognize contracted multi-question queries
+**Contributor:** jsdhwfmax · **Branch:** session/2026-10-27-issue-405
+
+- Normalize straight/curly question contractions for classification while retaining the original sub-query wording. Restrict positive suffixes to WH roots so possessive names such as Will's do not become questions; handle can't/won't and the issue's missing auxiliary/WH prefixes.
+- Added25 public rewriter cases;247 related tests pass. A production-source revert turns15 cases red; four possessive controls also rejected the initial over-broad implementation. Whole-tree Ruff and wheel build pass. Existing18-chunk/8-query benchmark outputs are unchanged at k1..6, so no published result was regenerated.
+- Full Windows collection is blocked by an existing filename-encoding fixture. All19 supplemental runtime failures reproduce with original production source. A separate first-run checkout-guard error came from editing README during tests; validation is now sequenced to avoid that interference.
+
+**Why this work:** common contracted questions were silently excluded from the deterministic multi-hop path.
+
+**Open checks:** keep the external contribution as a draft pending required hosted Linux checks; Postgres, eval-extra and Next.js results are not claimed. The owner's internal session identity and public issue-comment steps were adapted to the actual contributor and the user's PR-only communication authorization.
+
+**Next session:** inspect current-head hosted results and actionable review feedback without rerunning unchanged local proof.
+
 ## 2026-10-27 — Correctness no longer scores words inside citation markers (#404)
 
 The correctness eval is a stand-in for an LLM judge. It counts how many of the
@@ -3922,6 +3936,18 @@ characters differently from Python. A shared table of test rows is checked
 against both versions, so they can't drift apart without a test failing.
 PR #429.
 
+## 2026-10-30 — Issue #405: Integrate upstream into draft PR #407
+**Duration:** ~5 min · **Branch:** session/2026-10-27-issue-405
+
+- Resolved the two session-history conflicts by preserving both branches' entries. Upstream blank/non-string safeguards and the original contraction fix remain intact.
+- 610 related cases, whole-tree Ruff and format checks passed. The unchanged fixed benchmark at k=1..6 retains the same decomposition, rankings and recall metrics.
+
+**Why this work, this session:** Upstream updates made the existing contribution conflict; this resumes the same contribution rather than adding another PR.
+
+**Open questions / blockers:** Required hosted checks remain pending; prior Windows collection and runtime baseline limits are still disclosed. No full-suite success is claimed.
+
+**Next session:** Inspect exact-head CI and maintainer feedback. Codex assisted; no separate public comments or automatic merge were made.
+
 ## 2026-10-30 — The template rewriter never keeps a zero-width step (#427)
 
 The blank-query fix in #425 made a rewrite refuse a blank sub-query, but the
@@ -3988,3 +4014,15 @@ the write failed partway, after the first two files had already been
 overwritten. The check now refuses a directory, and it confirms the folder the
 file really lives in (after following links) can be written to. Ordinary files
 behave as before. PR #438.
+
+## 2026-10-31 — Issue #405: Integrate upstream into draft PR #407
+**Duration:** ~5 min · **Branch:** session/2026-10-27-issue-405
+
+- Resolved the two session-history conflicts by preserving both branches' entries. Upstream blank/non-string safeguards and the original contraction fix remain intact.
+- 1284 related cases, whole-tree Ruff and format checks passed. The unchanged fixed benchmark at k=1..6 retains the same decomposition, rankings and recall metrics.
+
+**Why this work, this session:** Upstream updates made the existing contribution conflict; this resumes the same contribution rather than adding another PR.
+
+**Open questions / blockers:** Required hosted checks remain pending; prior Windows collection and runtime baseline limits are still disclosed. No full-suite success is claimed.
+
+**Next session:** Inspect exact-head CI and maintainer feedback. Codex assisted; no separate public comments or automatic merge were made.

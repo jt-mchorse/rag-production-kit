@@ -4309,6 +4309,29 @@ context_for_next_session:
 followups: []
 ---
 
+
+---
+session: 2026-10-27T05:22Z
+issue: 405
+branch: session/2026-10-27-issue-405
+contributor: jsdhwfmax
+focus: recognize_question_contractions_without_rewriting_sub_queries
+phase: external_draft_prepared
+delta:
+  code_and_test_files_changed: 3
+  tests_added: 25
+  related_suite: "247 passed across all 10 rewriter/retriever/benchmark test modules on Windows, Python3.12"
+  verification: "Initial pristine-source regression:15failed6passed. Review caught possessive Will/Can false-splits:4failed6passed; restrict positive contraction suffixes to WH roots. Complete production revert:15failed10passed. Whole-tree Ruff check/format and wheel build passed."
+  benchmarks: "Existing bench_rewriter18chunks/8questions rerun at k1..6; all query-level outputs/rankings/recalls unchanged. Published README numbers retained."
+context_for_next_session:
+  - "Only the classifier's first word is normalized; original sub-query text/case/apostrophe are preserved. Negative can't/won't map to can/will."
+  - "Windows canonical full collection fails on an unchanged non-UTF8-filename fixture. Supplemental continuation exposed19runtime failures also reproduced with original production source. An initial README checkout-guard error was contributor concurrent-edit interference, not an upstream baseline defect."
+  - "Do not claim whole-suite Windows/Linux, Postgres integration, eval extra or Next.js success; draft awaits hosted required checks. No skips/fixtures/configuration were weakened."
+  - "External contributor retained jsdhwfmax identity. User-authorized communication is PR submission/body/code only; owner-Cowork issue plan/close comments were recorded privately/in PR description instead. No automatic merge requested."
+decisions_made: []
+followups: []
+---
+
 ---
 session: 2026-10-27T07:17Z
 issue: 404
@@ -4500,6 +4523,27 @@ followups: []
 ---
 
 ---
+session: 2026-10-30T05:10Z
+duration_min: 5
+issue: 405
+branch: session/2026-10-27-issue-405
+focus: integrate_upstream_for_existing_contraction_fix_pr407
+phase: draft_updated
+
+delta:
+  files_changed: 2
+  tests_added: 0
+  validation: "610 related rewriter/retriever/blank/type-boundary cases passed; whole-tree Ruff check and format check passed; fixed benchmark k=1..6 outputs/rankings/metrics unchanged from Oct27."
+context_for_next_session:
+  - "Merged upstream 8ef52f0 normally into existing PR407; only conflicts were the two append-only session histories. Both sides' existing entries are preserved without edits."
+  - "Original contraction source additions, README wording and 25-case regression file remain intact; upstream blank/non-string guards and all other upstream changes are preserved."
+  - "Historical Windows collection/19 runtime baseline evidence is reused, not a new full-suite run or hosted pass. Keep draft pending current-head Linux, Postgres, Next.js and eval checks."
+  - "No public issue/comment, automatic merge, legal signature, dependency workaround or forced push. Codex assisted; external contributor remains jsdhwfmax."
+decisions_made: []
+followups: []
+---
+
+---
 session: 2026-10-30T07:20Z
 issue: 427
 branch: session/2026-10-29-0807-issue-427
@@ -4589,5 +4633,26 @@ measured: "origin/main a578284 (macOS uid 502): run_eval.main([]) with correctne
 context_for_next_session:
   - "CHECK_WRITABLE_ONLY_atomic_write_text_UNCHANGED_it_already_raised_each_error_just_after_siblings_were_replaced"
   - "PARENT_CHECK_IS_ON_THE_NEAREST_EXISTING_ANCESTOR_OF_THE_RESOLVED_TARGET_W_OK_or_X_OK_and_applies_to_EXISTING_targets_too_because_the_temp_file_goes_beside_the_resolved_file"
+followups: []
+---
+
+---
+session: 2026-10-31T05:09Z
+duration_min: 5
+issue: 405
+branch: session/2026-10-27-issue-405
+focus: integrate_upstream_for_existing_contraction_fix_pr407
+phase: draft_updated
+
+delta:
+  files_changed: 2
+  tests_added: 0
+  validation: "1284 related rewriter/retriever/blank/type-boundary cases passed; whole-tree Ruff check and format check passed; fixed benchmark k=1..6 outputs/rankings/metrics unchanged from Oct27."
+context_for_next_session:
+  - "Merged upstream f67a1b7 normally into existing PR407; only conflicts were the two append-only session histories. Both sides' existing entries are preserved without edits."
+  - "Original contraction source additions, README wording and 25-case regression file remain intact; upstream blank/non-string guards and all other upstream changes are preserved."
+  - "Historical Windows collection/19 runtime baseline evidence is reused, not a new full-suite run or hosted pass. Keep draft pending current-head Linux, Postgres, Next.js and eval checks."
+  - "No public issue/comment, automatic merge, legal signature, dependency workaround or forced push. Codex assisted; external contributor remains jsdhwfmax."
+decisions_made: []
 followups: []
 ---
